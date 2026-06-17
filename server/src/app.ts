@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { checkRepoStatus, initializeOpenSpec, createGitWorktree } from './services/repoService.js';
+import { checkRepoStatus, initializeOpenSpec, createGitWorktree, createLocalSchema, createNewChange } from './services/repoService.js';
 import { getChanges, getChangeDag } from './services/dagService.js';
 
 const app = express();
@@ -88,6 +88,42 @@ app.get('/api/changes/:change/dag', async (req, res) => {
     return res.json(dag);
   } catch (err: any) {
     return res.status(500).json({ error: err.message || 'Failed to build DAG' });
+  }
+});
+
+// API route to create local schema
+app.post('/api/schema', async (req, res) => {
+  const { repoPath, schemaName, artifacts } = req.body;
+
+  if (!repoPath || !schemaName || !artifacts || !Array.isArray(artifacts)) {
+    return res.status(400).json({
+      error: 'Missing parameters: repoPath, schemaName, and artifacts (array) are all required',
+    });
+  }
+
+  try {
+    await createLocalSchema(repoPath, schemaName, artifacts);
+    return res.json({ success: true, message: 'Local schema initialized successfully' });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Failed to initialize local schema' });
+  }
+});
+
+// API route to create new change
+app.post('/api/changes', async (req, res) => {
+  const { repoPath, changeName, schemaName, description } = req.body;
+
+  if (!repoPath || !changeName) {
+    return res.status(400).json({
+      error: 'Missing parameters: repoPath and changeName are required',
+    });
+  }
+
+  try {
+    await createNewChange(repoPath, changeName, schemaName, description);
+    return res.json({ success: true, message: 'Change proposal created successfully' });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Failed to create change proposal' });
   }
 });
 

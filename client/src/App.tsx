@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
 import DagViewer from './components/DagViewer.js';
+import CreateChangeForm from './components/CreateChangeForm.js';
 
 interface RepoStatus {
   exists: boolean;
@@ -34,6 +35,10 @@ function App() {
 
   // OpenSpec Init states
   const [initLoading, setInitLoading] = useState(false);
+
+  // OpenSpec Change states
+  const [showCreateChange, setShowCreateChange] = useState(false);
+  const [createChangeSuccess, setCreateChangeSuccess] = useState<string | null>(null);
 
   // Git Worktree states
   const [branchName, setBranchName] = useState('');
@@ -139,6 +144,8 @@ function App() {
     setDagData(null);
     setSelectedChange('');
     setChangesList([]);
+    setShowCreateChange(false);
+    setCreateChangeSuccess(null);
 
     try {
       const res = await fetch(`/api/status?path=${encodeURIComponent(path)}`);
@@ -327,61 +334,100 @@ function App() {
                 )}
 
                 {status.exists && status.isGit && status.isOpenSpec && (
-                  <section className="action-section worktree-section">
-                    <div className="action-header">
-                      <h3>Git Worktree Management</h3>
-                      <p>Checkout a new development branch to an isolated local folder.</p>
-                    </div>
+                  <>
+                    <section className="action-section change-section">
+                      <div className="action-header">
+                        <h3>Change Management</h3>
+                        <p>Create and plan new changes using standard workflows or custom states.</p>
+                      </div>
 
-                    <form onSubmit={handleCreateWorktree} className="worktree-form">
-                      <div className="form-group">
-                        <label htmlFor="branch-name-input">Branch Name:</label>
-                        <input
-                          id="branch-name-input"
-                          type="text"
-                          placeholder="e.g., feature/new-logic"
-                          value={branchName}
-                          onChange={(e) => setBranchName(e.target.value)}
-                          disabled={worktreeLoading}
-                          required
+                      {!showCreateChange ? (
+                        <button
+                          id="show-create-change-btn"
+                          onClick={() => {
+                            setShowCreateChange(true);
+                            setCreateChangeSuccess(null);
+                          }}
+                          className="btn btn-primary"
+                        >
+                          Create New Change
+                        </button>
+                      ) : (
+                        <CreateChangeForm
+                          repoPath={path}
+                          onCreateSuccess={(changeName) => {
+                            setShowCreateChange(false);
+                            setCreateChangeSuccess(`Change "${changeName}" created successfully.`);
+                            fetchChanges();
+                            setSelectedChange(changeName);
+                          }}
+                          onCancel={() => setShowCreateChange(false)}
                         />
+                      )}
+
+                      {createChangeSuccess && (
+                        <div className="message message-success" id="change-create-success">
+                          <p>{createChangeSuccess}</p>
+                        </div>
+                      )}
+                    </section>
+
+                    <section className="action-section worktree-section">
+                      <div className="action-header">
+                        <h3>Git Worktree Management</h3>
+                        <p>Checkout a new development branch to an isolated local folder.</p>
                       </div>
 
-                      <div className="form-group">
-                        <label htmlFor="worktree-path-input">Worktree Destination Path:</label>
-                        <input
-                          id="worktree-path-input"
-                          type="text"
-                          placeholder="Enter absolute destination path..."
-                          value={worktreePath}
-                          onChange={(e) => setWorktreePath(e.target.value)}
-                          disabled={worktreeLoading}
-                          required
-                        />
-                      </div>
+                      <form onSubmit={handleCreateWorktree} className="worktree-form">
+                        <div className="form-group">
+                          <label htmlFor="branch-name-input">Branch Name:</label>
+                          <input
+                            id="branch-name-input"
+                            type="text"
+                            placeholder="e.g., feature/new-logic"
+                            value={branchName}
+                            onChange={(e) => setBranchName(e.target.value)}
+                            disabled={worktreeLoading}
+                            required
+                          />
+                        </div>
 
-                      <button
-                        id="create-worktree-btn"
-                        type="submit"
-                        disabled={worktreeLoading || !branchName.trim() || !worktreePath.trim()}
-                        className="btn btn-primary"
-                      >
-                        {worktreeLoading ? 'Creating Worktree...' : 'Create Worktree'}
-                      </button>
-                    </form>
+                        <div className="form-group">
+                          <label htmlFor="worktree-path-input">Worktree Destination Path:</label>
+                          <input
+                            id="worktree-path-input"
+                            type="text"
+                            placeholder="Enter absolute destination path..."
+                            value={worktreePath}
+                            onChange={(e) => setWorktreePath(e.target.value)}
+                            disabled={worktreeLoading}
+                            required
+                          />
+                        </div>
 
-                    {worktreeSuccess && (
-                      <div className="message message-success">
-                        <p>{worktreeSuccess}</p>
-                      </div>
-                    )}
+                        <button
+                          id="create-worktree-btn"
+                          type="submit"
+                          disabled={worktreeLoading || !branchName.trim() || !worktreePath.trim()}
+                          className="btn btn-primary"
+                        >
+                          {worktreeLoading ? 'Creating Worktree...' : 'Create Worktree'}
+                        </button>
+                      </form>
 
-                    {worktreeError && (
-                      <div className="message message-danger">
-                        <p>Error: {worktreeError}</p>
-                      </div>
-                    )}
-                  </section>
+                      {worktreeSuccess && (
+                        <div className="message message-success">
+                          <p>{worktreeSuccess}</p>
+                        </div>
+                      )}
+
+                      {worktreeError && (
+                        <div className="message message-danger">
+                          <p>Error: {worktreeError}</p>
+                        </div>
+                      )}
+                    </section>
+                  </>
                 )}
               </>
             )}

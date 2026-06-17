@@ -10,6 +10,8 @@ vi.mock('../src/services/repoService.js', () => {
     checkRepoStatus: vi.fn(),
     initializeOpenSpec: vi.fn(),
     createGitWorktree: vi.fn(),
+    createLocalSchema: vi.fn(),
+    createNewChange: vi.fn(),
   };
 });
 
@@ -184,6 +186,77 @@ describe('API Routes - GET /api/changes/:change/dag', () => {
     const response = await request(app).get('/api/changes/my-change/dag?path=/my/repo');
     expect(response.status).toBe(500);
     expect(response.body).toEqual({ error: 'parsing failed' });
+  });
+});
+
+describe('API Routes - POST /api/schema', () => {
+  it('should return 400 when parameters are missing', async () => {
+    const response = await request(app).post('/api/schema').send({
+      repoPath: '/repo',
+      schemaName: 'custom-flow'
+    });
+    expect(response.status).toBe(400);
+    expect(response.body.error).toContain('Missing parameters');
+  });
+
+  it('should call createLocalSchema and return success', async () => {
+    vi.mocked(repoService.createLocalSchema).mockResolvedValueOnce(undefined);
+
+    const response = await request(app).post('/api/schema').send({
+      repoPath: '/repo',
+      schemaName: 'custom-flow',
+      artifacts: ['proposal', 'tasks']
+    });
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ success: true, message: 'Local schema initialized successfully' });
+    expect(repoService.createLocalSchema).toHaveBeenCalledWith('/repo', 'custom-flow', ['proposal', 'tasks']);
+  });
+
+  it('should return 500 when schema creation fails', async () => {
+    vi.mocked(repoService.createLocalSchema).mockRejectedValueOnce(new Error('init failed'));
+
+    const response = await request(app).post('/api/schema').send({
+      repoPath: '/repo',
+      schemaName: 'custom-flow',
+      artifacts: ['proposal']
+    });
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({ error: 'init failed' });
+  });
+});
+
+describe('API Routes - POST /api/changes', () => {
+  it('should return 400 when required parameters are missing', async () => {
+    const response = await request(app).post('/api/changes').send({
+      repoPath: '/repo'
+    });
+    expect(response.status).toBe(400);
+    expect(response.body.error).toContain('Missing parameters');
+  });
+
+  it('should call createNewChange and return success', async () => {
+    vi.mocked(repoService.createNewChange).mockResolvedValueOnce(undefined);
+
+    const response = await request(app).post('/api/changes').send({
+      repoPath: '/repo',
+      changeName: 'my-feature',
+      schemaName: 'custom-flow',
+      description: 'my description'
+    });
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ success: true, message: 'Change proposal created successfully' });
+    expect(repoService.createNewChange).toHaveBeenCalledWith('/repo', 'my-feature', 'custom-flow', 'my description');
+  });
+
+  it('should return 500 when change creation fails', async () => {
+    vi.mocked(repoService.createNewChange).mockRejectedValueOnce(new Error('creation failed'));
+
+    const response = await request(app).post('/api/changes').send({
+      repoPath: '/repo',
+      changeName: 'my-feature'
+    });
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({ error: 'creation failed' });
   });
 });
 

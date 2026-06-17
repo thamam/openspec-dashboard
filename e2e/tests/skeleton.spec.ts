@@ -32,15 +32,39 @@ test.describe('Walking Skeleton - E2E Path Verification', () => {
 test.describe('Workspace Management - E2E Actions', () => {
   let tempDir: string;
 
-  test.beforeEach(() => {
+  test.beforeEach(async ({ page }) => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'openspec-dashboard-e2e-'));
+    page.on('console', msg => console.log(`[PAGE LOG] ${msg.text()}`));
+    page.on('pageerror', err => console.log(`[PAGE ERROR] ${err.message}`));
+    
+    // Disable all CSS transitions/animations globally to prevent E2E layout shift failures
+    await page.addInitScript(() => {
+      const style = document.createElement('style');
+      style.innerHTML = `
+        *, *::before, *::after {
+          transition: none !important;
+          animation: none !important;
+        }
+      `;
+      const observer = new MutationObserver(() => {
+        const target = document.head || document.documentElement;
+        if (target) {
+          target.appendChild(style);
+          observer.disconnect();
+        }
+      });
+      observer.observe(document, { childList: true, subtree: true });
+    });
   });
+
+
 
   test.afterEach(() => {
     if (fs.existsSync(tempDir)) {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
   });
+
 
   test('should initialize OpenSpec in a git repository via UI', async ({ page }) => {
     // 1. Create a git repo
@@ -111,6 +135,125 @@ test.describe('Workspace Management - E2E Actions', () => {
     expect(fs.existsSync(worktreePath)).toBe(true);
     expect(fs.existsSync(path.join(worktreePath, '.git'))).toBe(true);
   });
+
+  test('should create a standard change proposal via UI', async ({ page }) => {
+    // 1. Create a git repo and initialize openspec
+    const gitDir = path.join(tempDir, 'git-repo-e2e-std-change');
+    fs.mkdirSync(gitDir);
+    execSync('git init -b main', { cwd: gitDir });
+    execSync('git config user.name "Test"', { cwd: gitDir });
+    execSync('git config user.email "test@test.com"', { cwd: gitDir });
+    fs.writeFileSync(path.join(gitDir, 'README.md'), '# Test');
+    execSync('git add README.md && git commit -m "Initial commit"', { cwd: gitDir });
+    execSync('openspec init --tools none', { cwd: gitDir });
+
+    // 2. Open dashboard and verify path
+    await page.goto('/');
+    await page.locator('#repo-path-input').fill(gitDir);
+    await page.locator('#verify-btn').click();
+
+    // 3. Verify Change Management section is visible, and click Create New Change button
+    await expect(page.locator('.change-section h3')).toHaveText('Change Management');
+    await page.locator('#show-create-change-btn').click();
+
+    // 4. Fill form details
+    await page.locator('#change-name-input').fill('standard-feat');
+    await page.locator('#change-desc-input').fill('standard change desc');
+    
+    // Select predefined schema (spec-driven)
+    await page.locator('#schema-select').selectOption('spec-driven');
+
+    // Click submit
+    await page.locator('.create-change-form button[type="submit"]').click();
+
+    // 5. Verify success message
+    await expect(page.locator('#change-create-success')).toContainText('Change "standard-feat" created successfully.');
+
+    // 6. Verify filesystem changes
+    const changeConfigFile = path.join(gitDir, 'openspec', 'changes', 'standard-feat', '.openspec.yaml');
+    expect(fs.existsSync(changeConfigFile)).toBe(true);
+    const content = fs.readFileSync(changeConfigFile, 'utf-8');
+    expect(content).toContain('schema: spec-driven');
+  });
+
+  test('should create a custom change proposal via UI with custom states', async ({ page }) => {
+    // 1. Create a git repo and initialize openspec
+    const gitDir = path.join(tempDir, 'git-repo-e2e-cust-change');
+    fs.mkdirSync(gitDir);
+    execSync('git init -b main', { cwd: gitDir });
+    execSync('git config user.name "Test"', { cwd: gitDir });
+    execSync('git config user.email "test@test.com"', { cwd: gitDir });
+    fs.writeFileSync(path.join(gitDir, 'README.md'), '# Test');
+    execSync('git add README.md && git commit -m "Initial commit"', { cwd: gitDir });
+    execSync('openspec init --tools none', { cwd: gitDir });
+
+    // 2. Open dashboard and verify path
+    await page.goto('/');
+    await page.locator('#repo-path-input').fill(gitDir);
+    await page.locator('#verify-btn').click();
+
+    // 3. Verify Change Management section is visible, and click Create New Change button
+    await expect(page.locator('.change-section h3')).toHaveText('Change Management');
+    await page.locator('#show-create-change-btn').click();
+
+    // 4. Fill form details
+    await page.locator('#change-name-input').fill('custom-feat');
+    await page.locator('label.radio-option:has-text("Custom States")').click();
+
+    // Wait for the layout transition to complete
+    await page.waitForTimeout(300);
+
+    // Verify default checked states
+    const specsCheckbox = page.locator('#check-specs');
+    const designCheckbox = page.locator('#check-design');
+
+    await expect(specsCheckbox).toBeChecked();
+    await expect(designCheckbox).toBeChecked();
+
+    // Toggle checkboxes by unchecking them directly
+    await specsCheckbox.uncheck();
+    await designCheckbox.uncheck();
+
+    // Verify they are unchecked
+    await expect(specsCheckbox).not.toBeChecked();
+    await expect(designCheckbox).not.toBeChecked();
+
+
+
+
+
+    // Click submit
+    await page.locator('.create-change-form button[type="submit"]').click();
+
+    // 5. Verify success message
+    await expect(page.locator('#change-create-success')).toContainText('Change "custom-feat" created successfully.');
+
+    // 6. Verify filesystem changes
+    const schemaFile = path.join(gitDir, 'openspec', 'schemas', 'schema-proposal-tasks', 'schema.yaml');
+    const schemasDir = path.join(gitDir, 'openspec', 'schemas');
+    if (!fs.existsSync(schemaFile)) {
+      console.log('Schemas directory exists:', fs.existsSync(schemasDir));
+      if (fs.existsSync(schemasDir)) {
+        console.log('Schemas directory contents:', fs.readdirSync(schemasDir));
+      }
+      const changesDir = path.join(gitDir, 'openspec', 'changes');
+      console.log('Changes directory contents:', fs.readdirSync(changesDir));
+    }
+    expect(fs.existsSync(schemaFile)).toBe(true);
+
+    const schemaContent = fs.readFileSync(schemaFile, 'utf-8');
+    expect(schemaContent).toContain('proposal');
+    expect(schemaContent).toContain('tasks');
+    expect(schemaContent).not.toContain('specs');
+    expect(schemaContent).not.toContain('design');
+
+    const changeConfigFile = path.join(gitDir, 'openspec', 'changes', 'custom-feat', '.openspec.yaml');
+    expect(fs.existsSync(changeConfigFile)).toBe(true);
+    const content = fs.readFileSync(changeConfigFile, 'utf-8');
+    expect(content).toContain('schema: schema-proposal-tasks');
+  });
+
+
 
   test('should load and display DAG linkage in Review Mode, and capture a screenshot', async ({ page }) => {
     // 1. Create a git repo with a complete OpenSpec change structure

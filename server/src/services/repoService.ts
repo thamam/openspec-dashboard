@@ -145,3 +145,62 @@ export async function createGitWorktree(
   await execPromise(`git worktree add -b "${branchName}" "${resolvedWorktreePath}"`, resolvedRepoPath);
 }
 
+export async function createLocalSchema(
+  repoPath: string,
+  schemaName: string,
+  artifacts: string[]
+): Promise<void> {
+  const resolvedRepoPath = path.resolve(repoPath);
+
+  // Validate inputs
+  const nameRegex = /^[a-zA-Z0-9.-]+$/;
+  if (!nameRegex.test(schemaName)) {
+    throw new Error('Invalid schema name format');
+  }
+
+  // Verify it exists and is a git repo first
+  const status = await checkRepoStatus(resolvedRepoPath);
+  if (!status.exists || !status.isGit) {
+    throw new Error('Target path is not a valid Git repository');
+  }
+
+  const artifactsList = artifacts.join(',');
+  await execPromise(
+    `openspec schema init "${schemaName}" --artifacts "${artifactsList}" --no-default`,
+    resolvedRepoPath
+  );
+}
+
+export async function createNewChange(
+  repoPath: string,
+  changeName: string,
+  schemaName: string = 'spec-driven',
+  description?: string
+): Promise<void> {
+  const resolvedRepoPath = path.resolve(repoPath);
+
+  // Validate inputs
+  const nameRegex = /^[a-zA-Z0-9.-]+$/;
+  if (!nameRegex.test(changeName)) {
+    throw new Error('Invalid change name format');
+  }
+  if (!nameRegex.test(schemaName)) {
+    throw new Error('Invalid schema name format');
+  }
+
+  // Verify it exists and is a git repo first
+  const status = await checkRepoStatus(resolvedRepoPath);
+  if (!status.exists || !status.isGit) {
+    throw new Error('Target path is not a valid Git repository');
+  }
+
+  let cmd = `openspec new change "${changeName}" --schema "${schemaName}"`;
+  if (description) {
+    const escapedDesc = description.replace(/"/g, '\\"');
+    cmd += ` --description "${escapedDesc}"`;
+  }
+
+  await execPromise(cmd, resolvedRepoPath);
+}
+
+

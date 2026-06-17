@@ -179,5 +179,71 @@ describe('Frontend App - App.tsx', () => {
       expect(screen.getByText('Git worktree created successfully')).toBeInTheDocument();
     });
   });
+
+  it('should support showing and submitting the CreateChangeForm within App', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ exists: true, isGit: true, isOpenSpec: true }),
+    });
+
+    render(<App />);
+    const input = screen.getByPlaceholderText('Enter local repository absolute path...');
+    const button = screen.getByRole('button', { name: 'Verify Path' });
+
+    fireEvent.change(input, { target: { value: '/Users/test/my-openspec-repo' } });
+    fireEvent.click(button);
+
+    // Verify change section appears
+    await waitFor(() => {
+      expect(screen.getByText('Change Management')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Create New Change' })).toBeInTheDocument();
+    });
+
+    const createNewBtn = screen.getByRole('button', { name: 'Create New Change' });
+    fireEvent.click(createNewBtn);
+
+    // Form should now render
+    expect(screen.getByLabelText('Change Name (kebab-case):')).toBeInTheDocument();
+
+    // Mock successful change creation response
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ success: true }),
+    });
+
+    // Mock the subsequent fetchChanges called on success
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => (['new-login']),
+    });
+
+    const nameInput = screen.getByLabelText('Change Name (kebab-case):');
+    const submitBtn = screen.getByRole('button', { name: 'Create Change' });
+
+    fireEvent.change(nameInput, { target: { value: 'new-login' } });
+    fireEvent.click(submitBtn);
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/changes',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            repoPath: '/Users/test/my-openspec-repo',
+            changeName: 'new-login',
+            schemaName: 'spec-driven',
+            description: '',
+          }),
+        })
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Change "new-login" created successfully.')).toBeInTheDocument();
+      // Form should be closed
+      expect(screen.queryByLabelText('Change Name (kebab-case):')).not.toBeInTheDocument();
+    });
+  });
 });
+
 

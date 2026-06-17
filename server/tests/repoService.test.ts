@@ -137,5 +137,43 @@ describe('repoService - initializeOpenSpec & createGitWorktree', () => {
       'Invalid branch name format'
     );
   });
+
+  it('should create a local schema successfully', async () => {
+    const gitDir = path.join(tempDir, 'git-repo-schema');
+    fs.mkdirSync(gitDir);
+    execSync('git init -b main', { cwd: gitDir });
+
+    const { initializeOpenSpec, createLocalSchema } = await import('../src/services/repoService.js');
+    await initializeOpenSpec(gitDir);
+    await createLocalSchema(gitDir, 'custom-flow', ['proposal', 'tasks']);
+
+    expect(fs.existsSync(path.join(gitDir, 'openspec', 'schemas', 'custom-flow', 'schema.yaml'))).toBe(true);
+  });
+
+  it('should create a new change successfully with predefined and custom schemas', async () => {
+    const gitDir = path.join(tempDir, 'git-repo-change');
+    fs.mkdirSync(gitDir);
+    execSync('git init -b main', { cwd: gitDir });
+
+    const { initializeOpenSpec, createLocalSchema, createNewChange } = await import('../src/services/repoService.js');
+    await initializeOpenSpec(gitDir);
+
+    // Create change with predefined schema
+    await createNewChange(gitDir, 'standard-change', 'spec-driven', 'my standard change description');
+    
+    const standardConfigPath = path.join(gitDir, 'openspec', 'changes', 'standard-change', '.openspec.yaml');
+    expect(fs.existsSync(standardConfigPath)).toBe(true);
+    const standardConfig = fs.readFileSync(standardConfigPath, 'utf8');
+    expect(standardConfig).toContain('schema: spec-driven');
+
+    // Create custom schema first, then create change with it
+    await createLocalSchema(gitDir, 'my-custom-schema', ['proposal', 'tasks']);
+    await createNewChange(gitDir, 'custom-change', 'my-custom-schema');
+    
+    const customConfigPath = path.join(gitDir, 'openspec', 'changes', 'custom-change', '.openspec.yaml');
+    expect(fs.existsSync(customConfigPath)).toBe(true);
+    const customConfig = fs.readFileSync(customConfigPath, 'utf8');
+    expect(customConfig).toContain('schema: my-custom-schema');
+  });
 });
 
