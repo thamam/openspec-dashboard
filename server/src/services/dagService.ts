@@ -266,37 +266,69 @@ export async function getChangeDag(
     }
   }
 
-  // 5. Connect Spec-Requirements <-> Design-Decisions via Jaccard Overlap
-  const reqNodeIds = nodes.filter(n => n.type === 'spec-requirement').map(n => n.id);
-  for (const reqId of reqNodeIds) {
-    const reqTokens = nodeTokensMap.get(reqId) || new Set();
-    
-    for (const decId of designNodeIds) {
-      const decTokens = nodeTokensMap.get(decId) || new Set();
-      const similarity = getJaccardSimilarity(reqTokens, decTokens);
-      
-      if (similarity > 0.1) {
-        edges.push({
-          source: reqId,
-          target: decId
-        });
+  // 5. Check if linkages.json exists
+  const linkagesPath = path.join(changeDir, 'linkages.json');
+  let hasExplicitLinkages = false;
+
+  if (fs.existsSync(linkagesPath)) {
+    try {
+      const linkagesContent = fs.readFileSync(linkagesPath, 'utf8');
+      const linkages = JSON.parse(linkagesContent);
+      if (Array.isArray(linkages)) {
+        hasExplicitLinkages = true;
+        for (const link of linkages) {
+          const sources = nodes.filter(n => n.label === link.source || n.id === link.source);
+          const targets = nodes.filter(n => n.label === link.target || n.id === link.target);
+
+          for (const srcNode of sources) {
+            for (const tgtNode of targets) {
+              edges.push({
+                source: srcNode.id,
+                target: tgtNode.id
+              });
+            }
+          }
+        }
       }
+    } catch (err) {
+      console.warn(`Failed to parse linkages.json at ${linkagesPath}:`, err);
     }
   }
 
-  // 6. Connect Design-Decisions <-> Tasks via Jaccard Overlap
-  for (const decId of designNodeIds) {
-    const decTokens = nodeTokensMap.get(decId) || new Set();
-    
-    for (const taskId of taskNodeIds) {
-      const taskTokens = nodeTokensMap.get(taskId) || new Set();
-      const similarity = getJaccardSimilarity(decTokens, taskTokens);
+  // 6. Fallback to Jaccard similarity matching if explicit linkages are not present
+  if (!hasExplicitLinkages) {
+    // Connect Spec-Requirements <-> Design-Decisions via Jaccard Overlap
+    const reqNodeIds = nodes.filter(n => n.type === 'spec-requirement').map(n => n.id);
+    for (const reqId of reqNodeIds) {
+      const reqTokens = nodeTokensMap.get(reqId) || new Set();
       
-      if (similarity > 0.1) {
-        edges.push({
-          source: decId,
-          target: taskId
-        });
+      for (const decId of designNodeIds) {
+        const decTokens = nodeTokensMap.get(decId) || new Set();
+        const similarity = getJaccardSimilarity(reqTokens, decTokens);
+        
+        if (similarity > 0.1) {
+          edges.push({
+            source: reqId,
+            target: decId
+          });
+        }
+      }
+    }
+
+    // Connect Design-Decisions <-> Tasks via Jaccard Overlap
+    for (const decId of designNodeIds) {
+      const decTokens = nodeTokensMap.get(decId) || new Set();
+      
+      for (const taskId of taskNodeIds) {
+        const taskTokens = nodeTokensMap.get(taskId) || new Set();
+        const similarity = getJaccardSimilarity(decTokens, taskTokens);
+        
+        if (similarity > 0.1) {
+          edges.push({
+            source: decId,
+            target: taskId
+          });
+        }
       }
     }
   }

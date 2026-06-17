@@ -143,6 +143,25 @@ test.describe('Workspace Management - E2E Actions', () => {
       `## 1. Widget Setup\n- [ ] 1.1 Create database schema for widget data\n- [x] 1.2 Implement widget service\n`
     );
 
+    // Write linkages.json
+    fs.writeFileSync(
+      path.join(changeDir, 'linkages.json'),
+      JSON.stringify([
+        {
+          source: 'Verify Widget Display',
+          target: 'Decision 1: Widget Database Integration'
+        },
+        {
+          source: 'Decision 1: Widget Database Integration',
+          target: '1.1 Create database schema for widget data'
+        },
+        {
+          source: 'Decision 1: Widget Database Integration',
+          target: '1.2 Implement widget service'
+        }
+      ])
+    );
+
     // 2. Open dashboard and verify path
     await page.goto('/');
     await page.locator('#repo-path-input').fill(gitDir);

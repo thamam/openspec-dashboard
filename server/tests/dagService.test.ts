@@ -118,3 +118,109 @@ Store widget data in sqlite database.
     expect(edges.some(e => e.source === 'design-decision-decision-1-widget-database-integration' && e.target === 'task-1-2-implement-widget-service')).toBe(true);
   });
 });
+
+describe('dagService - getChangeDag with explicit linkages.json', () => {
+  let tempDir: string;
+  let changeDir: string;
+
+  beforeAll(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dag-test-explicit-'));
+    changeDir = path.join(tempDir, 'openspec', 'changes', 'linkages-test');
+    fs.mkdirSync(changeDir, { recursive: true });
+
+    // 1. Write proposal.md
+    fs.writeFileSync(
+      path.join(changeDir, 'proposal.md'),
+      `## Capabilities
+- \`widget-core\`: Core widget rendering
+- \`sound-alerts\`: Sound alert capability
+`
+    );
+
+    // 2. Write specs
+    const widgetSpecDir = path.join(changeDir, 'specs', 'widget-core');
+    fs.mkdirSync(widgetSpecDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(widgetSpecDir, 'spec.md'),
+      `## Requirements
+### Requirement: Verify Widget Display
+The system SHALL show widget data.
+`
+    );
+
+    const soundSpecDir = path.join(changeDir, 'specs', 'sound-alerts');
+    fs.mkdirSync(soundSpecDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(soundSpecDir, 'spec.md'),
+      `## Requirements
+### Requirement: Sound Alert
+The system SHALL sound an alert on success.
+`
+    );
+
+    // 3. Write design.md
+    fs.writeFileSync(
+      path.join(changeDir, 'design.md'),
+      `## Decisions
+### Decision 1: Widget Database Integration
+Store widget data in sqlite database.
+
+### Decision 2: Play Alert Tone
+Play a beep sound.
+`
+    );
+
+    // 4. Write tasks.md
+    fs.writeFileSync(
+      path.join(changeDir, 'tasks.md'),
+      `## Tasks
+- [ ] 1.1 Create database schema for widget data
+- [ ] 2.1 Write beep tone service
+`
+    );
+
+    // 5. Write linkages.json (only linking the widget flow)
+    fs.writeFileSync(
+      path.join(changeDir, 'linkages.json'),
+      JSON.stringify([
+        {
+          source: 'Verify Widget Display',
+          target: 'Decision 1: Widget Database Integration'
+        },
+        {
+          source: 'Decision 1: Widget Database Integration',
+          target: '1.1 Create database schema for widget data'
+        }
+      ])
+    );
+  });
+
+  afterAll(() => {
+    if (fs.existsSync(tempDir)) {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('should use explicit linkages and bypass Jaccard similarity completely when linkages.json is present', async () => {
+    const dag = await getChangeDag(tempDir, 'linkages-test');
+    const edges = dag.edges;
+
+    // Verify explicit widget-core links exist (mapped by labels)
+    const reqNodeId = 'spec-req-verify-widget-display';
+    const decNodeId = 'design-decision-decision-1-widget-database-integration';
+    const taskNodeId = 'task-1-1-create-database-schema-for-widget-data';
+
+    expect(edges.some(e => e.source === reqNodeId && e.target === decNodeId)).toBe(true);
+    expect(edges.some(e => e.source === decNodeId && e.target === taskNodeId)).toBe(true);
+
+    // Verify Jaccard is bypassed:
+    // "Sound Alert" and "Play Alert Tone" and "Write beep tone service" have matching tokens ("alert", "tone", "beep"),
+    // but they are not linked in linkages.json.
+    const soundReqId = 'spec-req-sound-alert';
+    const soundDecId = 'design-decision-decision-2-play-alert-tone';
+    const soundTaskId = 'task-2-1-write-beep-tone-service';
+
+    expect(edges.some(e => e.source === soundReqId && e.target === soundDecId)).toBe(false);
+    expect(edges.some(e => e.source === soundDecId && e.target === soundTaskId)).toBe(false);
+  });
+});

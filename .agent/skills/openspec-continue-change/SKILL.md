@@ -116,3 +116,8 @@ For other schemas, follow the `instruction` field from the CLI output.
 - **IMPORTANT**: `context` and `rules` are constraints for YOU, not content for the file
   - Do NOT copy `<context>`, `<rules>`, `<project_context>` blocks into the artifact
   - These guide what you write, but should never appear in the output
+- **Generate Explicit Linkages (`linkages.json`)**:
+  - Whenever you generate or update artifacts (such as `design.md` or `tasks.md`), you MUST create or update `openspec/changes/<name>/linkages.json`.
+  - This file logs the linkages in real-time between Spec Requirements, Design Decisions, and Tasks.
+  - Format: A JSON array of link objects containing `"source"` and `"target"` fields.
+  - E.g., when creating a decision in `design.md`, write a link mapping the related requirement heading label to that decision heading label. When creating tasks in `tasks.md`, write links mapping decisions to tasks.
