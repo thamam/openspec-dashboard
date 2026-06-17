@@ -12,6 +12,8 @@ vi.mock('../src/services/repoService.js', () => {
     createGitWorktree: vi.fn(),
     createLocalSchema: vi.fn(),
     createNewChange: vi.fn(),
+    getChangeMetadata: vi.fn(),
+    updateProposeEngine: vi.fn(),
   };
 });
 
@@ -234,18 +236,19 @@ describe('API Routes - POST /api/changes', () => {
     expect(response.body.error).toContain('Missing parameters');
   });
 
-  it('should call createNewChange and return success', async () => {
+  it('should call createNewChange and return success with optional proposeEngine', async () => {
     vi.mocked(repoService.createNewChange).mockResolvedValueOnce(undefined);
 
     const response = await request(app).post('/api/changes').send({
       repoPath: '/repo',
       changeName: 'my-feature',
       schemaName: 'custom-flow',
-      description: 'my description'
+      description: 'my description',
+      proposeEngine: 'claude'
     });
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ success: true, message: 'Change proposal created successfully' });
-    expect(repoService.createNewChange).toHaveBeenCalledWith('/repo', 'my-feature', 'custom-flow', 'my description');
+    expect(repoService.createNewChange).toHaveBeenCalledWith('/repo', 'my-feature', 'custom-flow', 'my description', 'claude');
   });
 
   it('should return 500 when change creation fails', async () => {
@@ -257,6 +260,71 @@ describe('API Routes - POST /api/changes', () => {
     });
     expect(response.status).toBe(500);
     expect(response.body).toEqual({ error: 'creation failed' });
+  });
+});
+
+describe('API Routes - GET /api/changes/:change', () => {
+  it('should return 400 when path is missing', async () => {
+    const response = await request(app).get('/api/changes/my-change');
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: 'Missing query parameter "path"' });
+  });
+
+  it('should call getChangeMetadata and return metadata', async () => {
+    const mockMetadata = {
+      name: 'my-change',
+      schema: 'spec-driven',
+      created: '2026-06-17',
+      description: 'nice change',
+      proposeEngine: 'claude',
+    };
+    vi.mocked(repoService.getChangeMetadata).mockResolvedValueOnce(mockMetadata);
+
+    const response = await request(app).get('/api/changes/my-change?path=/repo');
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual(mockMetadata);
+    expect(repoService.getChangeMetadata).toHaveBeenCalledWith('/repo', 'my-change');
+  });
+
+  it('should return 500 when getChangeMetadata fails', async () => {
+    vi.mocked(repoService.getChangeMetadata).mockRejectedValueOnce(new Error('read failed'));
+
+    const response = await request(app).get('/api/changes/my-change?path=/repo');
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({ error: 'read failed' });
+  });
+});
+
+describe('API Routes - POST /api/changes/:change/engine', () => {
+  it('should return 400 when parameters are missing', async () => {
+    const response = await request(app).post('/api/changes/my-change/engine').send({
+      repoPath: '/repo',
+    });
+    expect(response.status).toBe(400);
+    expect(response.body.error).toContain('Missing parameters');
+  });
+
+  it('should call updateProposeEngine and return success', async () => {
+    vi.mocked(repoService.updateProposeEngine).mockResolvedValueOnce(undefined);
+
+    const response = await request(app).post('/api/changes/my-change/engine').send({
+      repoPath: '/repo',
+      proposeEngine: 'cursor',
+    });
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ success: true, message: 'Propose engine updated successfully' });
+    expect(repoService.updateProposeEngine).toHaveBeenCalledWith('/repo', 'my-change', 'cursor');
+  });
+
+  it('should return 500 when update fails', async () => {
+    vi.mocked(repoService.updateProposeEngine).mockRejectedValueOnce(new Error('update failed'));
+
+    const response = await request(app).post('/api/changes/my-change/engine').send({
+      repoPath: '/repo',
+      proposeEngine: 'cursor',
+    });
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({ error: 'update failed' });
   });
 });
 

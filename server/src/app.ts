@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { checkRepoStatus, initializeOpenSpec, createGitWorktree, createLocalSchema, createNewChange } from './services/repoService.js';
+import { checkRepoStatus, initializeOpenSpec, createGitWorktree, createLocalSchema, createNewChange, getChangeMetadata, updateProposeEngine } from './services/repoService.js';
 import { getChanges, getChangeDag } from './services/dagService.js';
 
 const app = express();
@@ -111,7 +111,7 @@ app.post('/api/schema', async (req, res) => {
 
 // API route to create new change
 app.post('/api/changes', async (req, res) => {
-  const { repoPath, changeName, schemaName, description } = req.body;
+  const { repoPath, changeName, schemaName, description, proposeEngine } = req.body;
 
   if (!repoPath || !changeName) {
     return res.status(400).json({
@@ -120,10 +120,46 @@ app.post('/api/changes', async (req, res) => {
   }
 
   try {
-    await createNewChange(repoPath, changeName, schemaName, description);
+    await createNewChange(repoPath, changeName, schemaName, description, proposeEngine);
     return res.json({ success: true, message: 'Change proposal created successfully' });
   } catch (err: any) {
     return res.status(500).json({ error: err.message || 'Failed to create change proposal' });
+  }
+});
+
+// API route to get change metadata
+app.get('/api/changes/:change', async (req, res) => {
+  const repoPath = req.query.path;
+  const changeName = decodeURIComponent(req.params.change);
+
+  if (!repoPath || typeof repoPath !== 'string') {
+    return res.status(400).json({ error: 'Missing query parameter "path"' });
+  }
+
+  try {
+    const metadata = await getChangeMetadata(repoPath, changeName);
+    return res.json(metadata);
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Failed to retrieve change metadata' });
+  }
+});
+
+// API route to update propose engine
+app.post('/api/changes/:change/engine', async (req, res) => {
+  const { repoPath, proposeEngine } = req.body;
+  const changeName = decodeURIComponent(req.params.change);
+
+  if (!repoPath || !proposeEngine) {
+    return res.status(400).json({
+      error: 'Missing parameters: repoPath and proposeEngine are required',
+    });
+  }
+
+  try {
+    await updateProposeEngine(repoPath, changeName, proposeEngine);
+    return res.json({ success: true, message: 'Propose engine updated successfully' });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Failed to update propose engine' });
   }
 });
 

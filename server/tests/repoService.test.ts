@@ -155,25 +155,72 @@ describe('repoService - initializeOpenSpec & createGitWorktree', () => {
     fs.mkdirSync(gitDir);
     execSync('git init -b main', { cwd: gitDir });
 
-    const { initializeOpenSpec, createLocalSchema, createNewChange } = await import('../src/services/repoService.js');
+    const { initializeOpenSpec, createLocalSchema, createNewChange, getChangeMetadata, updateProposeEngine } = await import('../src/services/repoService.js');
     await initializeOpenSpec(gitDir);
 
-    // Create change with predefined schema
-    await createNewChange(gitDir, 'standard-change', 'spec-driven', 'my standard change description');
+    // Create change with predefined schema and a specific engine (claude)
+    await createNewChange(gitDir, 'standard-change', 'spec-driven', 'my standard change description', 'claude');
     
     const standardConfigPath = path.join(gitDir, 'openspec', 'changes', 'standard-change', '.openspec.yaml');
     expect(fs.existsSync(standardConfigPath)).toBe(true);
     const standardConfig = fs.readFileSync(standardConfigPath, 'utf8');
-    expect(standardConfig).toContain('schema: spec-driven');
+    expect(standardConfig).toContain('schema: "spec-driven"');
+    expect(standardConfig).toContain('proposeEngine: "claude"');
 
-    // Create custom schema first, then create change with it
+    // Verify metadata retrieval
+    const metadata = await getChangeMetadata(gitDir, 'standard-change');
+    expect(metadata).toEqual({
+      name: 'standard-change',
+      schema: 'spec-driven',
+      created: expect.any(String),
+      description: 'my standard change description',
+      proposeEngine: 'claude',
+    });
+
+    // Update propose engine to cursor
+    await updateProposeEngine(gitDir, 'standard-change', 'cursor');
+    const updatedMetadata = await getChangeMetadata(gitDir, 'standard-change');
+    expect(updatedMetadata.proposeEngine).toBe('cursor');
+
+    // Create custom schema first, then create change with it (defaults to gemini engine)
     await createLocalSchema(gitDir, 'my-custom-schema', ['proposal', 'tasks']);
     await createNewChange(gitDir, 'custom-change', 'my-custom-schema');
     
     const customConfigPath = path.join(gitDir, 'openspec', 'changes', 'custom-change', '.openspec.yaml');
     expect(fs.existsSync(customConfigPath)).toBe(true);
     const customConfig = fs.readFileSync(customConfigPath, 'utf8');
-    expect(customConfig).toContain('schema: my-custom-schema');
+    expect(customConfig).toContain('schema: "my-custom-schema"');
+    expect(customConfig).toContain('proposeEngine: "gemini"');
+  });
+
+  it('should parse and stringify YAML correctly', async () => {
+    const { parseYaml, stringifyYaml } = await import('../src/services/repoService.js');
+    
+    const rawYaml = `
+      # This is a comment
+      schema: "spec-driven"
+      created: 2026-06-17
+      description: "My simple description"
+      proposeEngine: "claude"
+    `;
+
+    const parsed = parseYaml(rawYaml);
+    expect(parsed).toEqual({
+      schema: 'spec-driven',
+      created: '2026-06-17',
+      description: 'My simple description',
+      proposeEngine: 'claude',
+    });
+
+    const stringified = stringifyYaml({
+      schema: 'my-custom',
+      proposeEngine: 'cursor',
+      nonExistent: undefined,
+    });
+
+    expect(stringified).toContain('schema: "my-custom"');
+    expect(stringified).toContain('proposeEngine: "cursor"');
+    expect(stringified).not.toContain('nonExistent');
   });
 });
 

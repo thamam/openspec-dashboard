@@ -173,7 +173,7 @@ test.describe('Workspace Management - E2E Actions', () => {
     const changeConfigFile = path.join(gitDir, 'openspec', 'changes', 'standard-feat', '.openspec.yaml');
     expect(fs.existsSync(changeConfigFile)).toBe(true);
     const content = fs.readFileSync(changeConfigFile, 'utf-8');
-    expect(content).toContain('schema: spec-driven');
+    expect(content).toContain('schema: "spec-driven"');
   });
 
   test('should create a custom change proposal via UI with custom states', async ({ page }) => {
@@ -250,10 +250,72 @@ test.describe('Workspace Management - E2E Actions', () => {
     const changeConfigFile = path.join(gitDir, 'openspec', 'changes', 'custom-feat', '.openspec.yaml');
     expect(fs.existsSync(changeConfigFile)).toBe(true);
     const content = fs.readFileSync(changeConfigFile, 'utf-8');
-    expect(content).toContain('schema: schema-proposal-tasks');
+    expect(content).toContain('schema: "schema-proposal-tasks"');
   });
 
+  test('should create a change with a selected propose engine and verify it in Review Mode', async ({ page }) => {
+    // 1. Create a git repo and initialize openspec
+    const gitDir = path.join(tempDir, 'git-repo-e2e-engine');
+    fs.mkdirSync(gitDir);
+    execSync('git init -b main', { cwd: gitDir });
+    execSync('git config user.name "Test"', { cwd: gitDir });
+    execSync('git config user.email "test@test.com"', { cwd: gitDir });
+    fs.writeFileSync(path.join(gitDir, 'README.md'), '# Test');
+    execSync('git add README.md && git commit -m "Initial commit"', { cwd: gitDir });
+    execSync('openspec init --tools none', { cwd: gitDir });
 
+    // 2. Open dashboard and verify path
+    await page.goto('/');
+    await page.locator('#repo-path-input').fill(gitDir);
+    await page.locator('#verify-btn').click();
+
+    // 3. Click Create New Change button
+    await page.locator('#show-create-change-btn').click();
+
+    // 4. Fill form details and select Claude Code as engine
+    await page.locator('#change-name-input').fill('engine-feat');
+    await page.locator('#change-desc-input').fill('my custom engine feature description');
+    await page.locator('#propose-engine-select').selectOption('claude');
+
+    // Click submit
+    await page.locator('.create-change-form button[type="submit"]').click();
+
+    // 5. Verify success message
+    await expect(page.locator('#change-create-success')).toContainText('Change "engine-feat" created successfully.');
+
+    // 6. Verify filesystem changes (.openspec.yaml should contain proposeEngine: "claude")
+    const changeConfigFile = path.join(gitDir, 'openspec', 'changes', 'engine-feat', '.openspec.yaml');
+    expect(fs.existsSync(changeConfigFile)).toBe(true);
+    const content = fs.readFileSync(changeConfigFile, 'utf-8');
+    expect(content).toContain('proposeEngine: "claude"');
+
+    // 7. Click Review Mode Tab
+    await page.locator('#review-mode-tab').click();
+
+    // 8. Verify Metadata Card is visible with correct details
+    const metadataCard = page.locator('#change-metadata-card');
+    await expect(metadataCard).toBeVisible();
+    await expect(metadataCard.locator('h3')).toContainText('Change Details: engine-feat');
+    await expect(metadataCard.locator('.metadata-description')).toContainText('my custom engine feature description');
+
+    // 9. Verify correct Claude Code instructions are rendered
+    const instructionsPanel = page.locator('#engine-instructions-panel');
+    await expect(instructionsPanel).toBeVisible();
+    await expect(instructionsPanel.locator('.instruction-header')).toContainText('Claude Code Active');
+    await expect(instructionsPanel.locator('.instruction-code')).toContainText('/opsx:propose engine-feat');
+
+    // 10. Switch engine to Cursor in Review Mode
+    await page.locator('#propose-engine-select-review').selectOption('cursor');
+
+    // 11. Verify instructions panel updates to Cursor instructions
+    await expect(instructionsPanel.locator('.instruction-header')).toContainText('Cursor Active');
+    await expect(instructionsPanel.locator('.instruction-code')).toContainText('/opsx-propose engine-feat');
+
+    // 12. Verify filesystem was updated to cursor
+    await page.waitForTimeout(250);
+    const updatedContent = fs.readFileSync(changeConfigFile, 'utf-8');
+    expect(updatedContent).toContain('proposeEngine: "cursor"');
+  });
 
   test('should load and display DAG linkage in Review Mode, and capture a screenshot', async ({ page }) => {
     // 1. Create a git repo with a complete OpenSpec change structure

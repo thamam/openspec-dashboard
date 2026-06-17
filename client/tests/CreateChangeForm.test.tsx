@@ -90,7 +90,7 @@ describe('CreateChangeForm Component', () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it('should submit standard change proposal successfully', async () => {
+  it('should submit standard change proposal successfully with default proposeEngine', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ success: true }),
@@ -115,6 +115,7 @@ describe('CreateChangeForm Component', () => {
             changeName: 'new-login',
             schemaName: 'spec-driven',
             description: 'adds auth UI',
+            proposeEngine: 'gemini',
           }),
         })
       );
@@ -122,6 +123,38 @@ describe('CreateChangeForm Component', () => {
 
     await waitFor(() => {
       expect(mockOnCreateSuccess).toHaveBeenCalledWith('new-login');
+    });
+  });
+
+  it('should submit change proposal with selected proposeEngine', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ success: true }),
+    });
+
+    render(<CreateChangeForm {...defaultProps} />);
+    const nameInput = screen.getByLabelText('Change Name (kebab-case):');
+    const engineSelect = screen.getByLabelText('AI Propose Engine:');
+    const submitBtn = screen.getByRole('button', { name: 'Create Change' });
+
+    fireEvent.change(nameInput, { target: { value: 'new-login' } });
+    fireEvent.change(engineSelect, { target: { value: 'claude' } });
+    fireEvent.click(submitBtn);
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/changes',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            repoPath: '/Users/test/my-repo',
+            changeName: 'new-login',
+            schemaName: 'spec-driven',
+            description: '',
+            proposeEngine: 'claude',
+          }),
+        })
+      );
     });
   });
 
@@ -181,6 +214,7 @@ describe('CreateChangeForm Component', () => {
             changeName: 'quick-fix',
             schemaName: 'schema-proposal-tasks',
             description: '',
+            proposeEngine: 'gemini',
           }),
         })
       );

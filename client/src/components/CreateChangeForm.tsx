@@ -16,6 +16,7 @@ export default function CreateChangeForm({
   const [description, setDescription] = useState('');
   const [mode, setMode] = useState<'predefined' | 'custom'>('predefined');
   const [schemaName, setSchemaName] = useState('spec-driven');
+  const [proposeEngine, setProposeEngine] = useState('gemini');
   const [artifacts, setArtifacts] = useState({
     proposal: true,
     specs: true,
@@ -94,6 +95,7 @@ export default function CreateChangeForm({
           changeName: cleanName,
           schemaName: activeSchema,
           description: description.trim(),
+          proposeEngine,
         }),
       });
 
@@ -138,6 +140,21 @@ export default function CreateChangeForm({
           onChange={(e) => setDescription(e.target.value)}
           disabled={submitting}
         />
+      </div>
+
+      <div className="form-group">
+        <label htmlFor="propose-engine-select">AI Propose Engine:</label>
+        <select
+          id="propose-engine-select"
+          value={proposeEngine}
+          onChange={(e) => setProposeEngine(e.target.value)}
+          disabled={submitting}
+        >
+          <option value="gemini">Gemini (AGY)</option>
+          <option value="claude">Claude Code</option>
+          <option value="cursor">Cursor</option>
+          <option value="codex">Codex</option>
+        </select>
       </div>
 
       <div className="form-group">

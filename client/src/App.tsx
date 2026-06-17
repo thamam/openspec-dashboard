@@ -26,6 +26,14 @@ interface DagData {
   edges: DagEdge[];
 }
 
+interface ChangeMetadata {
+  name: string;
+  schema: string;
+  created: string;
+  description: string;
+  proposeEngine: string;
+}
+
 function App() {
   const [path, setPath] = useState('');
   const [loading, setLoading] = useState(false);
@@ -74,12 +82,59 @@ function App() {
     }
   }, [activeTab, path, status]);
 
-  // Load DAG when selected change changes
+  const [selectedChangeMetadata, setSelectedChangeMetadata] = useState<ChangeMetadata | null>(null);
+  const [metadataLoading, setMetadataLoading] = useState(false);
+  const [metadataError, setMetadataError] = useState<string | null>(null);
+
+  const fetchMetadata = async (changeName: string) => {
+    setMetadataLoading(true);
+    setMetadataError(null);
+    try {
+      const res = await fetch(`/api/changes/${encodeURIComponent(changeName)}?path=${encodeURIComponent(path)}`);
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to load change metadata');
+      }
+      setSelectedChangeMetadata(data);
+    } catch (err: any) {
+      setMetadataError(err.message || 'Failed to load change metadata');
+      setSelectedChangeMetadata(null);
+    } finally {
+      setMetadataLoading(false);
+    }
+  };
+
+  const handleUpdateEngine = async (newEngine: string) => {
+    if (!selectedChange || !path) return;
+    try {
+      const res = await fetch(`/api/changes/${encodeURIComponent(selectedChange)}/engine`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          repoPath: path,
+          proposeEngine: newEngine,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to update propose engine');
+      }
+      // Update local state
+      setSelectedChangeMetadata(prev => prev ? { ...prev, proposeEngine: newEngine } : null);
+    } catch (err: any) {
+      console.error('Failed to update propose engine', err);
+      alert(err.message || 'Failed to update propose engine');
+    }
+  };
+
+  // Load DAG and metadata when selected change changes
   useEffect(() => {
     if (selectedChange && path) {
       fetchDag();
+      fetchMetadata(selectedChange);
     } else {
       setDagData(null);
+      setSelectedChangeMetadata(null);
     }
   }, [selectedChange, path]);
 
@@ -460,6 +515,80 @@ function App() {
                 <p className="no-changes-msg">No active or archived changes found in this repository.</p>
               )}
             </div>
+
+            {selectedChangeMetadata && (
+              <div className="change-metadata-card" id="change-metadata-card">
+                <div className="metadata-card-header">
+                  <h3>Change Details: {selectedChangeMetadata.name}</h3>
+                  <span className="badge badge-info">{selectedChangeMetadata.schema}</span>
+                </div>
+                
+                {selectedChangeMetadata.description && (
+                  <p className="metadata-description">{selectedChangeMetadata.description}</p>
+                )}
+
+                <div className="metadata-grid">
+                  <div className="metadata-item">
+                    <span className="metadata-label">Created:</span>
+                    <span className="metadata-value">{selectedChangeMetadata.created}</span>
+                  </div>
+
+                  <div className="metadata-item">
+                    <label htmlFor="propose-engine-select-review" className="metadata-label">AI Propose Engine:</label>
+                    <select
+                      id="propose-engine-select-review"
+                      value={selectedChangeMetadata.proposeEngine}
+                      onChange={(e) => handleUpdateEngine(e.target.value)}
+                      className="engine-select-review"
+                    >
+                      <option value="gemini">Gemini (AGY)</option>
+                      <option value="claude">Claude Code</option>
+                      <option value="cursor">Cursor</option>
+                      <option value="codex">Codex</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="engine-instructions-panel" id="engine-instructions-panel">
+                  {selectedChangeMetadata.proposeEngine === 'gemini' && (
+                    <>
+                      <div className="instruction-header">Gemini (AGY) Active</div>
+                      <p className="instruction-text">
+                        Run the following command in Gemini Chat to generate/update change artifacts:
+                      </p>
+                      <code className="instruction-code">/opsx:propose {selectedChangeMetadata.name}</code>
+                    </>
+                  )}
+                  {selectedChangeMetadata.proposeEngine === 'claude' && (
+                    <>
+                      <div className="instruction-header">Claude Code Active</div>
+                      <p className="instruction-text">
+                        Run the following command in your Claude Code console to generate/update change artifacts:
+                      </p>
+                      <code className="instruction-code">/opsx:propose {selectedChangeMetadata.name}</code>
+                    </>
+                  )}
+                  {selectedChangeMetadata.proposeEngine === 'cursor' && (
+                    <>
+                      <div className="instruction-header">Cursor Active</div>
+                      <p className="instruction-text">
+                        Run the following command in Cursor Chat or Composer to generate/update change artifacts:
+                      </p>
+                      <code className="instruction-code">/opsx-propose {selectedChangeMetadata.name}</code>
+                    </>
+                  )}
+                  {selectedChangeMetadata.proposeEngine === 'codex' && (
+                    <>
+                      <div className="instruction-header">Codex Active</div>
+                      <p className="instruction-text">
+                        Run the following command in Codex chat to generate/update change artifacts:
+                      </p>
+                      <code className="instruction-code">/opsx-propose {selectedChangeMetadata.name}</code>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
 
             {dagLoading && <div className="dag-loading-state loading">Building Linkage DAG...</div>}
             

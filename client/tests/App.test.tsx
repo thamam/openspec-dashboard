@@ -217,6 +217,24 @@ describe('Frontend App - App.tsx', () => {
       json: async () => (['new-login']),
     });
 
+    // Mock subsequent dag load call
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ nodes: [], edges: [] }),
+    });
+
+    // Mock subsequent metadata load call
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        name: 'new-login',
+        schema: 'spec-driven',
+        created: '2026-06-17',
+        description: '',
+        proposeEngine: 'gemini',
+      }),
+    });
+
     const nameInput = screen.getByLabelText('Change Name (kebab-case):');
     const submitBtn = screen.getByRole('button', { name: 'Create Change' });
 
@@ -233,6 +251,7 @@ describe('Frontend App - App.tsx', () => {
             changeName: 'new-login',
             schemaName: 'spec-driven',
             description: '',
+            proposeEngine: 'gemini',
           }),
         })
       );

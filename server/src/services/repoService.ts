@@ -171,11 +171,44 @@ export async function createLocalSchema(
   );
 }
 
+export function parseYaml(content: string): Record<string, string> {
+  const result: Record<string, string> = {};
+  const lines = content.split('\n');
+  for (const line of lines) {
+    const clean = line.trim();
+    if (!clean || clean.startsWith('#')) continue;
+    const colonIndex = clean.indexOf(':');
+    if (colonIndex !== -1) {
+      const key = clean.substring(0, colonIndex).trim();
+      let value = clean.substring(colonIndex + 1).trim();
+      if (value.startsWith('"') && value.endsWith('"')) {
+        value = value.substring(1, value.length - 1);
+      } else if (value.startsWith("'") && value.endsWith("'")) {
+        value = value.substring(1, value.length - 1);
+      }
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
+export function stringifyYaml(data: Record<string, string | undefined>): string {
+  let content = '';
+  for (const [key, value] of Object.entries(data)) {
+    if (value !== undefined) {
+      const escaped = value.includes('"') ? value.replace(/"/g, '\\"') : value;
+      content += `${key}: "${escaped}"\n`;
+    }
+  }
+  return content;
+}
+
 export async function createNewChange(
   repoPath: string,
   changeName: string,
   schemaName: string = 'spec-driven',
-  description?: string
+  description?: string,
+  proposeEngine?: string
 ): Promise<void> {
   const resolvedRepoPath = path.resolve(repoPath);
 
@@ -186,6 +219,9 @@ export async function createNewChange(
   }
   if (!nameRegex.test(schemaName)) {
     throw new Error('Invalid schema name format');
+  }
+  if (proposeEngine && !nameRegex.test(proposeEngine)) {
+    throw new Error('Invalid propose engine format');
   }
 
   // Verify it exists and is a git repo first
@@ -201,6 +237,90 @@ export async function createNewChange(
   }
 
   await execPromise(cmd, resolvedRepoPath);
+
+  // Read generated .openspec.yaml and append proposeEngine (defaults to 'gemini')
+  const changeConfigFile = path.join(resolvedRepoPath, 'openspec', 'changes', changeName, '.openspec.yaml');
+  if (fs.existsSync(changeConfigFile)) {
+    const yamlContent = fs.readFileSync(changeConfigFile, 'utf8');
+    const data = parseYaml(yamlContent);
+    data.proposeEngine = proposeEngine || 'gemini';
+    fs.writeFileSync(changeConfigFile, stringifyYaml(data), 'utf8');
+  }
+}
+
+export interface ChangeMetadata {
+  name: string;
+  schema: string;
+  created: string;
+  description: string;
+  proposeEngine: string;
+}
+
+export async function getChangeMetadata(
+  repoPath: string,
+  changeName: string
+): Promise<ChangeMetadata> {
+  const resolvedRepoPath = path.resolve(repoPath);
+  const changeDir = path.join(resolvedRepoPath, 'openspec', 'changes', changeName);
+  
+  if (!fs.existsSync(changeDir)) {
+    throw new Error(`Change directory not found: ${changeName}`);
+  }
+
+  const changeConfigFile = path.join(changeDir, '.openspec.yaml');
+  let schema = 'spec-driven';
+  let created = '';
+  let description = '';
+  let proposeEngine = 'gemini';
+
+  if (fs.existsSync(changeConfigFile)) {
+    const yamlContent = fs.readFileSync(changeConfigFile, 'utf8');
+    const data = parseYaml(yamlContent);
+    if (data.schema) schema = data.schema;
+    if (data.created) created = data.created;
+    if (data.description) description = data.description;
+    if (data.proposeEngine) proposeEngine = data.proposeEngine;
+  }
+
+  // If description was not in yaml, we can check if it exists in README.md
+  const readmeFile = path.join(changeDir, 'README.md');
+  if (fs.existsSync(readmeFile) && !description) {
+    const readmeContent = fs.readFileSync(readmeFile, 'utf8');
+    const match = readmeContent.match(/^#\s+[^\n]+\n+([\s\S]+)$/m);
+    if (match) {
+      description = match[1].trim();
+    }
+  }
+
+  return {
+    name: changeName,
+    schema,
+    created,
+    description,
+    proposeEngine,
+  };
+}
+
+export async function updateProposeEngine(
+  repoPath: string,
+  changeName: string,
+  proposeEngine: string
+): Promise<void> {
+  const resolvedRepoPath = path.resolve(repoPath);
+  const nameRegex = /^[a-zA-Z0-9.-]+$/;
+  if (!nameRegex.test(proposeEngine)) {
+    throw new Error('Invalid propose engine format');
+  }
+
+  const changeConfigFile = path.join(resolvedRepoPath, 'openspec', 'changes', changeName, '.openspec.yaml');
+  if (!fs.existsSync(changeConfigFile)) {
+    throw new Error(`Change configuration file not found for change: ${changeName}`);
+  }
+
+  const yamlContent = fs.readFileSync(changeConfigFile, 'utf8');
+  const data = parseYaml(yamlContent);
+  data.proposeEngine = proposeEngine;
+  fs.writeFileSync(changeConfigFile, stringifyYaml(data), 'utf8');
 }
 
 
