@@ -69,3 +69,68 @@ describe('repoService - checkRepoStatus', () => {
     });
   });
 });
+
+describe('repoService - initializeOpenSpec & createGitWorktree', () => {
+  let tempDir: string;
+  const { execSync } = require('child_process');
+
+  beforeAll(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'openspec-dashboard-cmd-test-'));
+  });
+
+  afterAll(() => {
+    if (fs.existsSync(tempDir)) {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('should initialize OpenSpec successfully in a git repo', async () => {
+    const gitDir = path.join(tempDir, 'git-repo-init');
+    fs.mkdirSync(gitDir);
+    
+    // Initialize actual git repo
+    execSync('git init -b main', { cwd: gitDir });
+
+    const { initializeOpenSpec } = await import('../src/services/repoService.js');
+    await initializeOpenSpec(gitDir);
+
+    expect(fs.existsSync(path.join(gitDir, 'openspec'))).toBe(true);
+    const status = await checkRepoStatus(gitDir);
+    expect(status.isOpenSpec).toBe(true);
+  });
+
+  it('should create a git worktree successfully', async () => {
+    const gitDir = path.join(tempDir, 'git-repo-worktree');
+    fs.mkdirSync(gitDir);
+    
+    // Initialize git repo and make an initial commit
+    execSync('git init -b main', { cwd: gitDir });
+    execSync('git config user.name "Test"', { cwd: gitDir });
+    execSync('git config user.email "test@test.com"', { cwd: gitDir });
+    fs.writeFileSync(path.join(gitDir, 'README.md'), '# Test');
+    execSync('git add README.md && git commit -m "Initial commit"', { cwd: gitDir });
+
+    const worktreeDest = path.join(tempDir, 'worktree-dest');
+
+    const { createGitWorktree } = await import('../src/services/repoService.js');
+    await createGitWorktree(gitDir, 'feature/my-worktree', worktreeDest);
+
+    // Verify directory exists and has a .git file (worktree pointer)
+    expect(fs.existsSync(worktreeDest)).toBe(true);
+    expect(fs.existsSync(path.join(worktreeDest, '.git'))).toBe(true);
+    
+    // Verify branch exists in the original repo
+    const branches = execSync('git branch', { cwd: gitDir }).toString();
+    expect(branches).toContain('feature/my-worktree');
+  });
+
+  it('should throw validation error when branch name is invalid', async () => {
+    const gitDir = path.join(tempDir, 'git-repo-worktree');
+    const { createGitWorktree } = await import('../src/services/repoService.js');
+
+    await expect(createGitWorktree(gitDir, 'invalid branch; rm -rf /', '/some/path')).rejects.toThrow(
+      'Invalid branch name format'
+    );
+  });
+});
+

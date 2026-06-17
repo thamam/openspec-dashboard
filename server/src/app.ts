@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { checkRepoStatus } from './services/repoService.js';
+import { checkRepoStatus, initializeOpenSpec, createGitWorktree } from './services/repoService.js';
 
 const app = express();
 
@@ -23,4 +23,39 @@ app.get('/api/status', async (req, res) => {
   }
 });
 
+// API route to initialize OpenSpec
+app.post('/api/init', async (req, res) => {
+  const { path } = req.body;
+
+  if (!path || typeof path !== 'string') {
+    return res.status(400).json({ error: 'Missing parameter "path"' });
+  }
+
+  try {
+    await initializeOpenSpec(path);
+    return res.json({ success: true, message: 'OpenSpec initialized successfully' });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Failed to initialize OpenSpec' });
+  }
+});
+
+// API route to create a git worktree
+app.post('/api/worktree', async (req, res) => {
+  const { repoPath, branchName, worktreePath } = req.body;
+
+  if (!repoPath || !branchName || !worktreePath) {
+    return res.status(400).json({
+      error: 'Missing parameters: repoPath, branchName, and worktreePath are all required',
+    });
+  }
+
+  try {
+    await createGitWorktree(repoPath, branchName, worktreePath);
+    return res.json({ success: true, message: 'Git worktree created successfully' });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Failed to create Git worktree' });
+  }
+});
+
 export { app };
+

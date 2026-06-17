@@ -260,3 +260,121 @@ h2 {
 .loading {
   animation: pulse 1.5s infinite;
 }
+
+/* Action Section & Forms */
+.action-section {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: var(--shadow);
+  transition: var(--transition);
+}
+
+.action-section:hover {
+  box-shadow: var(--shadow-lg);
+  border-color: #cbd5e1;
+}
+
+.action-header {
+  margin-bottom: 1.5rem;
+}
+
+.action-header h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-main);
+  margin-bottom: 0.5rem;
+}
+
+.action-header p {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+}
+
+.btn {
+  padding: 0.875rem 2rem;
+  font-size: 1rem;
+  font-weight: 500;
+  font-family: var(--font-family);
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.btn-primary {
+  background-color: var(--accent-color);
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: var(--accent-hover);
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.worktree-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-group label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.form-group input {
+  width: 100%;
+  padding: 0.875rem 1.25rem;
+  font-size: 1rem;
+  font-family: var(--font-family);
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  background-color: #ffffff;
+  color: var(--text-main);
+  outline: none;
+  transition: var(--transition);
+}
+
+.form-group input:focus {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+}
+
+.form-group input:disabled {
+  background-color: #f8fafc;
+  cursor: not-allowed;
+}
+
+.message {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  border: 1px solid transparent;
+}
+
+.message-success {
+  background-color: var(--success-bg);
+  border-color: #a7f3d0;
+  color: #047857;
+}
+
+.message-danger {
+  background-color: var(--danger-bg);
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
