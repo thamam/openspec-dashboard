@@ -69,6 +69,36 @@ function execPromise(command: string, cwd: string): Promise<string> {
   });
 }
 
+function copyDirSync(src: string, dest: string) {
+  if (fs.existsSync(dest)) {
+    fs.rmSync(dest, { recursive: true, force: true });
+  }
+  fs.mkdirSync(dest, { recursive: true });
+  const entries = fs.readdirSync(src, { withFileTypes: true });
+  for (const entry of entries) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+    if (entry.isDirectory()) {
+      copyDirSync(srcPath, destPath);
+    } else {
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
+}
+
+function findTemplateRoot(): string {
+  let current = path.resolve(process.cwd());
+  while (current !== path.dirname(current)) {
+    if (fs.existsSync(path.join(current, '.agent', 'skills'))) {
+      return current;
+    }
+    current = path.dirname(current);
+  }
+  return path.resolve(process.cwd());
+}
+
+const templateRoot = findTemplateRoot();
+
 export async function initializeOpenSpec(dirPath: string): Promise<void> {
   const resolvedPath = path.resolve(dirPath);
   
@@ -79,6 +109,16 @@ export async function initializeOpenSpec(dirPath: string): Promise<void> {
   }
 
   await execPromise('openspec init --tools none', resolvedPath);
+
+  // Copy .agent, .claude, .codex, .cursor directories
+  const directoriesToCopy = ['.agent', '.claude', '.codex', '.cursor'];
+  for (const dir of directoriesToCopy) {
+    const srcPath = path.join(templateRoot, dir);
+    const destPath = path.join(resolvedPath, dir);
+    if (fs.existsSync(srcPath)) {
+      copyDirSync(srcPath, destPath);
+    }
+  }
 }
 
 export async function createGitWorktree(

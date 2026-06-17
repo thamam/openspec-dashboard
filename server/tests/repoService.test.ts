@@ -95,6 +95,11 @@ describe('repoService - initializeOpenSpec & createGitWorktree', () => {
     await initializeOpenSpec(gitDir);
 
     expect(fs.existsSync(path.join(gitDir, 'openspec'))).toBe(true);
+    expect(fs.existsSync(path.join(gitDir, '.agent'))).toBe(true);
+    expect(fs.existsSync(path.join(gitDir, '.claude'))).toBe(true);
+    expect(fs.existsSync(path.join(gitDir, '.codex'))).toBe(true);
+    expect(fs.existsSync(path.join(gitDir, '.cursor'))).toBe(true);
+
     const status = await checkRepoStatus(gitDir);
     expect(status.isOpenSpec).toBe(true);
   });

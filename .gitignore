@@ -15,8 +15,6 @@ Thumbs.db
 
 # Agent/AI temporary files
 .gemini/
-.claude/
-.cursor/
 .env
 .env.local
 .env.development.local

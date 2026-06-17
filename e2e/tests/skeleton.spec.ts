@@ -66,6 +66,10 @@ test.describe('Workspace Management - E2E Actions', () => {
     // 5. Verify status updates to OpenSpec: Initialized
     await expect(page.locator('.status-indicator.text-success').last()).toContainText('OpenSpec: Initialized');
     expect(fs.existsSync(path.join(gitDir, 'openspec'))).toBe(true);
+    expect(fs.existsSync(path.join(gitDir, '.agent'))).toBe(true);
+    expect(fs.existsSync(path.join(gitDir, '.claude'))).toBe(true);
+    expect(fs.existsSync(path.join(gitDir, '.codex'))).toBe(true);
+    expect(fs.existsSync(path.join(gitDir, '.cursor'))).toBe(true);
   });
 
   test('should create git worktree in an initialized repository via UI', async ({ page }) => {
