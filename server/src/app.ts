@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { checkRepoStatus, initializeOpenSpec, createGitWorktree } from './services/repoService.js';
+import { getChanges, getChangeDag } from './services/dagService.js';
 
 const app = express();
 
@@ -57,5 +58,39 @@ app.post('/api/worktree', async (req, res) => {
   }
 });
 
+// API route to list changes
+app.get('/api/changes', async (req, res) => {
+  const repoPath = req.query.path;
+
+  if (!repoPath || typeof repoPath !== 'string') {
+    return res.status(400).json({ error: 'Missing query parameter "path"' });
+  }
+
+  try {
+    const changes = await getChanges(repoPath);
+    return res.json(changes);
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Failed to retrieve changes list' });
+  }
+});
+
+// API route to get change DAG
+app.get('/api/changes/:change/dag', async (req, res) => {
+  const repoPath = req.query.path;
+  const changeName = decodeURIComponent(req.params.change);
+
+  if (!repoPath || typeof repoPath !== 'string') {
+    return res.status(400).json({ error: 'Missing query parameter "path"' });
+  }
+
+  try {
+    const dag = await getChangeDag(repoPath, changeName);
+    return res.json(dag);
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Failed to build DAG' });
+  }
+});
+
 export { app };
+
 

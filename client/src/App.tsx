@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
+import DagViewer from './components/DagViewer.js';
 
 interface RepoStatus {
   exists: boolean;
@@ -7,11 +8,29 @@ interface RepoStatus {
   isOpenSpec: boolean;
 }
 
+interface DagNode {
+  id: string;
+  label: string;
+  type: 'proposal' | 'spec-requirement' | 'spec-scenario' | 'design-decision' | 'task';
+  status?: 'pending' | 'completed';
+}
+
+interface DagEdge {
+  source: string;
+  target: string;
+}
+
+interface DagData {
+  nodes: DagNode[];
+  edges: DagEdge[];
+}
+
 function App() {
   const [path, setPath] = useState('');
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<RepoStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'workspace' | 'review'>('workspace');
 
   // OpenSpec Init states
   const [initLoading, setInitLoading] = useState(false);
@@ -22,6 +41,13 @@ function App() {
   const [worktreeLoading, setWorktreeLoading] = useState(false);
   const [worktreeSuccess, setWorktreeSuccess] = useState<string | null>(null);
   const [worktreeError, setWorktreeError] = useState<string | null>(null);
+
+  // Review Mode states
+  const [changesList, setChangesList] = useState<string[]>([]);
+  const [selectedChange, setSelectedChange] = useState<string>('');
+  const [dagData, setDagData] = useState<DagData | null>(null);
+  const [dagLoading, setDagLoading] = useState(false);
+  const [dagError, setDagError] = useState<string | null>(null);
 
   // Auto-generate default worktree path based on current path and branch name
   useEffect(() => {
@@ -35,6 +61,55 @@ function App() {
       }
     }
   }, [path, branchName]);
+
+  // Load changes list when switching to Review Tab or when path is verified
+  useEffect(() => {
+    if (activeTab === 'review' && status?.exists && status?.isGit) {
+      fetchChanges();
+    }
+  }, [activeTab, path, status]);
+
+  // Load DAG when selected change changes
+  useEffect(() => {
+    if (selectedChange && path) {
+      fetchDag();
+    } else {
+      setDagData(null);
+    }
+  }, [selectedChange, path]);
+
+  const fetchChanges = async () => {
+    try {
+      const res = await fetch(`/api/changes?path=${encodeURIComponent(path)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setChangesList(data);
+        if (data.length > 0 && !selectedChange) {
+          setSelectedChange(data[0]);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load changes', err);
+    }
+  };
+
+  const fetchDag = async () => {
+    setDagLoading(true);
+    setDagError(null);
+    try {
+      const res = await fetch(`/api/changes/${encodeURIComponent(selectedChange)}/dag?path=${encodeURIComponent(path)}`);
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to load DAG');
+      }
+      setDagData(data);
+    } catch (err: any) {
+      setDagError(err.message || 'Failed to load DAG');
+      setDagData(null);
+    } finally {
+      setDagLoading(false);
+    }
+  };
 
   const refetchStatus = async () => {
     try {
@@ -61,6 +136,9 @@ function App() {
     setStatus(null);
     setWorktreeSuccess(null);
     setWorktreeError(null);
+    setDagData(null);
+    setSelectedChange('');
+    setChangesList([]);
 
     try {
       const res = await fetch(`/api/status?path=${encodeURIComponent(path)}`);
@@ -90,7 +168,6 @@ function App() {
       if (!res.ok) {
         throw new Error(data.error || 'Failed to initialize OpenSpec');
       }
-      // Refetch directory status
       await refetchStatus();
     } catch (err: any) {
       setError(err.message || 'Failed to initialize OpenSpec');
@@ -141,152 +218,213 @@ function App() {
         <p className="app-subtitle">A Premium Development Interface for the Anti-Gravity Protocol</p>
       </header>
 
+      {status?.exists && status?.isGit && (
+        <div className="app-tabs">
+          <button
+            className={`tab-btn ${activeTab === 'workspace' ? 'active' : ''}`}
+            onClick={() => setActiveTab('workspace')}
+          >
+            📂 Workspace
+          </button>
+          <button
+            className={`tab-btn ${activeTab === 'review' ? 'active' : ''}`}
+            onClick={() => setActiveTab('review')}
+            id="review-mode-tab"
+          >
+            📊 Review Mode
+          </button>
+        </div>
+      )}
+
       <main className="app-content">
-        <section className="verify-section">
-          <h2>Verify Local Project Directory</h2>
-          <form onSubmit={handleVerify} className="verify-form">
-            <div className="input-group">
-              <input
-                id="repo-path-input"
-                type="text"
-                placeholder="Enter local repository absolute path..."
-                value={path}
-                onChange={(e) => setPath(e.target.value)}
-                disabled={loading}
-              />
-            </div>
-            <button id="verify-btn" type="submit" disabled={loading}>
-              {loading ? 'Verifying...' : 'Verify Path'}
-            </button>
-          </form>
-        </section>
-
-        {error && (
-          <section className="status-section error-card">
-            <h3>Verification Failed</h3>
-            <p className="error-message">Error: {error}</p>
-          </section>
-        )}
-
-        {status && (
+        {activeTab === 'workspace' ? (
           <>
-            <section className="status-section">
-              {status.exists ? (
-                <div className="status-grid">
-                  <div className="status-card-header">
-                    <h3>Project Folder Verified</h3>
-                    <span className="badge badge-success">Active</span>
-                  </div>
-                  
-                  <div className="status-item">
-                    <div className="status-label">Directory Path:</div>
-                    <div className="status-value path-value">{path}</div>
-                  </div>
-
-                  <div className="status-item">
-                    <div className="status-label">Git Integration:</div>
-                    <div className={`status-indicator ${status.isGit ? 'text-success' : 'text-danger'}`}>
-                      <span className="dot"></span>
-                      {status.isGit ? 'Git: Initialized' : 'Git: Not Initialized'}
-                    </div>
-                  </div>
-
-                  <div className="status-item">
-                    <div className="status-label">OpenSpec Engine:</div>
-                    <div className={`status-indicator ${status.isOpenSpec ? 'text-success' : 'text-danger'}`}>
-                      <span className="dot"></span>
-                      {status.isOpenSpec ? 'OpenSpec: Initialized' : 'OpenSpec: Not Initialized'}
-                    </div>
-                  </div>
+            <section className="verify-section">
+              <h2>Verify Local Project Directory</h2>
+              <form onSubmit={handleVerify} className="verify-form">
+                <div className="input-group">
+                  <input
+                    id="repo-path-input"
+                    type="text"
+                    placeholder="Enter local repository absolute path..."
+                    value={path}
+                    onChange={(e) => setPath(e.target.value)}
+                    disabled={loading}
+                  />
                 </div>
-              ) : (
-                <div className="status-grid error-card">
-                  <div className="status-card-header">
-                    <h3>Directory does not exist</h3>
-                    <span className="badge badge-danger">Not Found</span>
-                  </div>
-                  <p className="error-message">
-                    The directory <code>{path}</code> was not found on the local filesystem.
-                  </p>
-                </div>
-              )}
+                <button id="verify-btn" type="submit" disabled={loading}>
+                  {loading ? 'Verifying...' : 'Verify Path'}
+                </button>
+              </form>
             </section>
 
-            {status.exists && status.isGit && !status.isOpenSpec && (
-              <section className="action-section init-card">
-                <div className="action-header">
-                  <h3>Initialize OpenSpec</h3>
-                  <p>Enable OpenSpec change tracking and specs pipelines for this project.</p>
-                </div>
-                <button
-                  id="init-openspec-btn"
-                  onClick={handleInitOpenSpec}
-                  disabled={initLoading}
-                  className="btn btn-primary"
-                >
-                  {initLoading ? 'Initializing...' : 'Initialize OpenSpec'}
-                </button>
+            {error && (
+              <section className="status-section error-card">
+                <h3>Verification Failed</h3>
+                <p className="error-message">Error: {error}</p>
               </section>
             )}
 
-            {status.exists && status.isGit && status.isOpenSpec && (
-              <section className="action-section worktree-section">
-                <div className="action-header">
-                  <h3>Git Worktree Management</h3>
-                  <p>Checkout a new development branch to an isolated local folder.</p>
-                </div>
+            {status && (
+              <>
+                <section className="status-section">
+                  {status.exists ? (
+                    <div className="status-grid">
+                      <div className="status-card-header">
+                        <h3>Project Folder Verified</h3>
+                        <span className="badge badge-success">Active</span>
+                      </div>
+                      
+                      <div className="status-item">
+                        <div className="status-label">Directory Path:</div>
+                        <div className="status-value path-value">{path}</div>
+                      </div>
 
-                <form onSubmit={handleCreateWorktree} className="worktree-form">
-                  <div className="form-group">
-                    <label htmlFor="branch-name-input">Branch Name:</label>
-                    <input
-                      id="branch-name-input"
-                      type="text"
-                      placeholder="e.g., feature/new-logic"
-                      value={branchName}
-                      onChange={(e) => setBranchName(e.target.value)}
-                      disabled={worktreeLoading}
-                      required
-                    />
-                  </div>
+                      <div className="status-item">
+                        <div className="status-label">Git Integration:</div>
+                        <div className={`status-indicator ${status.isGit ? 'text-success' : 'text-danger'}`}>
+                          <span className="dot"></span>
+                          {status.isGit ? 'Git: Initialized' : 'Git: Not Initialized'}
+                        </div>
+                      </div>
 
-                  <div className="form-group">
-                    <label htmlFor="worktree-path-input">Worktree Destination Path:</label>
-                    <input
-                      id="worktree-path-input"
-                      type="text"
-                      placeholder="Enter absolute destination path..."
-                      value={worktreePath}
-                      onChange={(e) => setWorktreePath(e.target.value)}
-                      disabled={worktreeLoading}
-                      required
-                    />
-                  </div>
+                      <div className="status-item">
+                        <div className="status-label">OpenSpec Engine:</div>
+                        <div className={`status-indicator ${status.isOpenSpec ? 'text-success' : 'text-danger'}`}>
+                          <span className="dot"></span>
+                          {status.isOpenSpec ? 'OpenSpec: Initialized' : 'OpenSpec: Not Initialized'}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="status-grid error-card">
+                      <div className="status-card-header">
+                        <h3>Directory does not exist</h3>
+                        <span className="badge badge-danger">Not Found</span>
+                      </div>
+                      <p className="error-message">
+                        The directory <code>{path}</code> was not found on the local filesystem.
+                      </p>
+                    </div>
+                  )}
+                </section>
 
-                  <button
-                    id="create-worktree-btn"
-                    type="submit"
-                    disabled={worktreeLoading || !branchName.trim() || !worktreePath.trim()}
-                    className="btn btn-primary"
-                  >
-                    {worktreeLoading ? 'Creating Worktree...' : 'Create Worktree'}
-                  </button>
-                </form>
-
-                {worktreeSuccess && (
-                  <div className="message message-success">
-                    <p>{worktreeSuccess}</p>
-                  </div>
+                {status.exists && status.isGit && !status.isOpenSpec && (
+                  <section className="action-section init-card">
+                    <div className="action-header">
+                      <h3>Initialize OpenSpec</h3>
+                      <p>Enable OpenSpec change tracking and specs pipelines for this project.</p>
+                    </div>
+                    <button
+                      id="init-openspec-btn"
+                      onClick={handleInitOpenSpec}
+                      disabled={initLoading}
+                      className="btn btn-primary"
+                    >
+                      {initLoading ? 'Initializing...' : 'Initialize OpenSpec'}
+                    </button>
+                  </section>
                 )}
 
-                {worktreeError && (
-                  <div className="message message-danger">
-                    <p>Error: {worktreeError}</p>
-                  </div>
+                {status.exists && status.isGit && status.isOpenSpec && (
+                  <section className="action-section worktree-section">
+                    <div className="action-header">
+                      <h3>Git Worktree Management</h3>
+                      <p>Checkout a new development branch to an isolated local folder.</p>
+                    </div>
+
+                    <form onSubmit={handleCreateWorktree} className="worktree-form">
+                      <div className="form-group">
+                        <label htmlFor="branch-name-input">Branch Name:</label>
+                        <input
+                          id="branch-name-input"
+                          type="text"
+                          placeholder="e.g., feature/new-logic"
+                          value={branchName}
+                          onChange={(e) => setBranchName(e.target.value)}
+                          disabled={worktreeLoading}
+                          required
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor="worktree-path-input">Worktree Destination Path:</label>
+                        <input
+                          id="worktree-path-input"
+                          type="text"
+                          placeholder="Enter absolute destination path..."
+                          value={worktreePath}
+                          onChange={(e) => setWorktreePath(e.target.value)}
+                          disabled={worktreeLoading}
+                          required
+                        />
+                      </div>
+
+                      <button
+                        id="create-worktree-btn"
+                        type="submit"
+                        disabled={worktreeLoading || !branchName.trim() || !worktreePath.trim()}
+                        className="btn btn-primary"
+                      >
+                        {worktreeLoading ? 'Creating Worktree...' : 'Create Worktree'}
+                      </button>
+                    </form>
+
+                    {worktreeSuccess && (
+                      <div className="message message-success">
+                        <p>{worktreeSuccess}</p>
+                      </div>
+                    )}
+
+                    {worktreeError && (
+                      <div className="message message-danger">
+                        <p>Error: {worktreeError}</p>
+                      </div>
+                    )}
+                  </section>
                 )}
-              </section>
+              </>
             )}
           </>
+        ) : (
+          <section className="review-section-wrapper">
+            <div className="review-header-card">
+              <h2>Traceability Audit & Linkage DAG</h2>
+              <p className="review-subtitle">
+                Trace structural items across Proposal, Specs, Design, and Tasks.
+              </p>
+              
+              {changesList.length > 0 ? (
+                <div className="change-selector-group">
+                  <label htmlFor="change-select">Select OpenSpec Change:</label>
+                  <select
+                    id="change-select"
+                    value={selectedChange}
+                    onChange={(e) => setSelectedChange(e.target.value)}
+                    className="change-select"
+                  >
+                    {changesList.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <p className="no-changes-msg">No active or archived changes found in this repository.</p>
+              )}
+            </div>
+
+            {dagLoading && <div className="dag-loading-state loading">Building Linkage DAG...</div>}
+            
+            {dagError && (
+              <div className="message message-danger">
+                <p>Failed to build DAG: {dagError}</p>
+              </div>
+            )}
+
+            {dagData && !dagLoading && <DagViewer dag={dagData} />}
+          </section>
         )}
       </main>
     </div>

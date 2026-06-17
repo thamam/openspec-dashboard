@@ -378,3 +378,105 @@ h2 {
   color: #b91c1c;
 }
 
+/* App Tabs Styling */
+.app-tabs {
+  display: flex;
+  gap: 1rem;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 2rem;
+  padding-bottom: 0.5rem;
+}
+
+.tab-btn {
+  background: none;
+  border: none;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  position: relative;
+  transition: var(--transition);
+}
+
+.tab-btn:hover {
+  color: var(--accent-color);
+}
+
+.tab-btn.active {
+  color: var(--accent-color);
+}
+
+.tab-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: -9px;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background-color: var(--accent-color);
+  border-radius: 9999px;
+}
+
+.review-section-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.review-header-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: var(--shadow);
+}
+
+.review-subtitle {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  margin-bottom: 1.5rem;
+}
+
+.change-selector-group {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.change-selector-group label {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.change-select {
+  padding: 0.6rem 1rem;
+  font-size: 0.95rem;
+  font-family: var(--font-family);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  outline: none;
+  background-color: white;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.change-select:focus {
+  border-color: var(--accent-color);
+}
+
+.no-changes-msg {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.dag-loading-state {
+  text-align: center;
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+  padding: 3rem;
+}
+
+

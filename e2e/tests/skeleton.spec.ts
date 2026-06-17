@@ -107,4 +107,65 @@ test.describe('Workspace Management - E2E Actions', () => {
     expect(fs.existsSync(worktreePath)).toBe(true);
     expect(fs.existsSync(path.join(worktreePath, '.git'))).toBe(true);
   });
+
+  test('should load and display DAG linkage in Review Mode, and capture a screenshot', async ({ page }) => {
+    // 1. Create a git repo with a complete OpenSpec change structure
+    const gitDir = path.join(tempDir, 'git-repo-e2e-dag');
+    const changeDir = path.join(gitDir, 'openspec', 'changes', 'e2e-change');
+    fs.mkdirSync(changeDir, { recursive: true });
+
+    // Initialize git
+    execSync('git init -b main', { cwd: gitDir });
+
+    // Write proposal
+    fs.writeFileSync(
+      path.join(changeDir, 'proposal.md'),
+      `## Capabilities\n### New Capabilities\n- \`widget-feature\`: Add widget logic\n`
+    );
+
+    // Write spec
+    const specDir = path.join(changeDir, 'specs', 'widget-feature');
+    fs.mkdirSync(specDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(specDir, 'spec.md'),
+      `## ADDED Requirements\n### Requirement: Verify Widget Display\nThe system SHALL show widget data.\n\n#### Scenario: Display successful\n- **WHEN** user loads widget\n- **THEN** data displays\n`
+    );
+
+    // Write design
+    fs.writeFileSync(
+      path.join(changeDir, 'design.md'),
+      `## Decisions\n### Decision 1: Widget Database Integration\nStore widget data in sqlite database.\n`
+    );
+
+    // Write tasks
+    fs.writeFileSync(
+      path.join(changeDir, 'tasks.md'),
+      `## 1. Widget Setup\n- [ ] 1.1 Create database schema for widget data\n- [x] 1.2 Implement widget service\n`
+    );
+
+    // 2. Open dashboard and verify path
+    await page.goto('/');
+    await page.locator('#repo-path-input').fill(gitDir);
+    await page.locator('#verify-btn').click();
+
+    // 3. Click Review Mode Tab
+    await page.locator('#review-mode-tab').click();
+
+    // 4. Verify DAG elements are loaded
+    await expect(page.locator('.dag-column h4').first()).toHaveText('Proposal');
+    await expect(page.locator('.node-label').first()).toContainText('widget-feature');
+    await expect(page.locator('.node-label').nth(1)).toContainText('Verify Widget Display');
+
+    // 5. Take screenshot of the visual DAG dashboard
+    const screenshotPath = path.join(path.resolve('.'), 'test-results', 'dashboard-screenshot.png');
+    
+    // Make sure test-results directory exists
+    fs.mkdirSync(path.dirname(screenshotPath), { recursive: true });
+    
+    await page.screenshot({ path: screenshotPath, fullPage: true });
+    
+    // Verify screenshot file created
+    expect(fs.existsSync(screenshotPath)).toBe(true);
+  });
 });
+

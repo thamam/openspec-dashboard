@@ -1,0 +1,199 @@
+.dag-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+.dag-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  padding: 1rem 1.5rem;
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+
+.dag-filter-input {
+  padding: 0.6rem 1rem;
+  font-size: 0.9rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  outline: none;
+  width: 250px;
+  transition: var(--transition);
+}
+
+.dag-filter-input:focus {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.1);
+}
+
+.checkbox-group label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  user-select: none;
+}
+
+.dag-canvas-wrapper {
+  position: relative;
+  width: 100%;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: var(--shadow);
+  overflow: visible;
+}
+
+.dag-svg-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.dag-columns {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2rem;
+  position: relative;
+  z-index: 2;
+}
+
+.dag-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.dag-column h4 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  border-bottom: 2px solid var(--border-color);
+  padding-bottom: 0.5rem;
+  text-align: center;
+}
+
+.nodes-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Dag Node Styling */
+.dag-node {
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 0.85rem;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+  transition: var(--transition);
+  user-select: none;
+}
+
+.dag-node:hover {
+  border-color: var(--accent-color);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px rgba(79, 70, 229, 0.08);
+}
+
+.node-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.node-type {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent-color);
+}
+
+.node-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-main);
+  line-height: 1.3;
+}
+
+.task-status {
+  align-self: flex-start;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+}
+
+.task-status.completed {
+  background-color: var(--success-bg);
+  color: var(--success-color);
+}
+
+.task-status.pending {
+  background-color: #f1f5f9;
+  color: var(--text-secondary);
+}
+
+/* Interactivity States */
+.dag-node.selected {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
+}
+
+.dag-node.faded {
+  opacity: 0.25;
+  filter: grayscale(80%);
+}
+
+.dag-node.highlighted {
+  border-color: var(--accent-color);
+  border-width: 2px;
+}
+
+.dag-node.critical {
+  border-color: #f97316;
+  background-color: #fff7ed;
+}
+
+.dag-node.filtered-out {
+  display: none;
+}
+
+/* Svg Edge Lines */
+.dag-edge-line {
+  stroke: #cbd5e1;
+  stroke-width: 1.5;
+  fill: none;
+  transition: var(--transition);
+}
+
+.dag-edge-line.highlighted {
+  stroke: var(--accent-color);
+  stroke-width: 3;
+}
+
+.dag-edge-line.faded {
+  stroke-opacity: 0.15;
+}
+
+.dag-edge-line.critical {
+  stroke: #ea580c;
+  stroke-width: 2;
+  stroke-dasharray: 4 2;
+}
