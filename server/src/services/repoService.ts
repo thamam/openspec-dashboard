@@ -254,6 +254,48 @@ export interface ChangeMetadata {
   created: string;
   description: string;
   proposeEngine: string;
+  worktreeBranch?: string | null;
+}
+
+export async function getChangeWorktree(repoPath: string, changeName: string): Promise<string | null> {
+  try {
+    const output = await execPromise('git worktree list --porcelain', repoPath);
+    const blocks = output.split('\n\n');
+    for (const block of blocks) {
+      const lines = block.split('\n');
+      let worktreePath = '';
+      let branch = '';
+      for (const line of lines) {
+        if (line.startsWith('worktree ')) {
+          worktreePath = line.substring(9).trim();
+        } else if (line.startsWith('branch ')) {
+          branch = line.substring(7).trim(); // refs/heads/branch-name
+        }
+      }
+      const shortBranch = branch.replace('refs/heads/', '');
+      if (
+        shortBranch === changeName ||
+        shortBranch.includes(changeName) ||
+        worktreePath.endsWith(changeName) ||
+        worktreePath.includes(`/${changeName}`)
+      ) {
+        return shortBranch;
+      }
+    }
+  } catch (err) {
+    console.error('Failed to list git worktrees:', err);
+  }
+  return null;
+}
+
+export async function runProposeCommand(
+  repoPath: string,
+  changeName: string,
+  engine: string
+): Promise<string> {
+  const resolvedRepoPath = path.resolve(repoPath);
+  const cmd = `openspec propose "${changeName}" --engine "${engine}"`;
+  return await execPromise(cmd, resolvedRepoPath);
 }
 
 export async function getChangeMetadata(
@@ -292,12 +334,15 @@ export async function getChangeMetadata(
     }
   }
 
+  const worktreeBranch = await getChangeWorktree(resolvedRepoPath, changeName);
+
   return {
     name: changeName,
     schema,
     created,
     description,
     proposeEngine,
+    worktreeBranch,
   };
 }
 
@@ -321,6 +366,40 @@ export async function updateProposeEngine(
   const data = parseYaml(yamlContent);
   data.proposeEngine = proposeEngine;
   fs.writeFileSync(changeConfigFile, stringifyYaml(data), 'utf8');
+}
+
+export function getChangeFilesContent(
+  repoPath: string,
+  changeName: string
+): string {
+  const resolvedRepoPath = path.resolve(repoPath);
+  const changeDir = path.join(resolvedRepoPath, 'openspec', 'changes', changeName);
+
+  if (!fs.existsSync(changeDir)) {
+    throw new Error(`Change directory not found: ${changeName}`);
+  }
+
+  let result = '';
+
+  function readDirectory(dir: string, relativeDir: string = '') {
+    if (!fs.existsSync(dir)) return;
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      const relPath = relativeDir ? path.join(relativeDir, entry.name) : entry.name;
+
+      if (entry.isDirectory()) {
+        readDirectory(fullPath, relPath);
+      } else if (entry.isFile() && entry.name.endsWith('.md')) {
+        const fileContent = fs.readFileSync(fullPath, 'utf8');
+        result += `=== FILE: ${relPath} ===\n${fileContent}\n\n`;
+      }
+    }
+  }
+
+  readDirectory(changeDir);
+  return result;
 }
 
 

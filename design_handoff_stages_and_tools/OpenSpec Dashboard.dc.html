@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;450;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;}
+html,body{margin:0;height:100%;}
+::-webkit-scrollbar{width:9px;height:9px;}
+::-webkit-scrollbar-thumb{background:var(--border,#e2e8f0);border-radius:8px;border:2px solid transparent;background-clip:content-box;}
+::-webkit-scrollbar-track{background:transparent;}
+.osd-md code{font-family:'Fira Code',monospace;font-size:.85em;background:var(--surface-2,#f1f5f9);padding:1px 5px;border-radius:5px;}
+.osd-md pre{font-family:'Fira Code',monospace;background:var(--surface-2,#f1f5f9);padding:11px 13px;border-radius:9px;overflow:auto;font-size:12px;line-height:1.55;border:1px solid var(--border,#e2e8f0);margin:8px 0 2px;}
+.osd-md pre code{background:none;padding:0;}
+.osd-md ul,.osd-md ol{margin:6px 0;padding-left:19px;}
+.osd-md li{margin:3px 0;}
+.osd-md p{margin:5px 0;}
+.osd-md p:first-child{margin-top:0;}
+.osd-md p:last-child{margin-bottom:0;}
+.osd-md strong{font-weight:650;}
+@keyframes osdFade{from{opacity:0}to{opacity:1}}
+@keyframes osdScale{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}
+@keyframes osdMsg{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes osdSlide{from{transform:translateX(24px);opacity:0}to{transform:none;opacity:1}}
+@keyframes osdSpin{to{transform:rotate(360deg)}}
+</style>
+</helmet>
+
+<div style="{{ themeVars }}">
+
+  <!-- ===================== REPO VERIFICATION (State A) ===================== -->
+  <sc-if value="{{ needsVerify }}" hint-placeholder-val="{{ false }}">
+    <div style="height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;">
+      <div style="width:100%;max-width:460px;">
+        <div style="display:flex;align-items:center;gap:11px;margin-bottom:24px;justify-content:center;">
+          <div style="width:34px;height:34px;border-radius:9px;background:var(--accent-grad,#4f46e5);display:flex;align-items:center;justify-content:center;color:#fff;font-family:'Fira Code',monospace;font-weight:600;font-size:16px;">&lt;/&gt;</div>
+          <div style="font-family:'Outfit',sans-serif;font-weight:700;font-size:19px;color:var(--text,#0f172a);">OpenSpec Dashboard</div>
+        </div>
+        <div style="background:var(--surface,#fff);border:1px solid var(--border,#e2e8f0);border-radius:var(--radius,14px);box-shadow:var(--shadow-lg);padding:26px;">
+          <div style="font-family:'Outfit',sans-serif;font-weight:700;font-size:17px;color:var(--text,#0f172a);">Connect a repository</div>
+          <div style="font-size:13px;color:var(--dim,#64748b);margin-top:5px;line-height:1.5;">Enter the absolute path to a local repository to begin.</div>
+          <label style="display:block;font-size:12px;font-weight:600;color:var(--text,#0f172a);margin:18px 0 6px;">Absolute Directory Path</label>
+          <input value="{{ pathInput }}" onChange="{{ onPathInput }}" placeholder="/Users/you/dev/project" style="width:100%;padding:11px 13px;font-family:'Fira Code',monospace;font-size:13px;color:var(--text,#0f172a);background:var(--surface-2,#f1f5f9);border:1px solid var(--border,#e2e8f0);border-radius:var(--radius-sm,10px);outline:none;"/>
+          <sc-if value="{{ verifyError }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:12px;display:flex;align-items:center;gap:9px;padding:11px 13px;background:var(--amber-soft,#fffbeb);border:1px solid var(--amber,#f59e0b);border-radius:var(--radius-sm,10px);color:var(--amber-text,#b45309);font-size:12.5px;"><span>⚠</span><span>That directory doesn't exist or isn't readable.</span></div>
+          </sc-if>
+          <button onClick="{{ verifyPath }}" style="margin-top:16px;width:100%;padding:12px;background:var(--accent-grad,#4f46e5);color:#fff;border:none;border-radius:var(--radius-sm,10px);font-family:'Outfit',sans-serif;font-size:13.5px;font-weight:700;cursor:pointer;box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;gap:9px;">
+            <sc-if value="{{ verifying }}" hint-placeholder-val="{{ false }}"><span style="width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;display:inline-block;animation:osdSpin .7s linear infinite;"></span></sc-if>
+            {{ verifyLabel }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ===================== APP SHELL ===================== -->
+  <sc-if value="{{ repoVerified }}" hint-placeholder-val="{{ true }}">
+  <div style="height:100vh;display:flex;overflow:hidden;">
+
+    <!-- ===== SIDEBAR ===== -->
+    <aside style="width:266px;flex-shrink:0;background:var(--surface-2,#f1f5f9);border-right:1px solid var(--border,#e2e8f0);display:flex;flex-direction:column;">
+      <div style="padding:18px 18px 14px;display:flex;align-items:center;gap:10px;">
+        <div style="width:30px;height:30px;border-radius:8px;background:var(--accent-grad,#4f46e5);display:flex;align-items:center;justify-content:center;color:#fff;font-family:'Fira Code',monospace;font-weight:600;font-size:14px;">&lt;/&gt;</div>
+        <div style="font-family:'Outfit',sans-serif;font-weight:700;font-size:15px;color:var(--text,#0f172a);">OpenSpec</div>
+      </div>
+
+      <!-- repo card -->
+      <div style="margin:0 14px 6px;padding:12px 13px;background:var(--surface,#fff);border:1px solid var(--border,#e2e8f0);border-radius:var(--radius-sm,10px);box-shadow:var(--shadow);">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+          <div style="display:flex;align-items:center;gap:6px;min-width:0;">
+            <span style="width:7px;height:7px;border-radius:50%;background:var(--green,#10b981);flex-shrink:0;"></span>
+            <span style="font-family:'Fira Code',monospace;font-size:11.5px;color:var(--text,#0f172a);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ repoPath }}</span>
+          </div>
+          <button onClick="{{ reVerify }}" title="Switch repository" style="border:none;background:none;cursor:pointer;color:var(--faint,#9aa7bd);font-size:13px;flex-shrink:0;">⇄</button>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:9px;">
+          <span style="flex:1;display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:4px 6px;background:var(--green-soft,#ecfdf5);color:var(--green-text,#047857);border-radius:6px;font-size:10px;font-weight:600;"><span style="width:5px;height:5px;border-radius:50%;background:var(--green,#10b981);"></span>Git</span>
+          <sc-if value="{{ openspecInit }}" hint-placeholder-val="{{ false }}"><span style="flex:1;display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:4px 6px;background:var(--green-soft,#ecfdf5);color:var(--green-text,#047857);border-radius:6px;font-size:10px;font-weight:600;"><span style="width:5px;height:5px;border-radius:50%;background:var(--green,#10b981);"></span>OpenSpec</span></sc-if>
+          <sc-if value="{{ notOpenspec }}" hint-placeholder-val="{{ true }}"><span style="flex:1;display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:4px 6px;background:var(--amber-soft,#fffbeb);color:var(--amber-text,#b45309);border-radius:6px;font-size:10px;font-weight:600;"><span style="width:5px;height:5px;border-radius:50%;background:var(--amber,#f59e0b);"></span>OpenSpec</span></sc-if>
+        </div>
+      </div>
+
+      <!-- changes -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px 8px;">
+        <span style="font-family:'Outfit',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--faint,#9aa7bd);">Changes</span>
+        <span style="font-size:11px;color:var(--faint,#9aa7bd);">{{ changeCount }}</span>
+      </div>
+      <div style="flex:1;overflow-y:auto;padding:0 12px;display:flex;flex-direction:column;gap:5px;">
+        <sc-for list="{{ changeList }}" as="c" hint-placeholder-count="3"><div onClick="{{ c.onClick }}" style="cursor:pointer;padding:10px 11px;border-radius:var(--radius-sm,10px);border:1px solid transparent;transition:all .15s;{{ c.sel }}"><div style="display:flex;align-items:center;gap:7px;"><span style="width:6px;height:6px;border-radius:50%;flex-shrink:0;background:{{ c.dot }};"></span><span style="font-family:'Fira Code',monospace;font-size:12px;font-weight:500;color:var(--text,#0f172a);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ c.name }}</span></div><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:7px;padding-left:13px;"><span style="font-size:10px;font-weight:600;color:{{ c.statusColor }};">{{ c.status }}</span><span style="font-size:10px;color:var(--faint,#9aa7bd);font-family:'Fira Code',monospace;">{{ c.progress }}</span></div></div></sc-for>
+      </div>
+      <div style="padding:12px;">
+        <button onClick="{{ openNewChange }}" style="width:100%;display:flex;align-items:center;justify-content:center;gap:7px;padding:10px;background:var(--accent-grad,#4f46e5);color:#fff;border:none;border-radius:var(--radius-sm,10px);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;box-shadow:var(--shadow);"><span style="font-size:15px;line-height:1;">+</span>New Change</button>
+      </div>
+
+      <!-- footer: appearance -->
+      <div style="padding:12px 14px;border-top:1px solid var(--border,#e2e8f0);display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        <div style="display:flex;gap:2px;padding:2px;background:var(--surface,#fff);border-radius:8px;border:1px solid var(--border,#e2e8f0);">
+          <button onClick="{{ tSoft.onClick }}" title="Soft theme" style="border:none;cursor:pointer;font-family:inherit;font-size:10.5px;font-weight:600;padding:4px 8px;border-radius:6px;{{ softStyle }}">S</button>
+          <button onClick="{{ tMono.onClick }}" title="Mono theme" style="border:none;cursor:pointer;font-family:inherit;font-size:10.5px;font-weight:600;padding:4px 8px;border-radius:6px;{{ monoStyle }}">M</button>
+          <button onClick="{{ tVivid.onClick }}" title="Vivid theme" style="border:none;cursor:pointer;font-family:inherit;font-size:10.5px;font-weight:600;padding:4px 8px;border-radius:6px;{{ vividStyle }}">V</button>
+        </div>
+        <button onClick="{{ toggleMode }}" style="width:32px;height:30px;border:1px solid var(--border,#e2e8f0);background:var(--surface,#fff);border-radius:8px;cursor:pointer;font-size:13px;color:var(--text,#0f172a);">{{ modeIcon }}</button>
+      </div>
+    </aside>
+
+    <!-- ===== MAIN ===== -->
+    <div style="flex:1;display:flex;flex-direction:column;min-width:0;background:var(--bg,#f6f8fb);">
+
+      <!-- header -->
+      <header style="flex-shrink:0;background:var(--surface,#fff);border-bottom:1px solid var(--border,#e2e8f0);padding:15px 26px;display:flex;align-items:center;justify-content:space-between;gap:18px;">
+        <div style="min-width:0;">
+          <div style="font-family:'Fira Code',monospace;font-weight:500;font-size:17px;color:var(--text,#0f172a);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ selectedChange }}</div>
+          <div style="font-size:12px;color:var(--dim,#64748b);margin-top:2px;">{{ meta.schema }} · created {{ meta.created }}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="display:flex;gap:3px;padding:3px;background:var(--surface-2,#f1f5f9);border-radius:10px;border:1px solid var(--border,#e2e8f0);">
+            <button onClick="{{ setBuild }}" style="border:none;cursor:pointer;font-family:'Outfit',sans-serif;font-size:13px;font-weight:600;padding:8px 18px;border-radius:8px;transition:all .18s;{{ buildStyle }}">Build</button>
+            <button onClick="{{ setReview }}" style="border:none;cursor:pointer;font-family:'Outfit',sans-serif;font-size:13px;font-weight:600;padding:8px 18px;border-radius:8px;transition:all .18s;{{ reviewStyle }}">Review</button>
+          </div>
+        </div>
+      </header>
+
+      <!-- ===== BUILD VIEW ===== -->
+      <sc-if value="{{ isBuild }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1;min-height:0;overflow-y:auto;padding:26px;">
+          <div style="max-width:680px;margin:0 auto;display:flex;flex-direction:column;gap:18px;">
+
+            <sc-if value="{{ hasNotice }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;align-items:center;gap:10px;padding:12px 15px;background:var(--green-soft,#ecfdf5);border:1px solid var(--green,#10b981);border-radius:var(--radius-sm,10px);color:var(--green-text,#047857);font-size:13px;font-weight:500;margin-bottom:20px;animation:osdMsg .2s ease;"><span>✓</span><span style="flex:1;">{{ wsNotice }}</span><button onClick="{{ clearNotice }}" style="border:none;background:none;cursor:pointer;color:var(--green-text,#047857);font-size:15px;">×</button></div>
+            </sc-if>
+
+            <sc-if value="{{ notOpenspec }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;align-items:center;gap:13px;padding:13px 16px;background:var(--amber-soft,#fffbeb);border:1px solid var(--amber,#f59e0b);border-radius:var(--radius-sm,10px);margin-bottom:20px;"><span style="font-size:15px;">⚠</span><div style="flex:1;"><div style="font-size:13px;font-weight:600;color:var(--text,#0f172a);">OpenSpec isn't initialized in this repo</div><div style="font-size:12px;color:var(--dim,#64748b);margin-top:1px;">Scaffold the openspec/ directory to start tracking changes.</div></div><button onClick="{{ initOpenspec }}" style="padding:9px 15px;background:var(--accent-grad,#4f46e5);color:#fff;border:none;border-radius:var(--radius-sm,10px);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;">Initialize</button></div>
+            </sc-if>
+
+            <!-- Propose -->
+            <div style="background:var(--surface,#fff);border:1px solid var(--border,#e2e8f0);border-radius:var(--radius,14px);box-shadow:var(--shadow);padding:19px 21px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;">
+                <div><div style="font-family:'Outfit',sans-serif;font-weight:700;font-size:15px;color:var(--text,#0f172a);">Propose</div><div style="font-size:12.5px;color:var(--dim,#64748b);margin-top:2px;">Generate the spec, design & task pipeline with your engine.</div></div>
+                <div style="position:relative;min-width:150px;"><select onChange="{{ onProposeEngine }}" value="{{ proposeEngine }}" style="appearance:none;-webkit-appearance:none;width:100%;padding:8px 30px 8px 11px;font-family:inherit;font-size:12.5px;color:var(--text,#0f172a);background:var(--surface-2,#f1f5f9);border:1px solid var(--border,#e2e8f0);border-radius:var(--radius-sm,10px);cursor:pointer;outline:none;"><sc-for list="{{ engineOptions }}" as="o" hint-placeholder-count="4"><option value="{{ o.v }}">{{ o.l }}</option></sc-for></select><span style="position:absolute;right:11px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--dim,#64748b);font-size:10px;">▾</span></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;background:var(--surface-2,#f1f5f9);border:1px solid var(--border,#e2e8f0);border-radius:var(--radius-sm,10px);padding:11px 14px;">
+                <span style="color:var(--accent,#4f46e5);font-family:'Fira Code',monospace;font-size:13px;font-weight:600;">$</span>
+                <code style="flex:1;font-family:'Fira Code',monospace;font-size:12.5px;color:var(--text,#0f172a);overflow:auto;white-space:nowrap;">{{ commandText }}</code>
+                <button onClick="{{ runPropose }}" style="padding:8px 15px;background:var(--accent-soft,#eef2ff);color:var(--accent,#4f46e5);border:1px solid var(--accent-border,#c7d2fe);border-radius:8px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">Run</button>
+              </div>
+            </div>
+
+            <!-- Worktree -->
+            <div style="background:var(--surface,#fff);border:1px solid var(--border,#e2e8f0);border-radius:var(--radius,14px);box-shadow:var(--shadow);padding:19px 21px;">
+              <div style="font-family:'Outfit',sans-serif;font-weight:700;font-size:15px;color:var(--text,#0f172a);">Git Worktree</div>
+              <div style="font-size:12.5px;color:var(--dim,#64748b);margin-top:2px;margin-bottom:14px;">Spin up an isolated worktree for this change.</div>
+              <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+                <div style="flex:1;min-width:180px;"><label style="display:block;font-size:11.5px;font-weight:600;color:var(--dim,#64748b);margin-bottom:5px;">Branch Name</label><input value="{{ branchName }}" onChange="{{ onBranch }}" placeholder="feature/passwordless-auth" style="width:100%;padding:9px 12px;font-family:'Fira Code',monospace;font-size:12.5px;color:var(--text,#0f172a);background:var(--surface-2,#f1f5f9);border:1px solid var(--border,#e2e8f0);border-radius:var(--radius-sm,10px);outline:none;"/></div>
+                <div style="flex:1;min-width:180px;"><label style="display:block;font-size:11.5px;font-weight:600;color:var(--dim,#64748b);margin-bottom:5px;">Destination <span style="font-weight:400;color:var(--faint,#9aa7bd);">(auto)</span></label><input value="{{ destPath }}" readonly style="width:100%;padding:9px 12px;font-family:'Fira Code',monospace;font-size:12.5px;color:var(--dim,#64748b);background:var(--surface-2,#f1f5f9);border:1px solid var(--border,#e2e8f0);border-radius:var(--radius-sm,10px);outline:none;"/></div>
+                <button onClick="{{ createWorktree }}" style="padding:9px 16px;background:var(--surface,#fff);color:var(--text,#0f172a);border:1px solid var(--border,#e2e8f0);border-radius:var(--radius-sm,10px);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;box-shadow:var(--shadow);">Create Worktree</button>
+              </div>
+            </div>
+
+            <!-- Brainstorm -->
+            <div style="background:var(--surface,#fff);border:1px solid var(--border,#e2e8f0);border-radius:var(--radius,14px);box-shadow:var(--shadow);padding:19px 21px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+              <div><div style="font-family:'Outfit',sans-serif;font-weight:700;font-size:15px;color:var(--text,#0f172a);">Brainstorm &amp; Stress-Test</div><div style="font-size:12.5px;color:var(--dim,#64748b);margin-top:2px;max-width:380px;">Have an AI auditor grill your idea and surface edge cases before committing.</div></div>
+              <button onClick="{{ openBrainstorm }}" style="display:inline-flex;align-items:center;gap:8px;padding:10px 18px;background:var(--surface,#fff);color:var(--accent,#4f46e5);border:1px solid var(--accent-border,#c7d2fe);border-radius:var(--radius-sm,10px);font-family:'Outfit',sans-serif;font-size:13px;font-weight:700;cursor:pointer;box-shadow:var(--shadow);white-space:nowrap;">⚡ Grill Me</button>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ===== REVIEW VIEW ===== -->
+      <sc-if value="{{ isReview }}" hint-placeholder-val="{{ true }}">
+        <div style="flex:1;min-height:0;display:flex;">
+          <!-- DAG area -->
+          <div style="flex:1;min-width:0;overflow:auto;padding:22px 26px;">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+              <span style="display:inline-flex;align-items:center;gap:6px;padding:6px 11px;background:var(--surface,#fff);border:1px solid var(--border,#e2e8f0);border-radius:8px;font-size:12px;color:var(--dim,#64748b);box-shadow:var(--shadow);">Schema <strong style="color:var(--text,#0f172a);font-weight:600;">{{ meta.schema }}</strong></span>
+              <span style="display:inline-flex;align-items:center;gap:6px;padding:6px 11px;background:var(--surface,#fff);border:1px solid var(--border,#e2e8f0);border-radius:8px;font-size:12px;color:var(--dim,#64748b);box-shadow:var(--shadow);">{{ taskSummary }}</span>
+              <div style="flex:1;"></div>
+              <sc-if value="{{ auditorClosed }}" hint-placeholder-val="{{ true }}">
+                <button onClick="{{ openAuditor }}" style="display:inline-flex;align-items:center;gap:7px;padding:8px 14px;background:var(--accent-soft,#eef2ff);color:var(--accent,#4f46e5);border:1px solid var(--accent-border,#c7d2fe);border-radius:9px;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;">💬 Auditor</button>
+              </sc-if>
+            </div>
+
+            <div style="background:var(--canvas,#fbfcfe);border:1px solid var(--border,#e2e8f0);border-radius:var(--radius,14px);box-shadow:var(--shadow);padding:10px;overflow-x:auto;background-image:radial-gradient(var(--dot,transparent) 1px, transparent 1px);background-size:18px 18px;">
+              <div ref="{{ dagRef }}" style="position:relative;min-width:700px;padding:20px 16px 10px;">
+                <svg style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:0;">
+                  <sc-for list="{{ conns }}" as="c" hint-placeholder-count="0"><path d="{{ c.d }}" fill="none" stroke="{{ c.stroke }}" stroke-width="{{ c.w }}" stroke-opacity="{{ c.op }}" stroke-linecap="round"></path></sc-for>
+                </svg>
+                <div style="position:relative;z-index:1;display:grid;grid-template-columns:repeat(4,1fr);gap:0 26px;">
+                  <div style="display:flex;flex-direction:column;gap:16px;">
+                    <div style="font-family:'Outfit',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--accent,#4f46e5);padding-bottom:2px;">Proposal</div>
+                    <sc-for list="{{ proposalNodes }}" as="n" hint-placeholder-count="1"><div data-node="{{ n.id }}" onMouseEnter="{{ n.onEnter }}" onMouseLeave="{{ n.onLeave }}" onClick="{{ n.onClick }}" style="cursor:pointer;background:var(--surface,#fff);border:1px solid var(--border,#e2e8f0);border-radius:var(--radius-sm,10px);padding:11px 13px;box-shadow:var(--shadow);transition:opacity .18s,border-color .18s,box-shadow .18s;opacity:{{ n.op }};border-color:{{ n.bd }};box-shadow:{{ n.sh }};"><div style="font-family:'Fira Code',monospace;font-size:9.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--faint,#9aa7bd);margin-bottom:4px;">{{ n.kind }}</div><div style="font-family:'Fira Code',monospace;font-size:13px;font-weight:500;color:var(--text,#0f172a);line-height:1.25;">{{ n.title }}</div></div></sc-for>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:16px;">
+                    <div style="font-family:'Outfit',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--accent,#4f46e5);padding-bottom:2px;">Specs</div>
+                    <sc-for list="{{ specNodes }}" as="n" hint-placeholder-count="3"><div data-node="{{ n.id }}" onMouseEnter="{{ n.onEnter }}" onMouseLeave="{{ n.onLeave }}" onClick="{{ n.onClick }}" style="cursor:pointer;background:var(--surface,#fff);border:1px solid var(--border,#e2e8f0);border-radius:var(--radius-sm,10px);padding:11px 13px;box-shadow:var(--shadow);transition:opacity .18s,border-color .18s,box-shadow .18s;opacity:{{ n.op }};border-color:{{ n.bd }};box-shadow:{{ n.sh }};"><div style="font-family:'Fira Code',monospace;font-size:9.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--faint,#9aa7bd);margin-bottom:4px;">{{ n.kind }}</div><div style="font-size:13.5px;font-weight:600;color:var(--text,#0f172a);line-height:1.25;">{{ n.title }}</div><div style="font-size:11.5px;color:var(--dim,#64748b);margin-top:3px;">{{ n.sub }}</div></div></sc-for>
+                    <sc-if value="{{ isEmptyGraph }}" hint-placeholder-val="{{ false }}"><div style="padding:14px;border:1px dashed var(--border,#e2e8f0);border-radius:var(--radius-sm,10px);font-size:11.5px;color:var(--faint,#9aa7bd);text-align:center;line-height:1.5;">Run propose to populate specs, design &amp; tasks.</div></sc-if>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:16px;">
+                    <div style="font-family:'Outfit',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--accent,#4f46e5);padding-bottom:2px;">Design</div>
+                    <sc-for list="{{ designNodes }}" as="n" hint-placeholder-count="2"><div data-node="{{ n.id }}" onMouseEnter="{{ n.onEnter }}" onMouseLeave="{{ n.onLeave }}" onClick="{{ n.onClick }}" style="cursor:pointer;background:var(--surface,#fff);border:1px solid var(--border,#e2e8f0);border-radius:var(--radius-sm,10px);padding:11px 13px;box-shadow:var(--shadow);transition:opacity .18s,border-color .18s,box-shadow .18s;opacity:{{ n.op }};border-color:{{ n.bd }};box-shadow:{{ n.sh }};"><div style="font-family:'Fira Code',monospace;font-size:9.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--faint,#9aa7bd);margin-bottom:4px;">{{ n.kind }}</div><div style="font-size:13.5px;font-weight:600;color:var(--text,#0f172a);line-height:1.25;">{{ n.title }}</div><div style="font-size:11.5px;color:var(--dim,#64748b);margin-top:3px;">{{ n.sub }}</div></div></sc-for>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:16px;">
+                    <div style="font-family:'Outfit',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--accent,#4f46e5);padding-bottom:2px;">Tasks</div>
+                    <sc-for list="{{ taskNodes }}" as="n" hint-placeholder-count="4"><div data-node="{{ n.id }}" onMouseEnter="{{ n.onEnter }}" onMouseLeave="{{ n.onLeave }}" onClick="{{ n.onClick }}" style="cursor:pointer;background:var(--surface,#fff);border:1px solid var(--border,#e2e8f0);border-radius:var(--radius-sm,10px);padding:11px 13px;box-shadow:var(--shadow);transition:opacity .18s,border-color .18s,box-shadow .18s;opacity:{{ n.op }};border-color:{{ n.bd }};box-shadow:{{ n.sh }};"><div style="font-size:13px;font-weight:600;color:var(--text,#0f172a);line-height:1.25;">{{ n.title }}</div><div onClick="{{ n.onToggle }}" style="display:flex;align-items:center;gap:7px;margin-top:8px;"><span style="width:16px;height:16px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;border:1.5px solid {{ n.checkBd }};background:{{ n.checkBg }};color:#fff;font-size:10px;line-height:1;">{{ n.check }}</span><span style="font-size:11px;font-weight:500;color:{{ n.taskColor }};">{{ n.taskLabel }}</span></div></div></sc-for>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div style="font-size:11.5px;color:var(--faint,#9aa7bd);text-align:center;margin-top:12px;">Hover or click a node to trace its connected path. Toggle task checkboxes to update completion.</div>
+          </div>
+
+          <!-- Auditor panel -->
+          <sc-if value="{{ auditorOpen }}" hint-placeholder-val="{{ false }}">
+          <aside style="width:392px;flex-shrink:0;border-left:1px solid var(--border,#e2e8f0);background:var(--surface,#fff);display:flex;flex-direction:column;animation:osdSlide .24s ease;">
+            <div style="padding:15px 18px;border-bottom:1px solid var(--border,#e2e8f0);display:flex;align-items:center;justify-content:space-between;gap:10px;">
+              <div><div style="font-family:'Outfit',sans-serif;font-weight:700;font-size:14px;color:var(--text,#0f172a);">Traceability Auditor</div><div style="font-size:11px;color:var(--dim,#64748b);margin-top:1px;">Alignment & linkage checks</div></div>
+              <div style="display:flex;gap:6px;"><button onClick="{{ toggleSettings }}" style="width:32px;height:32px;border:1px solid var(--border,#e2e8f0);background:var(--surface-2,#f1f5f9);border-radius:8px;cursor:pointer;font-size:14px;color:var(--dim,#64748b);">⚙</button><button onClick="{{ closeAuditor }}" style="width:32px;height:32px;border:1px solid var(--border,#e2e8f0);background:var(--surface-2,#f1f5f9);border-radius:8px;cursor:pointer;font-size:16px;color:var(--dim,#64748b);">×</button></div>
+            </div>
+            <sc-if value="{{ settingsOpen }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:13px 18px;border-bottom:1px solid var(--border,#e2e8f0);background:var(--surface-2,#f1f5f9);display:flex;flex-direction:column;gap:9px;">
+                <div style="position:relative;"><div style="font-size:10.5px;color:var(--faint,#9aa7bd);font-weight:600;margin-bottom:4px;">Provider</div><select onChange="{{ onProvider }}" value="{{ llmProvider }}" style="appearance:none;-webkit-appearance:none;width:100%;padding:7px 28px 7px 10px;font-family:inherit;font-size:12px;color:var(--text,#0f172a);background:var(--surface,#fff);border:1px solid var(--border,#e2e8f0);border-radius:8px;cursor:pointer;outline:none;"><sc-for list="{{ providerOptions }}" as="o" hint-placeholder-count="3"><option value="{{ o.v }}">{{ o.l }}</option></sc-for></select><span style="position:absolute;right:11px;bottom:9px;pointer-events:none;color:var(--dim,#64748b);font-size:10px;">▾</span></div>
+                <div><div style="font-size:10.5px;color:var(--faint,#9aa7bd);font-weight:600;margin-bottom:4px;">Model</div><input value="{{ llmModel }}" onChange="{{ onModel }}" style="width:100%;padding:7px 10px;font-family:'Fira Code',monospace;font-size:11.5px;color:var(--text,#0f172a);background:var(--surface,#fff);border:1px solid var(--border,#e2e8f0);border-radius:8px;outline:none;"/></div>
+              </div>
+            </sc-if>
+            <div style="padding:11px 18px;display:flex;gap:7px;flex-wrap:wrap;border-bottom:1px solid var(--border,#e2e8f0);">
+              <sc-for list="{{ shortcuts }}" as="sc" hint-placeholder-count="3"><button onClick="{{ sc.onClick }}" style="display:inline-flex;align-items:center;gap:5px;padding:6px 10px;background:var(--accent-soft,#eef2ff);color:var(--accent,#4f46e5);border:1px solid var(--accent-border,#c7d2fe);border-radius:8px;font-family:inherit;font-size:11.5px;font-weight:600;cursor:pointer;"><span style="font-size:12px;">{{ sc.icon }}</span>{{ sc.label }}</button></sc-for>
+            </div>
+            <div ref="{{ chatRef }}" style="flex:1;overflow-y:auto;padding:16px;">
+              <sc-for list="{{ messages }}" as="m" hint-placeholder-count="1"><div style="display:flex;justify-content:{{ m.justify }};margin-bottom:12px;animation:osdMsg .25s ease;"><div class="osd-md" style="max-width:88%;padding:10px 13px;border-radius:12px;font-size:12.5px;line-height:1.55;background:{{ m.bg }};color:{{ m.color }};border:{{ m.border }};box-shadow:var(--shadow);">{{ m.html }}</div></div></sc-for>
+            </div>
+            <div style="padding:12px 15px;border-top:1px solid var(--border,#e2e8f0);display:flex;gap:8px;">
+              <input value="{{ chatInput }}" onChange="{{ onChatInput }}" onKeyDown="{{ onChatKey }}" placeholder="Ask the auditor…" style="flex:1;padding:10px 13px;font-family:inherit;font-size:12.5px;color:var(--text,#0f172a);background:var(--surface-2,#f1f5f9);border:1px solid var(--border,#e2e8f0);border-radius:10px;outline:none;"/>
+              <button onClick="{{ sendChat }}" style="padding:0 16px;background:var(--accent-grad,#4f46e5);color:#fff;border:none;border-radius:10px;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;">Send</button>
+            </div>
+          </aside>
+          </sc-if>
+        </div>
+      </sc-if>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ===================== NEW CHANGE MODAL ===================== -->
+  <sc-if value="{{ newChangeOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;inset:0;z-index:55;background:rgba(2,6,23,.5);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);display:flex;align-items:center;justify-content:center;padding:24px;animation:osdFade .2s ease;">
+      <div style="width:min(560px,96vw);max-height:90vh;overflow-y:auto;background:var(--surface,#fff);border:1px solid var(--border,#e2e8f0);border-radius:var(--radius,14px);box-shadow:var(--shadow-lg);padding:24px;animation:osdScale .26s ease;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;"><div style="font-family:'Outfit',sans-serif;font-weight:700;font-size:17px;color:var(--text,#0f172a);">Create New Change</div><button onClick="{{ closeNewChange }}" style="width:32px;height:32px;border:1px solid var(--border,#e2e8f0);background:var(--surface-2,#f1f5f9);border-radius:8px;cursor:pointer;font-size:16px;color:var(--dim,#64748b);">×</button></div>
+        <div style="display:flex;flex-direction:column;gap:16px;">
+          <div><label style="display:block;font-size:12px;font-weight:600;color:var(--text,#0f172a);margin-bottom:6px;">Change Name</label><input value="{{ changeName }}" onChange="{{ onChangeName }}" placeholder="add-feature-name" style="width:100%;padding:10px 13px;font-family:'Fira Code',monospace;font-size:13px;color:var(--text,#0f172a);background:var(--surface-2,#f1f5f9);border:1px solid var(--border,#e2e8f0);border-radius:var(--radius-sm,10px);outline:none;"/><sc-if value="{{ changeNameErr }}" hint-placeholder-val=""><div style="font-size:11.5px;color:var(--amber-text,#b45309);margin-top:5px;">{{ changeNameErr }}</div></sc-if></div>
+          <div><label style="display:block;font-size:12px;font-weight:600;color:var(--text,#0f172a);margin-bottom:6px;">Description <span style="color:var(--faint,#9aa7bd);font-weight:400;">(optional)</span></label><textarea value="{{ desc }}" onChange="{{ onDesc }}" placeholder="What does this change accomplish?" style="width:100%;min-height:64px;resize:vertical;padding:10px 13px;font-family:inherit;font-size:13px;color:var(--text,#0f172a);background:var(--surface-2,#f1f5f9);border:1px solid var(--border,#e2e8f0);border-radius:var(--radius-sm,10px);outline:none;line-height:1.5;"></textarea></div>
+          <div><label style="display:block;font-size:12px;font-weight:600;color:var(--text,#0f172a);margin-bottom:6px;">Propose Engine</label><div style="position:relative;"><select onChange="{{ onWsEngine }}" value="{{ wsEngine }}" style="appearance:none;-webkit-appearance:none;width:100%;padding:10px 32px 10px 13px;font-family:inherit;font-size:13px;color:var(--text,#0f172a);background:var(--surface-2,#f1f5f9);border:1px solid var(--border,#e2e8f0);border-radius:var(--radius-sm,10px);cursor:pointer;outline:none;"><sc-for list="{{ engineOptions }}" as="o" hint-placeholder-count="4"><option value="{{ o.v }}">{{ o.l }}</option></sc-for></select><span style="position:absolute;right:13px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--dim,#64748b);font-size:10px;">▾</span></div></div>
+          <div>
+            <label style="display:block;font-size:12px;font-weight:600;color:var(--text,#0f172a);margin-bottom:8px;">Workflow Mode</label>
+            <div style="display:inline-flex;gap:3px;padding:3px;background:var(--surface-2,#f1f5f9);border-radius:10px;border:1px solid var(--border,#e2e8f0);margin-bottom:12px;"><button onClick="{{ setStandard }}" style="border:none;cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:600;padding:7px 16px;border-radius:8px;{{ stdStyle }}">Standard</button><button onClick="{{ setCustom }}" style="border:none;cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:600;padding:7px 16px;border-radius:8px;{{ cusStyle }}">Custom States</button></div>
+            <sc-if value="{{ isStandard }}" hint-placeholder-val="{{ true }}"><div style="position:relative;"><select onChange="{{ onSchema }}" value="{{ schema }}" style="appearance:none;-webkit-appearance:none;width:100%;padding:10px 32px 10px 13px;font-family:'Fira Code',monospace;font-size:12.5px;color:var(--text,#0f172a);background:var(--surface-2,#f1f5f9);border:1px solid var(--border,#e2e8f0);border-radius:var(--radius-sm,10px);cursor:pointer;outline:none;"><sc-for list="{{ schemaOptions }}" as="o" hint-placeholder-count="4"><option value="{{ o.v }}">{{ o.l }}</option></sc-for></select><span style="position:absolute;right:13px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--dim,#64748b);font-size:10px;">▾</span></div></sc-if>
+            <sc-if value="{{ isCustom }}" hint-placeholder-val="{{ false }}"><div style="display:grid;grid-template-columns:repeat(2,1fr);gap:9px;"><sc-for list="{{ customStateList }}" as="c" hint-placeholder-count="4"><div onClick="{{ c.onToggle }}" style="display:flex;align-items:center;gap:9px;padding:10px 13px;background:var(--surface-2,#f1f5f9);border:1px solid var(--border,#e2e8f0);border-radius:var(--radius-sm,10px);cursor:pointer;"><span style="width:17px;height:17px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;border:1.5px solid;color:#fff;font-size:11px;{{ c.box }}">{{ c.check }}</span><span style="font-size:13px;color:var(--text,#0f172a);font-weight:500;">{{ c.label }}</span></div></sc-for></div></sc-if>
+          </div>
+          <div style="display:flex;gap:10px;padding-top:4px;"><button onClick="{{ createChange }}" style="padding:11px 20px;background:var(--accent-grad,#4f46e5);color:#fff;border:none;border-radius:var(--radius-sm,10px);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;box-shadow:var(--shadow);">Create Change</button><button onClick="{{ closeNewChange }}" style="padding:11px 20px;background:var(--surface,#fff);color:var(--text,#0f172a);border:1px solid var(--border,#e2e8f0);border-radius:var(--radius-sm,10px);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">Cancel</button></div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ===================== BRAINSTORM OVERLAY ===================== -->
+  <sc-if value="{{ brainstormOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;inset:0;z-index:60;background:rgba(2,6,23,.5);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);display:flex;align-items:center;justify-content:center;padding:24px;animation:osdFade .2s ease;">
+      <div style="width:min(1060px,96vw);height:min(86vh,740px);background:var(--bg,#f6f8fb);border:1px solid var(--border,#e2e8f0);border-radius:var(--radius,14px);box-shadow:var(--shadow-lg);overflow:hidden;display:flex;flex-direction:column;animation:osdScale .26s ease;">
+        <div style="padding:16px 22px;background:var(--surface,#fff);border-bottom:1px solid var(--border,#e2e8f0);display:flex;align-items:center;justify-content:space-between;gap:12px;">
+          <div style="display:flex;align-items:center;gap:11px;"><div style="width:30px;height:30px;border-radius:8px;background:var(--accent-grad,#4f46e5);display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px;">⚡</div><div><div style="font-family:'Outfit',sans-serif;font-weight:700;font-size:15px;color:var(--text,#0f172a);">Grill Me with Docs</div><div style="font-size:11.5px;color:var(--dim,#64748b);">AI design auditor</div></div></div>
+          <button onClick="{{ closeBrainstorm }}" style="width:34px;height:34px;border:1px solid var(--border,#e2e8f0);background:var(--surface-2,#f1f5f9);border-radius:9px;cursor:pointer;font-size:17px;color:var(--dim,#64748b);">×</button>
+        </div>
+        <sc-if value="{{ isPhase1 }}" hint-placeholder-val="{{ true }}">
+          <div style="flex:1;overflow-y:auto;padding:32px;display:flex;align-items:flex-start;justify-content:center;">
+            <div style="width:100%;max-width:560px;display:flex;flex-direction:column;gap:18px;">
+              <div><div style="font-family:'Outfit',sans-serif;font-weight:700;font-size:22px;color:var(--text,#0f172a);letter-spacing:-.01em;">Let's pressure-test your idea</div><div style="font-size:13.5px;color:var(--dim,#64748b);margin-top:5px;line-height:1.55;">The auditor will interrogate your concept, surface edge cases, and recommend decisions before any files hit disk.</div></div>
+              <div><label style="display:block;font-size:12px;font-weight:600;color:var(--text,#0f172a);margin-bottom:6px;">Temporary Change Name</label><input value="{{ bsName }}" onChange="{{ onBsName }}" placeholder="add-feature-name" style="width:100%;padding:11px 14px;font-family:'Fira Code',monospace;font-size:13px;color:var(--text,#0f172a);background:var(--surface,#fff);border:1px solid var(--border,#e2e8f0);border-radius:var(--radius-sm,10px);outline:none;box-shadow:var(--shadow);"/></div>
+              <div><label style="display:block;font-size:12px;font-weight:600;color:var(--text,#0f172a);margin-bottom:6px;">Initial Feature Idea</label><textarea value="{{ bsIdea }}" onChange="{{ onBsIdea }}" placeholder="Describe the feature you want to build…" style="width:100%;min-height:120px;resize:vertical;padding:12px 14px;font-family:inherit;font-size:13.5px;color:var(--text,#0f172a);background:var(--surface,#fff);border:1px solid var(--border,#e2e8f0);border-radius:var(--radius-sm,10px);outline:none;line-height:1.55;box-shadow:var(--shadow);"></textarea></div>
+              <div style="background:var(--surface,#fff);border:1px solid var(--border,#e2e8f0);border-radius:var(--radius-sm,10px);overflow:hidden;box-shadow:var(--shadow);">
+                <div onClick="{{ toggleBsModel }}" style="display:flex;align-items:center;justify-content:space-between;padding:13px 16px;cursor:pointer;"><span style="font-size:13px;font-weight:600;color:var(--text,#0f172a);">AI Model Options</span><span style="color:var(--dim,#64748b);font-size:12px;">{{ bsModelCaret }}</span></div>
+                <sc-if value="{{ bsModelOpen }}" hint-placeholder-val="{{ false }}"><div style="padding:0 16px 16px;display:flex;flex-direction:column;gap:11px;border-top:1px solid var(--border,#e2e8f0);padding-top:14px;"><div style="position:relative;"><div style="font-size:11px;color:var(--faint,#9aa7bd);font-weight:600;margin-bottom:4px;">Provider</div><select onChange="{{ onBsProvider }}" value="{{ bsProvider }}" style="appearance:none;-webkit-appearance:none;width:100%;padding:9px 30px 9px 11px;font-family:inherit;font-size:12.5px;color:var(--text,#0f172a);background:var(--surface-2,#f1f5f9);border:1px solid var(--border,#e2e8f0);border-radius:9px;cursor:pointer;outline:none;"><sc-for list="{{ providerOptions }}" as="o" hint-placeholder-count="3"><option value="{{ o.v }}">{{ o.l }}</option></sc-for></select><span style="position:absolute;right:12px;bottom:10px;pointer-events:none;color:var(--dim,#64748b);font-size:10px;">▾</span></div><div><div style="font-size:11px;color:var(--faint,#9aa7bd);font-weight:600;margin-bottom:4px;">Model name</div><input value="{{ bsModel }}" onChange="{{ onBsModelInput }}" style="width:100%;padding:9px 11px;font-family:'Fira Code',monospace;font-size:12px;color:var(--text,#0f172a);background:var(--surface-2,#f1f5f9);border:1px solid var(--border,#e2e8f0);border-radius:9px;outline:none;"/></div><div><div style="font-size:11px;color:var(--faint,#9aa7bd);font-weight:600;margin-bottom:4px;">Endpoint</div><input value="{{ bsEndpoint }}" onChange="{{ onBsEndpoint }}" placeholder="http://localhost:11434" style="width:100%;padding:9px 11px;font-family:'Fira Code',monospace;font-size:12px;color:var(--text,#0f172a);background:var(--surface-2,#f1f5f9);border:1px solid var(--border,#e2e8f0);border-radius:9px;outline:none;"/></div></div></sc-if>
+              </div>
+              <div style="display:flex;gap:10px;"><button onClick="{{ startBrainstorm }}" style="padding:12px 22px;background:var(--accent-grad,#4f46e5);color:#fff;border:none;border-radius:var(--radius-sm,10px);font-family:'Outfit',sans-serif;font-size:13.5px;font-weight:700;cursor:pointer;box-shadow:var(--shadow);">Start Brainstorming</button><button onClick="{{ closeBrainstorm }}" style="padding:12px 22px;background:var(--surface,#fff);color:var(--text,#0f172a);border:1px solid var(--border,#e2e8f0);border-radius:var(--radius-sm,10px);font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer;">Cancel</button></div>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ isPhase2 }}" hint-placeholder-val="{{ false }}">
+          <div style="flex:1;display:flex;min-height:0;">
+            <div style="width:300px;flex-shrink:0;border-right:1px solid var(--border,#e2e8f0);background:var(--surface,#fff);display:flex;flex-direction:column;">
+              <div style="padding:15px 18px 12px;border-bottom:1px solid var(--border,#e2e8f0);"><div style="font-family:'Outfit',sans-serif;font-weight:700;font-size:13px;color:var(--text,#0f172a);text-transform:uppercase;letter-spacing:.04em;">Decision Tree</div><div style="font-size:11.5px;color:var(--dim,#64748b);margin-top:2px;">{{ bsProgress }}</div></div>
+              <div style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:9px;"><sc-for list="{{ bsTopics }}" as="t" hint-placeholder-count="5"><div style="padding:12px 13px;background:var(--surface-2,#f1f5f9);border:1px solid var(--border,#e2e8f0);border-radius:var(--radius-sm,10px);"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;"><span style="font-size:12.5px;font-weight:600;color:var(--text,#0f172a);">{{ t.label }}</span><span style="display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:5px;font-size:9.5px;font-weight:700;letter-spacing:.04em;background:{{ t.badgeBg }};color:{{ t.badgeColor }};"><span style="width:5px;height:5px;border-radius:50%;background:{{ t.dot }};"></span>{{ t.badge }}</span></div><div style="font-size:11px;color:var(--dim,#64748b);margin-top:5px;line-height:1.4;">{{ t.detail }}</div></div></sc-for></div>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;min-width:0;">
+              <div ref="{{ bsChatRef }}" style="flex:1;overflow-y:auto;padding:20px 22px;"><sc-for list="{{ bsMessages }}" as="m" hint-placeholder-count="1"><div style="display:flex;justify-content:{{ m.justify }};margin-bottom:14px;animation:osdMsg .25s ease;"><div class="osd-md" style="max-width:80%;padding:12px 15px;border-radius:13px;font-size:13.5px;line-height:1.6;background:{{ m.bg }};color:{{ m.color }};border:{{ m.border }};box-shadow:var(--shadow);">{{ m.html }}</div></div></sc-for></div>
+              <sc-if value="{{ hasRec }}" hint-placeholder-val="{{ true }}"><div style="padding:10px 22px 0;"><button onClick="{{ acceptRec }}" style="width:100%;text-align:left;padding:11px 15px;background:var(--green-soft,#ecfdf5);color:var(--green-text,#047857);border:1px solid var(--green,#10b981);border-radius:var(--radius-sm,10px);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;"><span>✓ Accept Recommendation:</span><span style="font-weight:500;opacity:.92;">"{{ bsRec }}"</span></button></div></sc-if>
+              <div style="padding:13px 22px;display:flex;gap:9px;"><input value="{{ bsInput }}" onChange="{{ onBsInput }}" onKeyDown="{{ onBsKey }}" placeholder="Respond to the auditor…" style="flex:1;padding:11px 14px;font-family:inherit;font-size:13px;color:var(--text,#0f172a);background:var(--surface,#fff);border:1px solid var(--border,#e2e8f0);border-radius:11px;outline:none;box-shadow:var(--shadow);"/><button onClick="{{ sendBs }}" style="padding:0 18px;background:var(--accent-grad,#4f46e5);color:#fff;border:none;border-radius:11px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;box-shadow:var(--shadow);">Send</button></div>
+              <div style="padding:13px 22px;border-top:1px solid var(--border,#e2e8f0);background:var(--surface,#fff);display:flex;align-items:center;justify-content:space-between;gap:12px;"><span style="font-size:11.5px;color:var(--faint,#9aa7bd);">Resolve at least 4 topics to unlock.</span><button onClick="{{ commitGenerate }}" style="padding:11px 20px;border:none;border-radius:var(--radius-sm,10px);font-family:'Outfit',sans-serif;font-size:13.5px;font-weight:700;box-shadow:var(--shadow);{{ commitStyle }}">Commit &amp; Generate Change</button></div>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Soft&quot;,&quot;Mono&quot;,&quot;Vivid&quot;],&quot;default&quot;:&quot;Soft&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;mode&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+const PALETTES = {
+  Soft:{
+    light:{bg:'#f6f8fb',surface:'#ffffff',s2:'#eef2f7',border:'#c8d4e3',text:'#0f172a',dim:'#64748b',faint:'#9aa7bd',accent:'#4f46e5',accent2:'#6366f1',accentSoft:'#eef2ff',accentBorder:'#c7d2fe',grad:'',green:'#10b981',greenSoft:'#ecfdf5',greenText:'#047857',amber:'#f59e0b',amberSoft:'#fffbeb',amberText:'#b45309',canvas:'#fbfcfe',dot:'transparent',shadow:'0 1px 3px rgba(15,23,42,0.06), 0 1px 2px rgba(15,23,42,0.04)',shadowLg:'0 18px 48px rgba(15,23,42,0.16)',radius:'14px',radiusSm:'10px',cn:'#9aa7bd'},
+    dark:{bg:'#0a0f1c',surface:'#121a2c',s2:'#0e1626',border:'#2c3a57',text:'#e9eefa',dim:'#92a1bd',faint:'#5a6884',accent:'#818cf8',accent2:'#a5b4fc',accentSoft:'rgba(99,102,241,0.18)',accentBorder:'#4f46e5',grad:'',green:'#34d399',greenSoft:'rgba(16,185,129,0.16)',greenText:'#6ee7b7',amber:'#fbbf24',amberSoft:'rgba(245,158,11,0.16)',amberText:'#fcd34d',canvas:'#0c1322',dot:'transparent',shadow:'0 1px 3px rgba(0,0,0,0.4)',shadowLg:'0 24px 60px rgba(0,0,0,0.55)',radius:'14px',radiusSm:'10px',cn:'#5a6884'}
+  },
+  Mono:{
+    light:{bg:'#eef1f5',surface:'#ffffff',s2:'#e3e8ef',border:'#bbc7d6',text:'#0b1220',dim:'#566173',faint:'#8b97a8',accent:'#4338ca',accent2:'#4f46e5',accentSoft:'#e8e9fb',accentBorder:'#c3c4f5',grad:'',green:'#0f9d6e',greenSoft:'#e6f6ef',greenText:'#0a7a55',amber:'#d97706',amberSoft:'#fdf2e3',amberText:'#92500a',canvas:'#f3f6f9',dot:'rgba(15,23,42,0.06)',shadow:'0 1px 2px rgba(15,23,42,0.06)',shadowLg:'0 16px 40px rgba(15,23,42,0.18)',radius:'9px',radiusSm:'7px',cn:'#9aa7bd'},
+    dark:{bg:'#070b13',surface:'#0f1622',s2:'#0b121d',border:'#26344b',text:'#dde6f2',dim:'#84909f',faint:'#4f5b6e',accent:'#7c83f5',accent2:'#a5b4fc',accentSoft:'rgba(99,102,241,0.16)',accentBorder:'#4338ca',grad:'',green:'#2dd4a7',greenSoft:'rgba(16,185,129,0.14)',greenText:'#6ee7b7',amber:'#f0a93b',amberSoft:'rgba(245,158,11,0.14)',amberText:'#fcd34d',canvas:'#090f19',dot:'rgba(255,255,255,0.045)',shadow:'0 1px 2px rgba(0,0,0,0.5)',shadowLg:'0 24px 60px rgba(0,0,0,0.6)',radius:'9px',radiusSm:'7px',cn:'#566173'}
+  },
+  Vivid:{
+    light:{bg:'#f7f5fd',surface:'#ffffff',s2:'#efeafa',border:'#d2c2ec',text:'#1c1430',dim:'#6b6388',faint:'#a99fc4',accent:'#6d28d9',accent2:'#7c3aed',accentSoft:'#f1ecff',accentBorder:'#d9cdfb',grad:'linear-gradient(135deg,#6366f1 0%,#a855f7 100%)',green:'#0ea372',greenSoft:'#e6f7f0',greenText:'#08855c',amber:'#ea8a08',amberSoft:'#fdf3e2',amberText:'#9a5a0a',canvas:'#fbfaff',dot:'transparent',shadow:'0 2px 8px rgba(108,40,217,0.08), 0 1px 2px rgba(28,20,48,0.04)',shadowLg:'0 24px 60px rgba(108,40,217,0.24)',radius:'18px',radiusSm:'13px',cn:'#b3a8d0'},
+    dark:{bg:'#0d0a1a',surface:'#171228',s2:'#120e22',border:'#382c57',text:'#ece8fb',dim:'#a094c2',faint:'#6a5e8c',accent:'#a78bfa',accent2:'#c4b5fd',accentSoft:'rgba(124,58,237,0.22)',accentBorder:'#6d28d9',grad:'linear-gradient(135deg,#818cf8 0%,#c084fc 100%)',green:'#34d399',greenSoft:'rgba(16,185,129,0.16)',greenText:'#6ee7b7',amber:'#fbbf24',amberSoft:'rgba(245,158,11,0.16)',amberText:'#fcd34d',canvas:'#0f0b1d',dot:'transparent',shadow:'0 2px 10px rgba(0,0,0,0.45)',shadowLg:'0 28px 70px rgba(124,58,237,0.42)',radius:'18px',radiusSm:'13px',cn:'#6a5e8c'}
+  }
+};
+
+const CHANGES = {
+  'add-passwordless-auth':{schema:'spec-driven',created:'Jun 12, 2026',status:'In review',
+    proposal:[{id:'p1',title:'passwordless-auth'}],
+    specs:[{id:'s1',title:'Magic-link request',sub:'2 scenarios'},{id:'s2',title:'Token verification',sub:'3 scenarios'},{id:'s3',title:'Session issuance',sub:'2 scenarios'}],
+    design:[{id:'d1',title:'Signed token format',sub:'2 decisions'},{id:'d2',title:'Session store',sub:'1 decision'}],
+    tasks:[{id:'t1',title:'Email link sender',done:true},{id:'t2',title:'Verify endpoint',done:true},{id:'t3',title:'Session middleware',done:false},{id:'t4',title:'Rate limiting',done:false}],
+    edges:[['p1','s1'],['p1','s2'],['p1','s3'],['s1','d1'],['s2','d1'],['s3','d2'],['d1','t1'],['d1','t2'],['d2','t3'],['s2','t4']]},
+  'refactor-billing-engine':{schema:'spec-driven',created:'Jun 09, 2026',status:'Proposing',
+    proposal:[{id:'p1',title:'billing-engine'}],
+    specs:[{id:'s1',title:'Invoice generation',sub:'2 scenarios'},{id:'s2',title:'Proration logic',sub:'3 scenarios'}],
+    design:[{id:'d1',title:'Money value type',sub:'1 decision'}],
+    tasks:[{id:'t1',title:'Decimal migration',done:true},{id:'t2',title:'Proration calc',done:false},{id:'t3',title:'Invoice templates',done:false}],
+    edges:[['p1','s1'],['p1','s2'],['s1','d1'],['s2','d1'],['d1','t1'],['d1','t2'],['s1','t3']]},
+  'add-realtime-presence':{schema:'docs-first',created:'Jun 04, 2026',status:'In review',
+    proposal:[{id:'p1',title:'realtime-presence'}],
+    specs:[{id:'s1',title:'Heartbeat protocol',sub:'2 scenarios'},{id:'s2',title:'Presence fanout',sub:'2 scenarios'},{id:'s3',title:'Idle detection',sub:'1 scenario'}],
+    design:[{id:'d1',title:'Transport choice',sub:'2 decisions'}],
+    tasks:[{id:'t1',title:'WS gateway',done:true},{id:'t2',title:'Heartbeat timer',done:true},{id:'t3',title:'Fanout worker',done:false}],
+    edges:[['p1','s1'],['p1','s2'],['p1','s3'],['s1','d1'],['s2','d1'],['s3','d1'],['d1','t1'],['d1','t2'],['d1','t3']]}
+};
+
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function inlineMd(s){return esc(s).replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');}
+function mdToHtml(md){
+  const parts=String(md).split('```');let html='';
+  parts.forEach((part,i)=>{
+    if(i%2===1){html+='<pre>'+esc(part.replace(/^\n+|\n+$/g,''))+'</pre>';return;}
+    const lines=part.split('\n');let listType=null,buf='';
+    const flush=()=>{if(listType){html+='<'+listType+'>'+buf+'</'+listType+'>';buf='';listType=null;}};
+    lines.forEach(line=>{
+      const t=line.trim();if(!t){flush();return;}
+      const ul=t.match(/^[-*]\s+(.*)/),ol=t.match(/^\d+\.\s+(.*)/);
+      if(ul){if(listType&&listType!=='ul')flush();listType='ul';buf+='<li>'+inlineMd(ul[1])+'</li>';}
+      else if(ol){if(listType&&listType!=='ol')flush();listType='ol';buf+='<li>'+inlineMd(ol[1])+'</li>';}
+      else{flush();html+='<p>'+inlineMd(t)+'</p>';}
+    });
+    flush();
+  });
+  return html;
+}
+
+class Component extends DCLogic {
+  constructor(props){
+    super(props);
+    const taskDone={};
+    Object.entries(CHANGES).forEach(([cid,c])=>{c.tasks.forEach(t=>{taskDone[cid+':'+t.id]=!!t.done;});});
+    this.state={
+      theme:props.theme||'Soft',mode:props.mode||'light',
+      repoVerified:true,verifyState:'idle',pathInput:'~/dev/acme-platform',repoPath:'~/dev/acme-platform',
+      view:'review',selectedChange:'add-passwordless-auth',userChanges:{},
+      proposeEngine:'claude-code',hoverNode:null,connectors:[],taskDone,
+      auditorOpen:false,settingsOpen:false,llmProvider:'gemini',llmModel:'gemini-2.5-pro',llmEndpoint:'',
+      messages:[{role:'auditor',md:"Hi — I audit traceability across the change DAG. Pick a shortcut, or ask me anything about **add-passwordless-auth**."}],
+      chatInput:'',openspecInit:false,
+      newChangeOpen:false,changeName:'',desc:'',wsEngine:'gemini',workflowMode:'standard',schema:'spec-driven',
+      customStates:{proposal:true,specs:true,design:true,tasks:false},
+      branchName:'',wsNotice:'',
+      brainstormOpen:false,brainstormPhase:1,bsName:'add-payment-retries',bsIdea:'',bsModelOpen:false,
+      bsProvider:'gemini',bsModel:'gemini-2.5-pro',bsEndpoint:'',
+      bsTopics:[
+        {id:1,label:'Identifier strategy',status:'resolved',rec:'Use an opaque integer database column'},
+        {id:2,label:'Token lifetime',status:'resolved',rec:'10-minute TTL, single-use'},
+        {id:3,label:'Rate limiting',status:'resolved',rec:'5 requests / 15 min per email'},
+        {id:4,label:'Multi-device sessions',status:'open',rec:'Allow concurrent sessions, cap at 10 devices'},
+        {id:5,label:'Account recovery',status:'open',rec:'Issue one-time backup codes at signup'}
+      ],
+      bsMessages:[{role:'auditor',md:"Let's pressure-test this idea. Three decisions are locked in; two remain.\n\n**Multi-device sessions** — should one account hold active sessions on several devices at once? Think about revocation and session-store load before you answer."}],
+      bsInput:''
+    };
+    this._mlen=this.state.messages.length;this._bslen=this.state.bsMessages.length;
+  }
+  allChanges(){return Object.assign({},CHANGES,this.state.userChanges);}
+  graph(){return this.allChanges()[this.state.selectedChange];}
+  componentDidMount(){
+    this._onResize=()=>this.measureConnectors();
+    window.addEventListener('resize',this._onResize);
+    requestAnimationFrame(()=>this.measureConnectors());
+    setTimeout(()=>this.measureConnectors(),140);
+    if(document.fonts&&document.fonts.ready){document.fonts.ready.then(()=>this.measureConnectors());}
+  }
+  componentWillUnmount(){window.removeEventListener('resize',this._onResize);}
+  componentDidUpdate(pp,ps){
+    const sig=s=>s?[s.selectedChange,s.view,s.theme,s.mode,s.openspecInit,s.auditorOpen,s.repoVerified].join('|'):'';
+    if(sig(ps)!==sig(this.state))requestAnimationFrame(()=>this.measureConnectors());
+    if(this.chatEl&&this.state.messages.length!==this._mlen){this._mlen=this.state.messages.length;this.chatEl.scrollTop=this.chatEl.scrollHeight;}
+    if(this.bsChatEl&&this.state.bsMessages.length!==this._bslen){this._bslen=this.state.bsMessages.length;this.bsChatEl.scrollTop=this.bsChatEl.scrollHeight;}
+  }
+  measureConnectors(){
+    const c=this.dagEl;if(!c){return;}
+    const box=c.getBoundingClientRect();const pos={};
+    c.querySelectorAll('[data-node]').forEach(el=>{const r=el.getBoundingClientRect();pos[el.getAttribute('data-node')]={right:r.right-box.left,left:r.left-box.left,cy:r.top-box.top+r.height/2};});
+    const g=this.graph();
+    const conns=g.edges.map(([a,b])=>{const A=pos[a],B=pos[b];if(!A||!B)return null;const x1=A.right,y1=A.cy,x2=B.left,y2=B.cy;const dx=Math.max(36,(x2-x1)*0.55);return {a,b,d:'M'+x1+','+y1+' C'+(x1+dx)+','+y1+' '+(x2-dx)+','+y2+' '+x2+','+y2};}).filter(Boolean);
+    this.setState({connectors:conns});
+  }
+  selectChange(id){this.setState({selectedChange:id,hoverNode:null,messages:[{role:'auditor',md:"Now viewing **"+id+"**. Open a shortcut to audit its DAG."}]});}
+  runShortcut(key){
+    const g=this.graph(),cid=this.state.selectedChange;
+    const tasks=g.tasks.map(t=>({...t,done:this.state.taskDone[cid+':'+t.id]}));
+    const done=tasks.filter(t=>t.done).length,total=tasks.length,pending=tasks.filter(t=>!t.done);
+    let label,md;
+    if(key==='audit'){label='Audit Traceability';md='**Traceability audit — `'+cid+'`**\n\n- ✅ All '+g.specs.length+' specs trace back to the proposal capability\n- ✅ Design decisions cover every linked spec\n- '+(pending.length?'⚠️ '+pending.length+' task(s) still unlinked to a completed scenario':'✅ Every task maps to a completed scenario')+'\n- ✅ '+done+' / '+total+' tasks complete\n\nRun `openspec validate` to confirm the graph.';}
+    else if(key==='tasks'){label='List Incomplete Tasks';md='**Incomplete tasks ('+pending.length+')**\n\n'+(pending.length?pending.map((t,i)=>(i+1)+'. **'+t.title+'**').join('\n'):'_Nothing pending — all tasks complete._')+'\n\n```\nopenspec tasks --status pending\n```';}
+    else{label='Summarize Decisions';md='**Design decisions for `'+cid+'`**\n\n'+(g.design.length?g.design.map(d=>'- **'+d.title+'** — '+d.sub).join('\n'):'_No design decisions yet — run propose._');}
+    this.setState({messages:this.state.messages.concat([{role:'user',md:label},{role:'auditor',md}])});
+  }
+  sendChat(){const v=this.state.chatInput.trim();if(!v)return;const g=this.graph();const md="**Got it.** For `"+this.state.selectedChange+"` the proposal links to **"+g.specs.length+" specs** and **"+g.design.length+" design decisions**. Want me to run a full `openspec validate`?";this.setState({messages:this.state.messages.concat([{role:'user',md:v},{role:'auditor',md}]),chatInput:''});}
+  nextBsQuestion(topics){const n=topics.find(t=>t.status==='open');return n?"Next: **"+n.label+"** — what's your call?":'';}
+  acceptRec(){const topics=this.state.bsTopics.slice();const idx=topics.findIndex(t=>t.status==='open');if(idx<0)return;const t=topics[idx];topics[idx]={...t,status:'resolved'};const nq=this.nextBsQuestion(topics);this.setState({bsTopics:topics,bsMessages:this.state.bsMessages.concat([{role:'user',md:t.rec},{role:'auditor',md:'Recorded **'+t.label+'** → `'+t.rec+'`. '+(nq||'That covers the critical decisions — you can **commit & generate** whenever you are ready.')}])});}
+  sendBs(){const v=this.state.bsInput.trim();if(!v)return;this.setState({bsMessages:this.state.bsMessages.concat([{role:'user',md:v},{role:'auditor',md:"Noted — I'll factor that in. Accept the recommendation to lock this topic, or keep refining."}]),bsInput:''});}
+  verifyPath(){if(this.state.verifyState==='loading')return;this.setState({verifyState:'loading'});const p=this.state.pathInput.trim();setTimeout(()=>{if(!p||/nonexist|invalid|\bbad\b/.test(p)){this.setState({verifyState:'error'});}else{this.setState({repoVerified:true,repoPath:p,verifyState:'idle'});}},750);}
+  addDraft(name){const uc={...this.state.userChanges};uc[name]={schema:this.state.schema,created:'just now',status:'Draft',proposal:[{id:'p1',title:name}],specs:[],design:[],tasks:[],edges:[]};this.setState({userChanges:uc,selectedChange:name,hoverNode:null,messages:[{role:'auditor',md:"**"+name+"** created. Run propose to generate its spec/design/task pipeline."}]});}
+  renderVals(){
+    const s=this.state,p=PALETTES[s.theme][s.mode];
+    const themeVars={'--bg':p.bg,'--surface':p.surface,'--surface-2':p.s2,'--border':p.border,'--text':p.text,'--dim':p.dim,'--faint':p.faint,'--accent':p.accent,'--accent-2':p.accent2,'--accent-soft':p.accentSoft,'--accent-border':p.accentBorder,'--accent-grad':p.grad||p.accent,'--green':p.green,'--green-soft':p.greenSoft,'--green-text':p.greenText,'--amber':p.amber,'--amber-soft':p.amberSoft,'--amber-text':p.amberText,'--canvas':p.canvas,'--dot':p.dot,'--shadow':p.shadow,'--shadow-lg':p.shadowLg,'--radius':p.radius,'--radius-sm':p.radiusSm,'--cn':p.cn,fontFamily:"'Inter',system-ui,-apple-system,sans-serif",background:p.bg,color:p.text,transition:'background .3s, color .3s'};
+    const all=this.allChanges(),g=all[s.selectedChange];
+    const hv=s.hoverNode,connSet=new Set();
+    if(hv){connSet.add(hv);g.edges.forEach(([a,b])=>{if(a===hv)connSet.add(b);if(b===hv)connSet.add(a);});}
+    const deco=id=>!hv?{op:'',bd:'',sh:''}:(connSet.has(id)?{op:'1',bd:'var(--accent,#4f46e5)',sh:'0 0 0 3px var(--accent-soft,#eef2ff), var(--shadow,0 1px 3px rgba(15,23,42,.06))'}:{op:'0.38',bd:'',sh:''});
+    const mk=(n,kind,isTask)=>{const d=deco(n.id);const done=isTask?s.taskDone[s.selectedChange+':'+n.id]:false;return {id:n.id,kind:kind,title:n.title,sub:n.sub||'',isTask:!!isTask,op:d.op,bd:d.bd,sh:d.sh,onEnter:()=>this.setState({hoverNode:n.id}),onLeave:()=>this.setState({hoverNode:null}),onClick:()=>this.setState({hoverNode:s.hoverNode===n.id?null:n.id}),onToggle:isTask?(e)=>{e.stopPropagation();const k=s.selectedChange+':'+n.id;this.setState({taskDone:{...s.taskDone,[k]:!s.taskDone[k]}});}:null,check:done?'✓':'',checkBg:done?'var(--green,#10b981)':'transparent',checkBd:done?'var(--green,#10b981)':'var(--faint,#9aa7bd)',taskLabel:done?'completed':'pending',taskColor:done?'var(--green-text,#047857)':'var(--dim,#64748b)'};};
+    const conns=s.connectors.map(c=>{const active=hv&&(c.a===hv||c.b===hv);const dim=hv&&!active;return {d:c.d,stroke:active?'var(--accent,#4f46e5)':'var(--cn,#9aa7bd)',w:active?2.25:1.6,op:active?0.95:(dim?0.22:0.5)};});
+    const tasksNow=g.tasks.map(t=>({...t,done:s.taskDone[s.selectedChange+':'+t.id]}));
+    const doneN=tasksNow.filter(t=>t.done).length;
+    const statusColor=st=>st==='In review'?'var(--accent,#4f46e5)':(st==='Proposing'?'var(--amber-text,#b45309)':'var(--dim,#64748b)');
+    const statusDot=st=>st==='In review'?'var(--accent,#4f46e5)':(st==='Proposing'?'var(--amber,#f59e0b)':'var(--faint,#9aa7bd)');
+    const changeList=Object.entries(all).map(([id,c])=>{const sel=id===s.selectedChange;const dn=c.tasks.filter(t=>s.taskDone[id+':'+t.id]).length;return {name:id,status:c.status,statusColor:statusColor(c.status),dot:statusDot(c.status),progress:c.tasks.length?dn+'/'+c.tasks.length:'—',sel:sel?'background:var(--surface,#fff);border-color:var(--accent-border,#c7d2fe);box-shadow:var(--shadow,0 1px 3px rgba(15,23,42,.06));':'background:transparent;',onClick:()=>this.selectChange(id)};});
+    const kebabOk=/^[a-z0-9]+(-[a-z0-9]+)*$/.test(s.changeName);
+    const resolved=s.bsTopics.filter(t=>t.status==='resolved').length;
+    const firstOpen=s.bsTopics.find(t=>t.status==='open');
+    return {
+      themeVars,
+      needsVerify:!s.repoVerified,repoVerified:s.repoVerified,verifying:s.verifyState==='loading',verifyError:s.verifyState==='error',
+      verifyLabel:s.verifyState==='loading'?'Verifying…':'Verify Path',
+      pathInput:s.pathInput,onPathInput:e=>this.setState({pathInput:e.target.value,verifyState:'idle'}),verifyPath:()=>this.verifyPath(),
+      reVerify:()=>this.setState({repoVerified:false,verifyState:'idle'}),
+      repoPath:s.repoPath,openspecInit:s.openspecInit,notOpenspec:!s.openspecInit,
+      initOpenspec:()=>this.setState({openspecInit:true,wsNotice:'OpenSpec initialized in '+s.repoPath}),
+      changeList,changeCount:Object.keys(all).length,
+      openNewChange:()=>this.setState({newChangeOpen:true,changeName:'',desc:''}),
+      tSoft:{onClick:()=>this.setState({theme:'Soft'})},tMono:{onClick:()=>this.setState({theme:'Mono'})},tVivid:{onClick:()=>this.setState({theme:'Vivid'})},
+      softStyle:s.theme==='Soft'?'background:var(--accent,#4f46e5);color:#fff;':'background:transparent;color:var(--dim,#64748b);',
+      monoStyle:s.theme==='Mono'?'background:var(--accent,#4f46e5);color:#fff;':'background:transparent;color:var(--dim,#64748b);',
+      vividStyle:s.theme==='Vivid'?'background:var(--accent,#4f46e5);color:#fff;':'background:transparent;color:var(--dim,#64748b);',
+      toggleMode:()=>this.setState({mode:s.mode==='light'?'dark':'light'}),modeIcon:s.mode==='light'?'☾':'☀',
+      selectedChange:s.selectedChange,meta:{schema:g.schema,created:g.created},
+      isBuild:s.view==='build',isReview:s.view==='review',
+      setBuild:()=>this.setState({view:'build'}),setReview:()=>this.setState({view:'review'}),
+      buildStyle:s.view==='build'?'background:var(--surface,#fff);color:var(--text,#0f172a);box-shadow:var(--shadow,0 1px 3px rgba(15,23,42,.06));':'background:transparent;color:var(--dim,#64748b);',
+      reviewStyle:s.view==='review'?'background:var(--surface,#fff);color:var(--text,#0f172a);box-shadow:var(--shadow,0 1px 3px rgba(15,23,42,.06));':'background:transparent;color:var(--dim,#64748b);',
+      proposeEngine:s.proposeEngine,onProposeEngine:e=>this.setState({proposeEngine:e.target.value}),
+      engineOptions:[{v:'gemini',l:'Gemini'},{v:'claude-code',l:'Claude Code'},{v:'cursor',l:'Cursor'},{v:'codex',l:'Codex'}],
+      commandText:'npx openspec propose '+s.selectedChange+' --engine '+s.proposeEngine,
+      runPropose:()=>this.setState({wsNotice:'Proposed '+s.selectedChange+' with '+s.proposeEngine+'.'}),
+      proposalNodes:g.proposal.map(n=>mk(n,'proposal',false)),
+      specNodes:g.specs.map(n=>mk(n,'specs',false)),
+      designNodes:g.design.map(n=>mk(n,'design',false)),
+      taskNodes:g.tasks.map(n=>mk(n,'tasks',true)),
+      conns,dagRef:el=>{this.dagEl=el;},isEmptyGraph:g.specs.length===0,
+      taskSummary:g.tasks.length?(doneN+' / '+g.tasks.length+' tasks complete'):'Not yet proposed',
+      auditorOpen:s.auditorOpen,auditorClosed:!s.auditorOpen,openAuditor:()=>this.setState({auditorOpen:true}),closeAuditor:()=>this.setState({auditorOpen:false}),
+      messages:s.messages.map(m=>{const u=m.role==='user';return {html:{__html:mdToHtml(m.md)},justify:u?'flex-end':'flex-start',bg:u?'var(--accent,#4f46e5)':'var(--surface,#fff)',color:u?'#fff':'var(--text,#0f172a)',border:u?'1px solid transparent':'1px solid var(--border,#e2e8f0)'};}),
+      chatInput:s.chatInput,onChatInput:e=>this.setState({chatInput:e.target.value}),onChatKey:e=>{if(e.key==='Enter'){e.preventDefault();this.sendChat();}},sendChat:()=>this.sendChat(),chatRef:el=>{this.chatEl=el;},
+      shortcuts:[{icon:'🔍',label:'Audit',onClick:()=>this.runShortcut('audit')},{icon:'📋',label:'Incomplete',onClick:()=>this.runShortcut('tasks')},{icon:'💡',label:'Decisions',onClick:()=>this.runShortcut('decisions')}],
+      settingsOpen:s.settingsOpen,toggleSettings:()=>this.setState({settingsOpen:!s.settingsOpen}),
+      llmProvider:s.llmProvider,onProvider:e=>this.setState({llmProvider:e.target.value}),llmModel:s.llmModel,onModel:e=>this.setState({llmModel:e.target.value}),
+      providerOptions:[{v:'gemini',l:'Google Gemini'},{v:'ollama',l:'Ollama (local)'},{v:'openai',l:'Custom OpenAI API'}],
+      newChangeOpen:s.newChangeOpen,closeNewChange:()=>this.setState({newChangeOpen:false}),
+      changeName:s.changeName,onChangeName:e=>this.setState({changeName:e.target.value}),
+      changeNameErr:s.changeName&&!kebabOk?'Use kebab-case: lowercase letters, numbers, and hyphens.':'',
+      desc:s.desc,onDesc:e=>this.setState({desc:e.target.value}),
+      wsEngine:s.wsEngine,onWsEngine:e=>this.setState({wsEngine:e.target.value}),
+      isStandard:s.workflowMode==='standard',isCustom:s.workflowMode==='custom',
+      setStandard:()=>this.setState({workflowMode:'standard'}),setCustom:()=>this.setState({workflowMode:'custom'}),
+      stdStyle:s.workflowMode==='standard'?'background:var(--surface,#fff);color:var(--text,#0f172a);box-shadow:var(--shadow);':'background:transparent;color:var(--dim,#64748b);',
+      cusStyle:s.workflowMode==='custom'?'background:var(--surface,#fff);color:var(--text,#0f172a);box-shadow:var(--shadow);':'background:transparent;color:var(--dim,#64748b);',
+      schema:s.schema,onSchema:e=>this.setState({schema:e.target.value}),
+      schemaOptions:[{v:'spec-driven',l:'spec-driven'},{v:'docs-first',l:'docs-first'},{v:'lightweight',l:'lightweight'},{v:'rfc',l:'rfc'}],
+      customStateList:['proposal','specs','design','tasks'].map(k=>({key:k,label:k.charAt(0).toUpperCase()+k.slice(1),check:s.customStates[k]?'✓':'',box:s.customStates[k]?'background:var(--accent,#4f46e5);border-color:var(--accent,#4f46e5);':'background:transparent;border-color:var(--faint,#9aa7bd);',onToggle:()=>this.setState({customStates:{...s.customStates,[k]:!s.customStates[k]}})})),
+      createChange:()=>{if(s.changeName&&kebabOk){const nm=s.changeName;this.setState({newChangeOpen:false,wsNotice:'Change "'+nm+'" created.',changeName:'',desc:'',view:'review'});this.addDraft(nm);}},
+      branchName:s.branchName,onBranch:e=>this.setState({branchName:e.target.value}),
+      destPath:s.branchName?'../worktrees/'+s.branchName:'../worktrees/<branch>',
+      createWorktree:()=>{if(s.branchName)this.setState({wsNotice:'Worktree created at ../worktrees/'+s.branchName});},
+      wsNotice:s.wsNotice,clearNotice:()=>this.setState({wsNotice:''}),hasNotice:!!s.wsNotice,
+      openBrainstorm:()=>this.setState({brainstormOpen:true,brainstormPhase:1}),brainstormOpen:s.brainstormOpen,closeBrainstorm:()=>this.setState({brainstormOpen:false}),
+      isPhase1:s.brainstormPhase===1,isPhase2:s.brainstormPhase===2,
+      bsName:s.bsName,onBsName:e=>this.setState({bsName:e.target.value}),bsIdea:s.bsIdea,onBsIdea:e=>this.setState({bsIdea:e.target.value}),
+      bsModelOpen:s.bsModelOpen,toggleBsModel:()=>this.setState({bsModelOpen:!s.bsModelOpen}),bsModelCaret:s.bsModelOpen?'▾':'▸',
+      bsProvider:s.bsProvider,onBsProvider:e=>this.setState({bsProvider:e.target.value}),bsModel:s.bsModel,onBsModelInput:e=>this.setState({bsModel:e.target.value}),bsEndpoint:s.bsEndpoint,onBsEndpoint:e=>this.setState({bsEndpoint:e.target.value}),
+      startBrainstorm:()=>this.setState({brainstormPhase:2}),
+      bsTopics:s.bsTopics.map(t=>{const open=t.status==='open';return {label:t.label,badge:open?'OPEN':'RESOLVED',detail:open?'awaiting your decision':t.rec,badgeBg:open?'var(--amber-soft,#fffbeb)':'var(--green-soft,#ecfdf5)',badgeColor:open?'var(--amber-text,#b45309)':'var(--green-text,#047857)',dot:open?'var(--amber,#f59e0b)':'var(--green,#10b981)'};}),
+      bsMessages:s.bsMessages.map(m=>{const u=m.role==='user';return {html:{__html:mdToHtml(m.md)},justify:u?'flex-end':'flex-start',bg:u?'var(--accent,#4f46e5)':'var(--surface,#fff)',color:u?'#fff':'var(--text,#0f172a)',border:u?'1px solid transparent':'1px solid var(--border,#e2e8f0)'};}),
+      bsChatRef:el=>{this.bsChatEl=el;},bsInput:s.bsInput,onBsInput:e=>this.setState({bsInput:e.target.value}),onBsKey:e=>{if(e.key==='Enter'){e.preventDefault();this.sendBs();}},sendBs:()=>this.sendBs(),
+      bsRec:firstOpen?firstOpen.rec:'',hasRec:!!firstOpen,acceptRec:()=>this.acceptRec(),
+      bsProgress:resolved+' / '+s.bsTopics.length+' resolved',
+      commitGenerate:()=>{if(resolved>=4){const nm=s.bsName;this.setState({brainstormOpen:false,brainstormPhase:1,wsNotice:'Change "'+nm+'" generated and written to disk.',view:'review'});this.addDraft(nm);}},
+      commitStyle:resolved>=4?'background:var(--green,#10b981);color:#fff;cursor:pointer;opacity:1;':'background:var(--surface-2,#f1f5f9);color:var(--faint,#9aa7bd);cursor:not-allowed;opacity:.8;'
+    };
+  }
+}
+</script>
+</body>
+</html>

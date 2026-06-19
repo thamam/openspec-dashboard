@@ -143,9 +143,9 @@ export default function CreateChangeForm({
       </div>
 
       <div className="form-group">
-        <label htmlFor="propose-engine-select">AI Propose Engine:</label>
+        <label htmlFor="new-change-engine-select">AI Propose Engine:</label>
         <select
-          id="propose-engine-select"
+          id="new-change-engine-select"
           value={proposeEngine}
           onChange={(e) => setProposeEngine(e.target.value)}
           disabled={submitting}

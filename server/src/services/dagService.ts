@@ -6,6 +6,7 @@ export interface DagNode {
   label: string;
   type: 'proposal' | 'spec-requirement' | 'spec-scenario' | 'design-decision' | 'task';
   status?: 'pending' | 'completed';
+  scenariosCount?: number;
 }
 
 export interface DagEdge {
@@ -172,7 +173,8 @@ export async function getChangeDag(
               nodes.push({
                 id: currentReqId,
                 label: reqLabel,
-                type: 'spec-requirement'
+                type: 'spec-requirement',
+                scenariosCount: 0
               });
               nodeTokensMap.set(currentReqId, getTokens(reqLabel));
 
@@ -193,19 +195,10 @@ export async function getChangeDag(
             // Parse: #### Scenario: Display successful
             const scMatch = line.match(/^####\s+Scenario:\s*(.+)$/i);
             if (scMatch && currentReqId) {
-              const scLabel = scMatch[1].trim();
-              const scNodeId = makeId('spec-scenario', scLabel + '-' + currentReqId.substring(currentReqId.indexOf('-') + 1));
-              nodes.push({
-                id: scNodeId,
-                label: scLabel,
-                type: 'spec-scenario'
-              });
-              
-              // Link Scenario to its Requirement
-              edges.push({
-                source: currentReqId,
-                target: scNodeId
-              });
+              const reqNode = nodes.find(n => n.id === currentReqId);
+              if (reqNode) {
+                reqNode.scenariosCount = (reqNode.scenariosCount || 0) + 1;
+              }
             }
           }
         }
@@ -221,11 +214,43 @@ export async function getChangeDag(
     const content = fs.readFileSync(designPath, 'utf8');
     const lines = content.split('\n');
 
+    let inDecisionsSection = false;
+
     for (const line of lines) {
-      // Parse: ### Decision 1: Widget Database Integration
-      const decisionMatch = line.match(/^###\s+(Decision\s+\d+:\s*.+)$/i);
-      if (decisionMatch) {
-        const decisionLabel = decisionMatch[1].trim();
+      const trimmed = line.trim();
+      if (trimmed.match(/^##\s+(?:Design\s+)?Decisions/i)) {
+        inDecisionsSection = true;
+        continue;
+      } else if (trimmed.match(/^##\s+/)) {
+        inDecisionsSection = false;
+      }
+
+      if (!inDecisionsSection) {
+        continue;
+      }
+
+      // Check for level 3 heading format first:
+      // ### Decision 1: ... or ### D1 — ...
+      const headingMatch = line.match(/^###\s+((?:Decision\s+\d+|Decision(?=\s*[:—–-]\s*)|D\d+)\s*[:—–-]?\s*.+)$/i);
+      
+      // Check for bold-prefix format:
+      // **1. Slug-based...** or - **Decision 1: ...**
+      const boldMatch = line.match(/^\s*(?:-\s+|\*\s+)?\*\*((?:Decision\s+\d+|Decision|D\d+|\d+)\s*[:.—–-]\s*.*?)\*\*/i);
+
+      let decisionLabel: string | null = null;
+      if (headingMatch) {
+        decisionLabel = headingMatch[1].trim();
+      } else if (boldMatch) {
+        const rawLabel = boldMatch[1].trim();
+        // If it's a plain number (e.g. "1. Slug-based"), prepend "Decision " to format it nicely
+        if (rawLabel.match(/^\d+\./)) {
+          decisionLabel = `Decision ${rawLabel}`;
+        } else {
+          decisionLabel = rawLabel;
+        }
+      }
+
+      if (decisionLabel) {
         const nodeId = makeId('design-decision', decisionLabel);
         nodes.push({
           id: nodeId,

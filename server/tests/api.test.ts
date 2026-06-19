@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import { app } from '../src/app.js';
 import * as repoService from '../src/services/repoService.js';
@@ -14,6 +14,7 @@ vi.mock('../src/services/repoService.js', () => {
     createNewChange: vi.fn(),
     getChangeMetadata: vi.fn(),
     updateProposeEngine: vi.fn(),
+    getChangeFilesContent: vi.fn(),
   };
 });
 
@@ -325,6 +326,151 @@ describe('API Routes - POST /api/changes/:change/engine', () => {
     });
     expect(response.status).toBe(500);
     expect(response.body).toEqual({ error: 'update failed' });
+  });
+});
+
+describe('API Routes - POST /api/changes/:change/chat', () => {
+  const mockFetch = vi.fn();
+
+  beforeAll(() => {
+    vi.stubGlobal('fetch', mockFetch);
+    // Setup default mock values for repo/dag services
+    vi.mocked(repoService.getChangeFilesContent).mockReturnValue('=== FILE: proposal.md ===\nproposal content');
+    vi.mocked(dagService.getChangeDag).mockResolvedValue({ nodes: [], edges: [] });
+  });
+
+  afterAll(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('should return 400 when required parameters are missing', async () => {
+    const response = await request(app)
+      .post('/api/changes/my-change/chat')
+      .send({ repoPath: '/repo' });
+    expect(response.status).toBe(400);
+    expect(response.body.error).toContain('Missing or invalid parameter');
+  });
+
+  it('should call Gemini API successfully when api key is present', async () => {
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        candidates: [
+          {
+            content: {
+              parts: [{ text: 'Hello from Gemini!' }]
+            }
+          }
+        ]
+      })
+    });
+
+    const response = await request(app)
+      .post('/api/changes/my-change/chat')
+      .send({
+        repoPath: '/repo',
+        messages: [{ role: 'user', content: 'hello' }],
+        provider: 'gemini',
+        model: 'gemini-1.5-flash'
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ reply: 'Hello from Gemini!' });
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=test-api-key'),
+      expect.any(Object)
+    );
+
+    vi.unstubAllEnvs();
+  });
+
+  it('should return 400 when Gemini API key is missing', async () => {
+    vi.stubEnv('GEMINI_API_KEY', '');
+
+    const response = await request(app)
+      .post('/api/changes/my-change/chat')
+      .send({
+        repoPath: '/repo',
+        messages: [{ role: 'user', content: 'hello' }],
+        provider: 'gemini',
+        model: 'gemini-1.5-flash'
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toContain('Gemini API key is not configured');
+
+    vi.unstubAllEnvs();
+  });
+
+  it('should proxy Ollama API successfully', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        message: {
+          role: 'assistant',
+          content: 'Hello from Ollama!'
+        }
+      })
+    });
+
+    const response = await request(app)
+      .post('/api/changes/my-change/chat')
+      .send({
+        repoPath: '/repo',
+        messages: [{ role: 'user', content: 'hello' }],
+        provider: 'ollama',
+        model: 'gemma2'
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ reply: 'Hello from Ollama!' });
+    expect(mockFetch).toHaveBeenCalledWith(
+      'http://localhost:11434/api/chat',
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.stringContaining('"model":"gemma2"')
+      })
+    );
+  });
+
+  it('should proxy Custom API successfully with custom API key', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        choices: [
+          {
+            message: {
+              content: 'Hello from Custom API!'
+            }
+          }
+        ]
+      })
+    });
+
+    const response = await request(app)
+      .post('/api/changes/my-change/chat')
+      .send({
+        repoPath: '/repo',
+        messages: [{ role: 'user', content: 'hello' }],
+        provider: 'custom',
+        model: 'my-custom-model',
+        customEndpoint: 'https://api.custom.com/v1',
+        customApiKey: 'my-key'
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ reply: 'Hello from Custom API!' });
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://api.custom.com/v1/chat/completions',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          'Authorization': 'Bearer my-key'
+        })
+      })
+    );
   });
 });
 

@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;450;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;}
+html,body{margin:0;height:100%;}
+::-webkit-scrollbar{width:9px;height:9px;}
+::-webkit-scrollbar-thumb{background:#c8d4e3;border-radius:8px;border:2px solid transparent;background-clip:content-box;}
+::-webkit-scrollbar-track{background:transparent;}
+.st-md code{font-family:'Fira Code',monospace;}
+@keyframes stSlide{from{transform:translateX(20px);opacity:0}to{transform:none;opacity:1}}
+@keyframes stFade{from{opacity:0}to{opacity:1}}
+</style>
+</helmet>
+
+<div style="{{ themeVars }}">
+<div style="height:100vh;display:flex;overflow:hidden;font-family:'Inter',system-ui,sans-serif;background:var(--bg,#f6f8fb);color:var(--text,#0f172a);">
+
+  <!-- ===== SIDEBAR ===== -->
+  <aside style="width:240px;flex-shrink:0;background:var(--s2,#eef2f7);border-right:1px solid var(--border,#c8d4e3);display:flex;flex-direction:column;">
+    <div style="padding:18px 18px 14px;display:flex;align-items:center;gap:10px;">
+      <div style="width:30px;height:30px;border-radius:8px;background:var(--accent,#4f46e5);display:flex;align-items:center;justify-content:center;color:#fff;font-family:'Fira Code',monospace;font-weight:600;font-size:14px;">&lt;/&gt;</div>
+      <div style="font-family:'Outfit',sans-serif;font-weight:700;font-size:15px;color:var(--text,#0f172a);">OpenSpec</div>
+    </div>
+    <div style="margin:0 14px 6px;padding:11px 12px;background:var(--surface,#fff);border:1px solid var(--border,#c8d4e3);border-radius:10px;">
+      <div style="display:flex;align-items:center;gap:6px;"><span style="width:7px;height:7px;border-radius:50%;background:var(--green,#10b981);"></span><span style="font-family:'Fira Code',monospace;font-size:11.5px;color:var(--text,#0f172a);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">~/dev/acme-platform</span></div>
+    </div>
+    <div style="padding:14px 18px 8px;font-family:'Outfit',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--faint,#9aa7bd);">Changes</div>
+    <div style="flex:1;overflow-y:auto;padding:0 12px;display:flex;flex-direction:column;gap:5px;">
+      <div style="padding:10px 11px;border-radius:10px;background:var(--surface,#fff);border:1px solid var(--accent-border,#c7d2fe);"><div style="display:flex;align-items:center;gap:7px;"><span style="width:6px;height:6px;border-radius:50%;background:var(--accent,#4f46e5);"></span><span style="font-family:'Fira Code',monospace;font-size:12px;font-weight:500;color:var(--text,#0f172a);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">add-passwordless-auth</span></div><div style="display:flex;justify-content:space-between;margin-top:7px;padding-left:13px;"><span style="font-size:10px;font-weight:600;color:var(--accent,#4f46e5);">In review</span><span style="font-size:10px;color:var(--faint,#9aa7bd);font-family:'Fira Code',monospace;">2/4</span></div></div>
+      <div style="padding:10px 11px;border-radius:10px;"><div style="display:flex;align-items:center;gap:7px;"><span style="width:6px;height:6px;border-radius:50%;background:var(--amber,#f59e0b);"></span><span style="font-family:'Fira Code',monospace;font-size:12px;font-weight:500;color:var(--text,#0f172a);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">refactor-billing-engine</span></div><div style="display:flex;justify-content:space-between;margin-top:7px;padding-left:13px;"><span style="font-size:10px;font-weight:600;color:var(--amber-text,#b45309);">Proposing</span><span style="font-size:10px;color:var(--faint,#9aa7bd);font-family:'Fira Code',monospace;">1/3</span></div></div>
+      <div style="padding:10px 11px;border-radius:10px;"><div style="display:flex;align-items:center;gap:7px;"><span style="width:6px;height:6px;border-radius:50%;background:var(--accent,#4f46e5);"></span><span style="font-family:'Fira Code',monospace;font-size:12px;font-weight:500;color:var(--text,#0f172a);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">add-realtime-presence</span></div><div style="display:flex;justify-content:space-between;margin-top:7px;padding-left:13px;"><span style="font-size:10px;font-weight:600;color:var(--accent,#4f46e5);">In review</span><span style="font-size:10px;color:var(--faint,#9aa7bd);font-family:'Fira Code',monospace;">2/3</span></div></div>
+    </div>
+    <div style="padding:12px;"><div style="width:100%;display:flex;align-items:center;justify-content:center;gap:7px;padding:10px;background:var(--accent,#4f46e5);color:#fff;border-radius:10px;font-size:13px;font-weight:600;"><span style="font-size:15px;line-height:1;">+</span>New Change</div></div>
+  </aside>
+
+  <!-- ===== MAIN ===== -->
+  <div style="flex:1;display:flex;flex-direction:column;min-width:0;">
+
+    <!-- header -->
+    <header style="flex-shrink:0;background:var(--surface,#fff);border-bottom:1px solid var(--border,#c8d4e3);padding:13px 24px;display:flex;align-items:center;justify-content:space-between;gap:18px;">
+      <div style="display:flex;align-items:center;gap:14px;min-width:0;flex:1;">
+        <div style="flex:1;min-width:170px;">
+          <div style="font-family:'Fira Code',monospace;font-weight:500;font-size:16px;color:var(--text,#0f172a);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">add-passwordless-auth</div>
+          <div style="font-size:11.5px;color:var(--dim,#64748b);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">spec-driven · created Jun 12, 2026</div>
+        </div>
+        <!-- persistent worktree badge (the durable context, not an action) -->
+        <span style="display:inline-flex;align-items:center;gap:6px;padding:5px 10px;background:var(--s2,#eef2f7);border:1px solid var(--border,#c8d4e3);border-radius:8px;font-family:'Fira Code',monospace;font-size:11px;color:var(--dim,#64748b);flex-shrink:1;min-width:0;max-width:240px;"><span style="font-size:12px;flex-shrink:0;">⎇</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">worktrees/passwordless-auth</span></span>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:12px;flex-shrink:0;">
+        <!-- TOOL CLUSTER — summonable from any stage -->
+        <div style="display:flex;align-items:center;gap:5px;">
+          <button onClick="{{ openGrill }}" title="Grill Me — pressure-test" style="display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:9px;cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:600;transition:all .15s;{{ grillStyle }}"><span style="font-size:13px;">⚡</span>Grill Me</button>
+          <button onClick="{{ openAudit }}" title="Traceability audit" style="display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:9px;cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:600;transition:all .15s;{{ auditStyle }}"><span style="font-size:13px;">🔍</span>Audit</button>
+          <button onClick="{{ openChat }}" title="Ask the AI assistant" style="display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:9px;cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:600;transition:all .15s;{{ chatStyle }}"><span style="font-size:13px;">💬</span>Ask AI</button>
+        </div>
+        <div style="width:1px;height:24px;background:var(--border,#c8d4e3);"></div>
+        <span style="display:inline-flex;align-items:center;gap:5px;padding:6px 9px;background:var(--s2,#eef2f7);border:1px solid var(--border,#c8d4e3);border-radius:8px;font-size:11px;font-weight:600;color:var(--dim,#64748b);">⌘K</span>
+        <!-- plumbing menu -->
+        <div style="position:relative;">
+          <button onClick="{{ toggleRepoMenu }}" title="Repo & setup" style="width:34px;height:32px;border:1px solid var(--border,#c8d4e3);background:var(--surface,#fff);border-radius:8px;cursor:pointer;font-size:16px;color:var(--dim,#64748b);line-height:1;">⋯</button>
+          <sc-if value="{{ repoMenuOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;right:0;top:40px;z-index:30;width:210px;background:var(--surface,#fff);border:1px solid var(--border,#c8d4e3);border-radius:11px;box-shadow:0 18px 48px rgba(15,23,42,.16);padding:6px;animation:stFade .14s ease;">
+              <div style="padding:6px 10px 4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--faint,#9aa7bd);">Setup · run once</div>
+              <div onClick="{{ closeRepoMenu }}" style="padding:9px 10px;border-radius:7px;font-size:12.5px;color:var(--text,#0f172a);cursor:pointer;display:flex;align-items:center;gap:8px;"><span>⚙</span>Initialize OpenSpec</div>
+              <div onClick="{{ closeRepoMenu }}" style="padding:9px 10px;border-radius:7px;font-size:12.5px;color:var(--text,#0f172a);cursor:pointer;display:flex;align-items:center;gap:8px;"><span>⎇</span>Create Worktree…</div>
+              <div style="height:1px;background:var(--border,#c8d4e3);margin:5px 4px;"></div>
+              <div onClick="{{ closeRepoMenu }}" style="padding:9px 10px;border-radius:7px;font-size:12.5px;color:var(--text,#0f172a);cursor:pointer;display:flex;align-items:center;gap:8px;"><span>⇄</span>Switch Repository</div>
+              <div style="height:1px;background:var(--border,#c8d4e3);margin:5px 4px;"></div>
+              <div style="padding:4px 10px 6px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--faint,#9aa7bd);">Appearance</div>
+              <div style="padding:0 8px 5px;display:flex;gap:4px;">
+                <button onClick="{{ setSoft }}" style="flex:1;border:none;cursor:pointer;font-family:inherit;font-size:11.5px;font-weight:600;padding:7px 0;border-radius:7px;transition:all .15s;{{ softStyle }}">Soft</button>
+                <button onClick="{{ setMono }}" style="flex:1;border:none;cursor:pointer;font-family:inherit;font-size:11.5px;font-weight:600;padding:7px 0;border-radius:7px;transition:all .15s;{{ monoStyle }}">Mono</button>
+                <button onClick="{{ setVivid }}" style="flex:1;border:none;cursor:pointer;font-family:inherit;font-size:11.5px;font-weight:600;padding:7px 0;border-radius:7px;transition:all .15s;{{ vividStyle }}">Vivid</button>
+              </div>
+              <div onClick="{{ toggleMode }}" style="padding:9px 10px;border-radius:7px;font-size:12.5px;color:var(--text,#0f172a);cursor:pointer;display:flex;align-items:center;justify-content:space-between;"><span style="display:flex;align-items:center;gap:8px;"><span>{{ modeIcon }}</span>{{ modeLabel }}</span><span style="font-size:11px;color:var(--faint,#9aa7bd);">{{ modeHint }}</span></div>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+    </header>
+
+    <!-- hint strip -->
+    <sc-if value="{{ showHint }}" hint-placeholder-val="{{ true }}">
+      <div style="flex-shrink:0;padding:8px 24px;background:var(--accent-soft,#eef2ff);border-bottom:1px solid var(--accent-border,#c7d2fe);font-size:11.5px;color:var(--accent,#4f46e5);display:flex;align-items:center;gap:8px;">
+        <span style="font-weight:700;">Concept</span><span style="color:var(--dim,#64748b);">The <strong style="color:var(--text,#0f172a);">stage tabs</strong> are the spine. The <strong style="color:var(--text,#0f172a);">tools</strong> (top-right) can be summoned over any stage — open one, then switch stages and watch it re-scope.</span>
+      </div>
+    </sc-if>
+
+    <!-- STAGE SPINE -->
+    <div style="flex-shrink:0;background:var(--surface,#fff);border-bottom:1px solid var(--border,#c8d4e3);padding:0 24px;display:flex;align-items:stretch;gap:2px;">
+      <button onClick="{{ setPropose }}" style="border:none;background:none;cursor:pointer;font-family:'Outfit',sans-serif;font-size:13.5px;font-weight:600;padding:13px 16px 11px;display:flex;align-items:center;gap:8px;{{ proposeTabStyle }}"><span style="width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;{{ proposeDot }}">1</span>Propose</button>
+      <button onClick="{{ setReview }}" style="border:none;background:none;cursor:pointer;font-family:'Outfit',sans-serif;font-size:13.5px;font-weight:600;padding:13px 16px 11px;display:flex;align-items:center;gap:8px;{{ reviewTabStyle }}"><span style="width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;{{ reviewDot }}">2</span>Review</button>
+    </div>
+
+    <!-- BODY: stage content + tool dock -->
+    <div style="flex:1;min-height:0;display:flex;">
+
+      <!-- STAGE CONTENT -->
+      <div style="flex:1;min-width:0;overflow-y:auto;">
+
+        <!-- PROPOSE STAGE -->
+        <sc-if value="{{ isPropose }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:30px 34px;max-width:640px;animation:stFade .2s ease;">
+            <div style="font-family:'Outfit',sans-serif;font-weight:700;font-size:21px;color:var(--text,#0f172a);">Propose</div>
+            <div style="font-size:13.5px;color:var(--dim,#64748b);margin-top:5px;line-height:1.55;max-width:520px;">Generate the spec, design &amp; task pipeline with your engine. Output streams here, then populates the Review DAG.</div>
+
+            <div style="margin-top:24px;font-size:11.5px;font-weight:600;color:var(--dim,#64748b);margin-bottom:6px;">Engine</div>
+            <div style="display:inline-flex;align-items:center;gap:8px;padding:9px 14px;background:var(--surface,#fff);border:1px solid var(--border,#c8d4e3);border-radius:10px;font-size:13px;color:var(--text,#0f172a);box-shadow:0 1px 3px rgba(15,23,42,.06);">Gemini <span style="color:var(--dim,#64748b);font-size:10px;">▾</span></div>
+
+            <div style="margin-top:20px;font-size:11.5px;font-weight:600;color:var(--dim,#64748b);margin-bottom:6px;">Command</div>
+            <div style="display:flex;align-items:center;gap:10px;background:var(--surface,#fff);border:1px solid var(--border,#c8d4e3);border-radius:10px;padding:12px 15px;box-shadow:0 1px 3px rgba(15,23,42,.06);"><span style="color:var(--accent,#4f46e5);font-family:'Fira Code',monospace;font-weight:600;">$</span><code style="flex:1;font-family:'Fira Code',monospace;font-size:12.5px;color:var(--text,#0f172a);overflow:auto;white-space:nowrap;">npx openspec propose add-passwordless-auth --engine gemini</code></div>
+
+            <div style="margin-top:22px;display:inline-flex;align-items:center;gap:8px;padding:11px 22px;background:var(--accent,#4f46e5);color:#fff;border-radius:10px;font-family:'Outfit',sans-serif;font-size:13.5px;font-weight:700;cursor:pointer;box-shadow:0 1px 3px rgba(15,23,42,.06);">Run Propose</div>
+
+            <div style="margin-top:30px;padding:15px 17px;background:var(--canvas,#fbfcfe);border:1px dashed var(--border,#c8d4e3);border-radius:12px;font-size:12.5px;color:var(--faint,#9aa7bd);line-height:1.5;">Stuck on a decision before you generate? Summon <strong style="color:var(--accent,#4f46e5);">⚡ Grill Me</strong> from the toolbar — here it pressure-tests the raw <em>concept</em>.</div>
+          </div>
+        </sc-if>
+
+        <!-- REVIEW STAGE -->
+        <sc-if value="{{ isReview }}" hint-placeholder-val="{{ true }}">
+          <div style="padding:22px 26px;animation:stFade .2s ease;">
+            <div style="display:flex;align-items:center;gap:9px;margin-bottom:16px;flex-wrap:wrap;">
+              <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--faint,#9aa7bd);">Views</span>
+              <button onClick="{{ toggleDag }}" title="Toggle the DAG view" style="display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border-radius:8px;cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;transition:all .15s;{{ dagChipStyle }}"><span style="width:14px;height:14px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;line-height:1;{{ dagCheckStyle }}">{{ dagCheck }}</span>DAG</button>
+              <span style="display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:600;background:var(--surface,#fff);border:1px dashed var(--border,#c8d4e3);color:var(--faint,#9aa7bd);">Diff <span style="font-size:8.5px;padding:1px 5px;background:var(--s2,#eef2f7);border-radius:4px;text-transform:uppercase;letter-spacing:.04em;">soon</span></span>
+              <span style="display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:600;background:var(--surface,#fff);border:1px dashed var(--border,#c8d4e3);color:var(--faint,#9aa7bd);">Coverage <span style="font-size:8.5px;padding:1px 5px;background:var(--s2,#eef2f7);border-radius:4px;text-transform:uppercase;letter-spacing:.04em;">soon</span></span>
+              <span style="flex:1;min-width:14px;"></span>
+              <span style="display:inline-flex;align-items:center;gap:6px;padding:6px 11px;background:var(--surface,#fff);border:1px solid var(--border,#c8d4e3);border-radius:8px;font-size:12px;color:var(--dim,#64748b);box-shadow:0 1px 3px rgba(15,23,42,.06);">Schema <strong style="color:var(--text,#0f172a);font-weight:600;">spec-driven</strong></span>
+              <span style="display:inline-flex;align-items:center;gap:6px;padding:6px 11px;background:var(--surface,#fff);border:1px solid var(--border,#c8d4e3);border-radius:8px;font-size:12px;color:var(--dim,#64748b);box-shadow:0 1px 3px rgba(15,23,42,.06);">2 / 4 tasks complete</span>
+            </div>
+            <div style="background:var(--canvas,#fbfcfe);border:1px solid var(--border,#c8d4e3);border-radius:14px;box-shadow:0 1px 3px rgba(15,23,42,.06);padding:18px;overflow-x:auto;background-image:radial-gradient(rgba(15,23,42,0.05) 1px,transparent 1px);background-size:18px 18px;">
+              <div ref="{{ dagRef }}" style="position:relative;min-width:680px;">
+                <sc-if value="{{ dagOn }}" hint-placeholder-val="{{ true }}">
+                  <svg style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:0;">
+                    <sc-for list="{{ conns }}" as="c" hint-placeholder-count="0"><path d="{{ c.d }}" fill="none" stroke="{{ c.stroke }}" stroke-width="{{ c.w }}" stroke-opacity="{{ c.op }}" stroke-linecap="round"></path></sc-for>
+                  </svg>
+                </sc-if>
+                <div style="position:relative;z-index:1;display:grid;grid-template-columns:repeat(4,1fr);gap:0 30px;">
+                  <div style="display:flex;flex-direction:column;gap:16px;">
+                    <div style="font-family:'Outfit',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--accent,#4f46e5);">Proposal</div>
+                    <div data-node="p1" style="background:var(--surface,#fff);border:1px solid var(--border,#c8d4e3);border-radius:10px;padding:11px 13px;box-shadow:0 1px 3px rgba(15,23,42,.06);"><div style="font-family:'Fira Code',monospace;font-size:9.5px;text-transform:uppercase;color:var(--faint,#9aa7bd);margin-bottom:4px;">proposal</div><div style="font-family:'Fira Code',monospace;font-size:12.5px;font-weight:500;color:var(--text,#0f172a);">passwordless-auth</div></div>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:16px;">
+                    <div style="font-family:'Outfit',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--accent,#4f46e5);">Specs</div>
+                    <div data-node="s1" style="background:var(--surface,#fff);border:1px solid var(--border,#c8d4e3);border-radius:10px;padding:11px 13px;box-shadow:0 1px 3px rgba(15,23,42,.06);"><div style="font-size:13px;font-weight:600;color:var(--text,#0f172a);">Magic-link request</div><div style="font-size:11px;color:var(--dim,#64748b);margin-top:3px;">2 scenarios</div></div>
+                    <div data-node="s2" style="background:var(--surface,#fff);border:1px solid var(--border,#c8d4e3);border-radius:10px;padding:11px 13px;box-shadow:0 1px 3px rgba(15,23,42,.06);"><div style="font-size:13px;font-weight:600;color:var(--text,#0f172a);">Token verification</div><div style="font-size:11px;color:var(--dim,#64748b);margin-top:3px;">3 scenarios</div></div>
+                    <div data-node="s3" style="background:var(--surface,#fff);border:1px solid var(--border,#c8d4e3);border-radius:10px;padding:11px 13px;box-shadow:0 1px 3px rgba(15,23,42,.06);"><div style="font-size:13px;font-weight:600;color:var(--text,#0f172a);">Session issuance</div><div style="font-size:11px;color:var(--dim,#64748b);margin-top:3px;">2 scenarios</div></div>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:16px;">
+                    <div style="font-family:'Outfit',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--accent,#4f46e5);">Design</div>
+                    <div data-node="d1" style="background:var(--surface,#fff);border:1px solid var(--border,#c8d4e3);border-radius:10px;padding:11px 13px;box-shadow:0 1px 3px rgba(15,23,42,.06);"><div style="font-size:13px;font-weight:600;color:var(--text,#0f172a);">Signed token format</div><div style="font-size:11px;color:var(--dim,#64748b);margin-top:3px;">2 decisions</div></div>
+                    <div data-node="d2" style="background:var(--surface,#fff);border:1px solid var(--border,#c8d4e3);border-radius:10px;padding:11px 13px;box-shadow:0 1px 3px rgba(15,23,42,.06);"><div style="font-size:13px;font-weight:600;color:var(--text,#0f172a);">Session store</div><div style="font-size:11px;color:var(--dim,#64748b);margin-top:3px;">1 decision</div></div>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:16px;">
+                    <div style="font-family:'Outfit',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--accent,#4f46e5);">Tasks</div>
+                    <div data-node="t1" style="background:var(--surface,#fff);border:1px solid var(--border,#c8d4e3);border-radius:10px;padding:11px 13px;box-shadow:0 1px 3px rgba(15,23,42,.06);"><div style="font-size:12.5px;font-weight:600;color:var(--text,#0f172a);">Email link sender</div><div style="font-size:10.5px;font-weight:600;color:var(--green-text,#047857);margin-top:6px;">✓ completed</div></div>
+                    <div data-node="t2" style="background:var(--surface,#fff);border:1px solid var(--border,#c8d4e3);border-radius:10px;padding:11px 13px;box-shadow:0 1px 3px rgba(15,23,42,.06);"><div style="font-size:12.5px;font-weight:600;color:var(--text,#0f172a);">Verify endpoint</div><div style="font-size:10.5px;font-weight:600;color:var(--green-text,#047857);margin-top:6px;">✓ completed</div></div>
+                    <div data-node="t3" style="background:var(--surface,#fff);border:1px solid var(--border,#c8d4e3);border-radius:10px;padding:11px 13px;box-shadow:0 1px 3px rgba(15,23,42,.06);"><div style="font-size:12.5px;font-weight:600;color:var(--text,#0f172a);">Session middleware</div><div style="font-size:10.5px;font-weight:600;color:var(--dim,#64748b);margin-top:6px;">pending</div></div>
+                    <div data-node="t4" style="background:var(--surface,#fff);border:1px solid var(--border,#c8d4e3);border-radius:10px;padding:11px 13px;box-shadow:0 1px 3px rgba(15,23,42,.06);"><div style="font-size:12.5px;font-weight:600;color:var(--text,#0f172a);">Rate limiting</div><div style="font-size:10.5px;font-weight:600;color:var(--dim,#64748b);margin-top:6px;">pending</div></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+
+      <!-- TOOL DOCK -->
+      <sc-if value="{{ toolOpen }}" hint-placeholder-val="{{ false }}">
+        <aside style="width:388px;flex-shrink:0;border-left:1px solid var(--border,#c8d4e3);background:var(--surface,#fff);display:flex;flex-direction:column;animation:stSlide .22s ease;">
+          <div style="padding:14px 18px;border-bottom:1px solid var(--border,#c8d4e3);">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+              <div style="display:flex;align-items:center;gap:9px;"><span style="width:30px;height:30px;border-radius:8px;background:var(--accent-soft,#eef2ff);display:inline-flex;align-items:center;justify-content:center;font-size:15px;">{{ toolIcon }}</span><div style="font-family:'Outfit',sans-serif;font-weight:700;font-size:14px;color:var(--text,#0f172a);">{{ toolTitle }}</div></div>
+              <button onClick="{{ closeTool }}" style="width:30px;height:30px;border:1px solid var(--border,#c8d4e3);background:var(--s2,#eef2f7);border-radius:8px;cursor:pointer;font-size:15px;color:var(--dim,#64748b);">×</button>
+            </div>
+            <!-- context chip: proves the tool knows where it was invoked -->
+            <div style="margin-top:10px;display:inline-flex;align-items:center;gap:6px;padding:4px 9px;background:var(--s2,#eef2f7);border:1px solid var(--border,#c8d4e3);border-radius:7px;font-size:10.5px;color:var(--dim,#64748b);"><span style="width:5px;height:5px;border-radius:50%;background:var(--accent,#4f46e5);"></span>{{ contextChip }}</div>
+          </div>
+
+          <div style="flex:1;overflow-y:auto;padding:16px 18px;">
+            <!-- conversational tools -->
+            <sc-if value="{{ toolHasThread }}" hint-placeholder-val="{{ true }}">
+              <sc-for list="{{ messages }}" as="m" hint-placeholder-count="1"><div style="margin-bottom:12px;animation:stFade .2s ease;"><div class="st-md" style="padding:12px 14px;border-radius:12px;font-size:13px;line-height:1.6;background:var(--s2,#eef2f7);color:var(--text,#0f172a);border:1px solid var(--border,#c8d4e3);">{{ m.body }}</div></div></sc-for>
+            </sc-if>
+            <!-- audit: empty (context-aware degraded state) -->
+            <sc-if value="{{ auditEmpty }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:18px;border:1px dashed var(--border,#c8d4e3);border-radius:12px;text-align:center;"><div style="font-size:22px;margin-bottom:8px;">🔍</div><div style="font-size:13px;color:var(--dim,#64748b);line-height:1.55;">No DAG to audit yet. The graph is generated in <strong style="color:var(--text,#0f172a);">Propose</strong> — run it, then I can trace specs → design → tasks.</div></div>
+            </sc-if>
+            <!-- audit: results -->
+            <sc-if value="{{ auditFull }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:9px;">
+                <sc-for list="{{ auditItems }}" as="a" hint-placeholder-count="4"><div style="display:flex;align-items:flex-start;gap:10px;padding:11px 13px;background:var(--s2,#eef2f7);border:1px solid var(--border,#c8d4e3);border-radius:10px;"><span style="flex-shrink:0;width:18px;height:18px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;color:#fff;background:{{ a.color }};">{{ a.icon }}</span><span style="font-size:12.5px;color:var(--text,#0f172a);line-height:1.45;">{{ a.text }}</span></div></sc-for>
+              </div>
+            </sc-if>
+          </div>
+
+          <!-- composer (only for conversational tools) -->
+          <sc-if value="{{ toolHasThread }}" hint-placeholder-val="{{ true }}">
+            <div style="padding:12px 15px;border-top:1px solid var(--border,#c8d4e3);display:flex;gap:8px;">
+              <div style="flex:1;padding:10px 13px;font-size:12.5px;color:var(--faint,#9aa7bd);background:var(--s2,#eef2f7);border:1px solid var(--border,#c8d4e3);border-radius:10px;">{{ composerPlaceholder }}</div>
+              <div style="padding:0 16px;display:flex;align-items:center;background:var(--accent,#4f46e5);color:#fff;border-radius:10px;font-size:12.5px;font-weight:600;cursor:pointer;">Send</div>
+            </div>
+          </sc-if>
+        </aside>
+      </sc-if>
+    </div>
+  </div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:&quot;100%&quot;,&quot;height&quot;:&quot;100%&quot;},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Soft&quot;,&quot;Mono&quot;,&quot;Vivid&quot;],&quot;default&quot;:&quot;Soft&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;mode&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;defaultStage&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Propose&quot;,&quot;Review&quot;],&quot;default&quot;:&quot;Review&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;defaultTool&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Grill Me&quot;,&quot;Audit&quot;,&quot;Ask AI&quot;,&quot;None&quot;],&quot;default&quot;:&quot;Grill Me&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;showHint&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;}}">
+function fmt(md){
+  return {__html:String(md)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/`([^`]+)`/g,'<code style="font-family:\'Fira Code\',monospace;font-size:.88em;background:rgba(15,23,42,.06);padding:1px 5px;border-radius:5px;">$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g,'<strong style="font-weight:650;">$1</strong>')
+    .replace(/\*([^*]+)\*/g,'<em>$1</em>')
+    .replace(/\n\n/g,'<br><br>')};
+}
+const TOOL_KEY={'Grill Me':'grill','Audit':'audit','Ask AI':'chat','None':null};
+const EDGES=[['p1','s1'],['p1','s2'],['p1','s3'],['s1','d1'],['s2','d1'],['s3','d2'],['d1','t1'],['d1','t2'],['d2','t3'],['s2','t4']];
+const PALETTES={
+  Soft:{
+    light:{bg:'#f6f8fb',surface:'#ffffff',s2:'#eef2f7',border:'#c8d4e3',text:'#0f172a',dim:'#64748b',faint:'#9aa7bd',accent:'#4f46e5',accentSoft:'#eef2ff',accentBorder:'#c7d2fe',green:'#10b981',greenSoft:'#ecfdf5',greenText:'#047857',amber:'#f59e0b',amberSoft:'#fffbeb',amberText:'#b45309',canvas:'#fbfcfe',dot:'rgba(15,23,42,0.05)'},
+    dark:{bg:'#0a0f1c',surface:'#121a2c',s2:'#0e1626',border:'#2c3a57',text:'#e9eefa',dim:'#92a1bd',faint:'#5a6884',accent:'#818cf8',accentSoft:'rgba(99,102,241,0.18)',accentBorder:'#4f46e5',green:'#34d399',greenSoft:'rgba(16,185,129,0.16)',greenText:'#6ee7b7',amber:'#fbbf24',amberSoft:'rgba(245,158,11,0.16)',amberText:'#fcd34d',canvas:'#0c1322',dot:'rgba(255,255,255,0.05)'}
+  },
+  Mono:{
+    light:{bg:'#eef1f5',surface:'#ffffff',s2:'#e3e8ef',border:'#bbc7d6',text:'#0b1220',dim:'#566173',faint:'#8b97a8',accent:'#4338ca',accentSoft:'#e8e9fb',accentBorder:'#c3c4f5',green:'#0f9d6e',greenSoft:'#e6f6ef',greenText:'#0a7a55',amber:'#d97706',amberSoft:'#fdf2e3',amberText:'#92500a',canvas:'#f3f6f9',dot:'rgba(15,23,42,0.06)'},
+    dark:{bg:'#070b13',surface:'#0f1622',s2:'#0b121d',border:'#26344b',text:'#dde6f2',dim:'#84909f',faint:'#4f5b6e',accent:'#7c83f5',accentSoft:'rgba(99,102,241,0.16)',accentBorder:'#4338ca',green:'#2dd4a7',greenSoft:'rgba(16,185,129,0.14)',greenText:'#6ee7b7',amber:'#f0a93b',amberSoft:'rgba(245,158,11,0.14)',amberText:'#fcd34d',canvas:'#090f19',dot:'rgba(255,255,255,0.045)'}
+  },
+  Vivid:{
+    light:{bg:'#f7f5fd',surface:'#ffffff',s2:'#efeafa',border:'#d2c2ec',text:'#1c1430',dim:'#6b6388',faint:'#a99fc4',accent:'#6d28d9',accentSoft:'#f1ecff',accentBorder:'#d9cdfb',green:'#0ea372',greenSoft:'#e6f7f0',greenText:'#08855c',amber:'#ea8a08',amberSoft:'#fdf3e2',amberText:'#9a5a0a',canvas:'#fbfaff',dot:'rgba(28,20,48,0.05)'},
+    dark:{bg:'#0d0a1a',surface:'#171228',s2:'#120e22',border:'#382c57',text:'#ece8fb',dim:'#a094c2',faint:'#6a5e8c',accent:'#a78bfa',accentSoft:'rgba(124,58,237,0.22)',accentBorder:'#6d28d9',green:'#34d399',greenSoft:'rgba(16,185,129,0.16)',greenText:'#6ee7b7',amber:'#fbbf24',amberSoft:'rgba(245,158,11,0.16)',amberText:'#fcd34d',canvas:'#0f0b1d',dot:'rgba(255,255,255,0.05)'}
+  }
+};
+
+class Component extends DCLogic {
+  constructor(props){
+    super(props);
+    this.state={
+      stage:(props.defaultStage==='Propose')?'propose':'review',
+      tool:TOOL_KEY[props.defaultTool||'Grill Me'],
+      repoMenuOpen:false,
+      dagOn:true,
+      connectors:[],
+      theme:props.theme||'Soft',
+      mode:props.mode||'light'
+    };
+  }
+  componentDidMount(){
+    this._onResize=()=>this.measureConnectors();
+    window.addEventListener('resize',this._onResize);
+    requestAnimationFrame(()=>this.measureConnectors());
+    setTimeout(()=>this.measureConnectors(),160);
+    if(document.fonts&&document.fonts.ready){document.fonts.ready.then(()=>this.measureConnectors());}
+  }
+  componentWillUnmount(){window.removeEventListener('resize',this._onResize);}
+  componentDidUpdate(pp,ps){
+    const sig=s=>s?[s.stage,s.dagOn,!!s.tool].join('|'):'';
+    if(sig(ps)!==sig(this.state)){requestAnimationFrame(()=>this.measureConnectors());setTimeout(()=>this.measureConnectors(),260);}
+  }
+  measureConnectors(){
+    const c=this.dagEl;if(!c){return;}
+    const box=c.getBoundingClientRect();const pos={};
+    c.querySelectorAll('[data-node]').forEach(el=>{const r=el.getBoundingClientRect();pos[el.getAttribute('data-node')]={right:r.right-box.left,left:r.left-box.left,cy:r.top-box.top+r.height/2};});
+    const conns=EDGES.map(([a,b])=>{const A=pos[a],B=pos[b];if(!A||!B)return null;const x1=A.right,y1=A.cy,x2=B.left,y2=B.cy;const dx=Math.max(34,(x2-x1)*0.55);return {d:'M'+x1+','+y1+' C'+(x1+dx)+','+y1+' '+(x2-dx)+','+y2+' '+x2+','+y2};}).filter(Boolean);
+    this.setState({connectors:conns});
+  }
+  panel(){
+    const s=this.state, stage=s.stage, tool=s.tool;
+    const stageLabel=stage==='propose'?'Propose':'Review';
+    const data={icon:'',title:'',chip:'',thread:false,messages:[],auditEmpty:false,auditFull:false,auditItems:[],composer:''};
+    if(tool==='grill'){
+      data.icon='⚡';data.title='Grill Me';data.thread=true;data.composer='Respond to the auditor…';
+      data.chip='pressure-testing · add-passwordless-auth · '+stageLabel;
+      if(stage==='propose'){
+        data.messages=[{md:"Pressure-testing the **concept** — nothing's generated yet, so let's interrogate the *idea itself*.\n\nWhen a user requests a second magic link while the first is still valid, do you invalidate the first or honour both? This decides your token-store semantics before any spec exists."}];
+      }else{
+        data.messages=[{md:"Pressure-testing the **generated spec**. I can see **3 specs** and **2 design decisions** in the DAG.\n\n`Token verification` has 3 scenarios but none cover rate-limiting — deliberate? And the `Session store` decision isn't linked to any task yet. Want me to flag it?"}];
+      }
+    }else if(tool==='chat'){
+      data.icon='💬';data.title='Ask AI';data.thread=true;data.composer='Ask about this stage…';
+      data.chip='context · add-passwordless-auth · '+stageLabel;
+      if(stage==='propose'){
+        data.messages=[{md:"Ask me anything about **shaping** this change — I can see your engine selection and the command you're about to run."}];
+      }else{
+        data.messages=[{md:"Ask me anything about the **generated DAG** — specs, design decisions, or task status for `add-passwordless-auth`."}];
+      }
+    }else if(tool==='audit'){
+      data.icon='🔍';data.title='Traceability Audit';
+      data.chip='auditing · add-passwordless-auth · '+stageLabel;
+      if(stage==='propose'){
+        data.auditEmpty=true;
+      }else{
+        data.auditFull=true;
+        data.auditItems=[
+          {ok:true,text:'All 3 specs trace back to the proposal capability'},
+          {ok:true,text:'Design decisions cover every linked spec'},
+          {ok:false,text:'2 tasks not yet linked to a completed scenario'},
+          {ok:true,text:'2 / 4 tasks complete'}
+        ];
+      }
+    }
+    return data;
+  }
+  toolBtn(key){
+    const active=this.state.tool===key;
+    return active
+      ? 'background:var(--accent-soft,#eef2ff);color:var(--accent,#4f46e5);border:1px solid var(--accent-border,#c7d2fe);'
+      : 'background:var(--surface,#fff);color:var(--dim,#64748b);border:1px solid var(--border,#c8d4e3);';
+  }
+  open(key){this.setState(s=>({tool:s.tool===key?null:key}));}
+  renderVals(){
+    const s=this.state, p=this.panel();
+    const pal=(PALETTES[s.theme]||PALETTES.Soft)[s.mode]||PALETTES.Soft.light;
+    const themeVars={'--bg':pal.bg,'--surface':pal.surface,'--s2':pal.s2,'--border':pal.border,'--text':pal.text,'--dim':pal.dim,'--faint':pal.faint,'--accent':pal.accent,'--accent-soft':pal.accentSoft,'--accent-border':pal.accentBorder,'--green':pal.green,'--green-soft':pal.greenSoft,'--green-text':pal.greenText,'--amber':pal.amber,'--amber-soft':pal.amberSoft,'--amber-text':pal.amberText,'--canvas':pal.canvas,fontFamily:"'Inter',system-ui,sans-serif",background:pal.bg,color:pal.text,transition:'background .3s,color .3s'};
+    const themeBtn=name=>s.theme===name?'background:var(--accent,#4f46e5);color:#fff;':'background:var(--s2,#eef2f7);color:var(--dim,#64748b);';
+    const tabActive='color:var(--text,#0f172a);box-shadow:inset 0 -2px 0 var(--accent,#4f46e5);';
+    const tabIdle='color:var(--faint,#9aa7bd);';
+    const dotActive='background:var(--accent,#4f46e5);color:#fff;';
+    const dotIdle='background:var(--s2,#eef2f7);color:var(--faint,#9aa7bd);';
+    return {
+      themeVars,
+      showHint:this.props.showHint!==false,
+      isPropose:s.stage==='propose',isReview:s.stage==='review',
+      setPropose:()=>this.setState({stage:'propose'}),setReview:()=>this.setState({stage:'review'}),
+      proposeTabStyle:s.stage==='propose'?tabActive:tabIdle,
+      reviewTabStyle:s.stage==='review'?tabActive:tabIdle,
+      proposeDot:s.stage==='propose'?dotActive:dotIdle,
+      reviewDot:s.stage==='review'?dotActive:dotIdle,
+      openGrill:()=>this.open('grill'),openAudit:()=>this.open('audit'),openChat:()=>this.open('chat'),
+      grillStyle:this.toolBtn('grill'),auditStyle:this.toolBtn('audit'),chatStyle:this.toolBtn('chat'),
+      toolOpen:!!s.tool,closeTool:()=>this.setState({tool:null}),
+      toolIcon:p.icon,toolTitle:p.title,contextChip:p.chip,
+      toolHasThread:p.thread,
+      messages:p.messages.map(m=>({body:React.createElement('span',{dangerouslySetInnerHTML:fmt(m.md)})})),
+      composerPlaceholder:p.composer,
+      auditEmpty:p.auditEmpty,auditFull:p.auditFull,
+      auditItems:p.auditItems.map(it=>({text:it.text,icon:it.ok?'✓':'!',color:it.ok?'var(--green,#10b981)':'var(--amber,#f59e0b)'})),
+      repoMenuOpen:s.repoMenuOpen,toggleRepoMenu:()=>this.setState(st=>({repoMenuOpen:!st.repoMenuOpen})),closeRepoMenu:()=>this.setState({repoMenuOpen:false}),
+      dagOn:s.dagOn,noViews:!s.dagOn,toggleDag:()=>this.setState(st=>({dagOn:!st.dagOn})),
+      dagChipStyle:s.dagOn?'background:var(--accent-soft,#eef2ff);color:var(--accent,#4f46e5);border:1px solid var(--accent-border,#c7d2fe);':'background:var(--surface,#fff);color:var(--dim,#64748b);border:1px solid var(--border,#c8d4e3);',
+      dagCheckStyle:s.dagOn?'background:var(--accent,#4f46e5);color:#fff;':'background:transparent;border:1.5px solid var(--faint,#9aa7bd);color:transparent;',
+      dagCheck:s.dagOn?'✓':'',
+      dagRef:el=>{this.dagEl=el;},
+      conns:s.connectors.map(c=>({d:c.d,stroke:'var(--accent,#4f46e5)',w:1.6,op:0.5})),
+      setSoft:()=>this.setState({theme:'Soft'}),setMono:()=>this.setState({theme:'Mono'}),setVivid:()=>this.setState({theme:'Vivid'}),
+      softStyle:themeBtn('Soft'),monoStyle:themeBtn('Mono'),vividStyle:themeBtn('Vivid'),
+      toggleMode:()=>this.setState(st=>({mode:st.mode==='light'?'dark':'light'})),
+      modeIcon:s.mode==='light'?'☾':'☀',modeLabel:s.mode==='light'?'Light mode':'Dark mode',modeHint:s.mode==='light'?'→ dark':'→ light'
+    };
+  }
+}
+</script>
+</body>
+</html>

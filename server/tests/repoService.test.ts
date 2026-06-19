@@ -175,6 +175,7 @@ describe('repoService - initializeOpenSpec & createGitWorktree', () => {
       created: expect.any(String),
       description: 'my standard change description',
       proposeEngine: 'claude',
+      worktreeBranch: null,
     });
 
     // Update propose engine to cursor
@@ -224,3 +225,48 @@ describe('repoService - initializeOpenSpec & createGitWorktree', () => {
   });
 });
 
+describe('repoService - getChangeFilesContent', () => {
+  let tempDir: string;
+
+  beforeAll(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'openspec-dashboard-get-content-test-'));
+  });
+
+  afterAll(() => {
+    if (fs.existsSync(tempDir)) {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('should throw an error when the change directory does not exist', async () => {
+    const { getChangeFilesContent } = await import('../src/services/repoService.js');
+    expect(() => getChangeFilesContent(tempDir, 'non-existent')).toThrow(
+      'Change directory not found: non-existent'
+    );
+  });
+
+  it('should aggregate markdown file contents recursively', async () => {
+    const changeName = 'my-test-change';
+    const changeDir = path.join(tempDir, 'openspec', 'changes', changeName);
+    fs.mkdirSync(path.dirname(changeDir), { recursive: true });
+    fs.mkdirSync(changeDir);
+
+    // Create a flat md file
+    fs.writeFileSync(path.join(changeDir, 'proposal.md'), '# Proposal Content');
+
+    // Create a nested md file
+    const specsDir = path.join(changeDir, 'specs');
+    fs.mkdirSync(specsDir);
+    fs.writeFileSync(path.join(specsDir, 'api.md'), '## API Spec Content');
+
+    // Create a non-md file (should be ignored)
+    fs.writeFileSync(path.join(changeDir, 'image.png'), 'binary-data');
+
+    const { getChangeFilesContent } = await import('../src/services/repoService.js');
+    const result = getChangeFilesContent(tempDir, changeName);
+
+    expect(result).toContain('=== FILE: proposal.md ===\n# Proposal Content');
+    expect(result).toContain('=== FILE: specs/api.md ===\n## API Spec Content');
+    expect(result).not.toContain('image.png');
+  });
+});

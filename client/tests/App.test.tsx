@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import React from 'react';
 import App from '../src/App.js';
 
 // Mock fetch globally
@@ -18,7 +19,7 @@ describe('Frontend App - App.tsx', () => {
     expect(screen.getByRole('button', { name: 'Verify Path' })).toBeInTheDocument();
   });
 
-  it('should display loading indicator, then git/openspec status when check is successful', async () => {
+  it('should display loading indicator, then enter app when check is successful', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ exists: true, isGit: true, isOpenSpec: true }),
@@ -39,10 +40,10 @@ describe('Frontend App - App.tsx', () => {
       expect(mockFetch).toHaveBeenCalledWith('/api/status?path=%2FUsers%2Ftest%2Fmy-repo');
     });
 
-    // Verify status displays
+    // Verify we entered the app (verify gate is gone, sidebar is rendered)
     await waitFor(() => {
-      expect(screen.getByText('Git: Initialized')).toBeInTheDocument();
-      expect(screen.getByText('OpenSpec: Initialized')).toBeInTheDocument();
+      expect(screen.queryByText('Connect a repository')).not.toBeInTheDocument();
+      expect(screen.getByText('OpenSpec')).toBeInTheDocument();
     });
   });
 
@@ -79,7 +80,7 @@ describe('Frontend App - App.tsx', () => {
     });
   });
 
-  it('should show "Initialize OpenSpec" action card when repo has git but no openspec', async () => {
+  it('should show "Initialize OpenSpec" action in plumbing menu when repo has git but no openspec', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ exists: true, isGit: true, isOpenSpec: false }),
@@ -93,10 +94,17 @@ describe('Frontend App - App.tsx', () => {
     fireEvent.click(button);
 
     await waitFor(() => {
-      expect(screen.getByText('Git: Initialized')).toBeInTheDocument();
-      expect(screen.getByText('OpenSpec: Not Initialized')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Initialize OpenSpec' })).toBeInTheDocument();
+      expect(screen.queryByText('Connect a repository')).not.toBeInTheDocument();
+      expect(screen.getByText('OpenSpec')).toBeInTheDocument();
     });
+
+    // Open plumbing menu
+    const plumbingTrigger = screen.getByTitle('Repo & setup');
+    fireEvent.click(plumbingTrigger);
+
+    // Expect menu item to be in document
+    const initItem = screen.getByText('Initialize OpenSpec');
+    expect(initItem).toBeInTheDocument();
 
     // Mock successful init response, and then the refetch status
     mockFetch
@@ -109,8 +117,7 @@ describe('Frontend App - App.tsx', () => {
         json: async () => ({ exists: true, isGit: true, isOpenSpec: true }),
       });
 
-    const initBtn = screen.getByRole('button', { name: 'Initialize OpenSpec' });
-    fireEvent.click(initBtn);
+    fireEvent.click(initItem);
 
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith(
@@ -121,10 +128,6 @@ describe('Frontend App - App.tsx', () => {
           body: JSON.stringify({ path: '/Users/test/git-no-openspec' }),
         })
       );
-    });
-
-    await waitFor(() => {
-      expect(screen.getByText('OpenSpec: Initialized')).toBeInTheDocument();
     });
   });
 
@@ -142,9 +145,19 @@ describe('Frontend App - App.tsx', () => {
     fireEvent.click(button);
 
     await waitFor(() => {
-      expect(screen.getByText('Git Worktree Management')).toBeInTheDocument();
-      expect(screen.getByPlaceholderText('e.g., feature/new-logic')).toBeInTheDocument();
+      expect(screen.queryByText('Connect a repository')).not.toBeInTheDocument();
     });
+
+    // Open plumbing menu
+    const plumbingTrigger = screen.getByTitle('Repo & setup');
+    fireEvent.click(plumbingTrigger);
+
+    // Click Create Worktree…
+    const worktreeItem = screen.getByText('Create Worktree…');
+    fireEvent.click(worktreeItem);
+
+    // Expect modal to open
+    expect(screen.getByText('Create Git Worktree')).toBeInTheDocument();
 
     // Mock successful worktree creation
     mockFetch.mockResolvedValueOnce({
@@ -152,7 +165,7 @@ describe('Frontend App - App.tsx', () => {
       json: async () => ({ success: true, message: 'Git worktree created successfully' }),
     });
 
-    const branchInput = screen.getByPlaceholderText('e.g., feature/new-logic');
+    const branchInput = screen.getByPlaceholderText('e.g., feature/login-flow');
     const worktreePathInput = screen.getByLabelText('Worktree Destination Path:');
     const createBtn = screen.getByRole('button', { name: 'Create Worktree' });
 
@@ -174,10 +187,6 @@ describe('Frontend App - App.tsx', () => {
         })
       );
     });
-
-    await waitFor(() => {
-      expect(screen.getByText('Git worktree created successfully')).toBeInTheDocument();
-    });
   });
 
   it('should support showing and submitting the CreateChangeForm within App', async () => {
@@ -193,16 +202,15 @@ describe('Frontend App - App.tsx', () => {
     fireEvent.change(input, { target: { value: '/Users/test/my-openspec-repo' } });
     fireEvent.click(button);
 
-    // Verify change section appears
+    // Verify + New Change button is visible
     await waitFor(() => {
-      expect(screen.getByText('Change Management')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Create New Change' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '+ New Change' })).toBeInTheDocument();
     });
 
-    const createNewBtn = screen.getByRole('button', { name: 'Create New Change' });
+    const createNewBtn = screen.getByRole('button', { name: '+ New Change' });
     fireEvent.click(createNewBtn);
 
-    // Form should now render
+    // Form should now render inside modal
     expect(screen.getByLabelText('Change Name (kebab-case):')).toBeInTheDocument();
 
     // Mock successful change creation response

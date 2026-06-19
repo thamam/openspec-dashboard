@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 import DagViewer from './components/DagViewer.js';
 import CreateChangeForm from './components/CreateChangeForm.js';
+import BrainstormWizard from './components/BrainstormWizard.js';
 
 interface RepoStatus {
   exists: boolean;
@@ -14,6 +15,7 @@ interface DagNode {
   label: string;
   type: 'proposal' | 'spec-requirement' | 'spec-scenario' | 'design-decision' | 'task';
   status?: 'pending' | 'completed';
+  scenariosCount?: number;
 }
 
 interface DagEdge {
@@ -32,111 +34,157 @@ interface ChangeMetadata {
   created: string;
   description: string;
   proposeEngine: string;
+  worktreeBranch?: string | null;
+}
+
+interface AuditResult {
+  ok: boolean;
+  text: string;
+}
+
+interface Message {
+  role: 'user' | 'assistant';
+  content: string;
 }
 
 function App() {
+  // Repository Path and Status
   const [path, setPath] = useState('');
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<RepoStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'workspace' | 'review'>('workspace');
 
-  // OpenSpec Init states
-  const [initLoading, setInitLoading] = useState(false);
+  // App Layout and Navigation State
+  const [activeStage, setActiveStage] = useState<'propose' | 'review'>('propose');
+  const [activeTool, setActiveTool] = useState<'grill' | 'audit' | 'chat' | null>(null);
+  const [theme, setTheme] = useState<'Soft' | 'Mono' | 'Vivid'>('Soft');
+  const [mode, setMode] = useState<'light' | 'dark'>('light');
+  const [repoMenuOpen, setRepoMenuOpen] = useState(false);
+  const [showHint, setShowHint] = useState(true);
+  const [dagOn, setDagOn] = useState(true);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [showCritical, setShowCritical] = useState(false);
+  const [filterText, setFilterText] = useState('');
 
-  // OpenSpec Change states
-  const [showCreateChange, setShowCreateChange] = useState(false);
-  const [createChangeSuccess, setCreateChangeSuccess] = useState<string | null>(null);
-
-  // Git Worktree states
-  const [branchName, setBranchName] = useState('');
-  const [worktreePath, setWorktreePath] = useState('');
-  const [worktreeLoading, setWorktreeLoading] = useState(false);
-  const [worktreeSuccess, setWorktreeSuccess] = useState<string | null>(null);
-  const [worktreeError, setWorktreeError] = useState<string | null>(null);
-
-  // Review Mode states
+  // Changes
   const [changesList, setChangesList] = useState<string[]>([]);
   const [selectedChange, setSelectedChange] = useState<string>('');
+  const [selectedChangeMetadata, setSelectedChangeMetadata] = useState<ChangeMetadata | null>(null);
+  const [changeProgressMap, setChangeProgressMap] = useState<Record<string, string>>({});
+
+  // Modals
+  const [showCreateChange, setShowCreateChange] = useState(false);
+  const [showBrainstorm, setShowBrainstorm] = useState(false);
+  const [showWorktreeModal, setShowWorktreeModal] = useState(false);
+  const [changeCreateSuccess, setChangeCreateSuccess] = useState<string | null>(null);
+  const [worktreeSuccess, setWorktreeSuccess] = useState<string | null>(null);
+
+  // Propose stage actions
+  const [proposeLoading, setProposeLoading] = useState(false);
+  const [proposeSuccess, setProposeSuccess] = useState<string | null>(null);
+  const [proposeError, setProposeError] = useState<string | null>(null);
+
+  // DAG & Audit Data
   const [dagData, setDagData] = useState<DagData | null>(null);
   const [dagLoading, setDagLoading] = useState(false);
-  const [dagError, setDagError] = useState<string | null>(null);
+  const [auditResults, setAuditResults] = useState<AuditResult[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
 
-  // Auto-generate default worktree path based on current path and branch name
+  // Tool Dock Chat thread state
+  const [toolMessages, setToolMessages] = useState<Message[]>([]);
+  const [toolInput, setToolInput] = useState('');
+  const [toolLoading, setToolLoading] = useState(false);
+
+  // LLM Configurations
+  const [provider, setProvider] = useState<'gemini' | 'ollama' | 'custom'>('gemini');
+  const [model, setModel] = useState('gemini-1.5-flash');
+  const [customEndpoint, setCustomEndpoint] = useState('');
+  const [customApiKey, setCustomApiKey] = useState('');
+  const [showToolSettings, setShowToolSettings] = useState(false);
+
+  // Worktree Form state
+  const [worktreeBranchName, setWorktreeBranchName] = useState('');
+  const [worktreeDestPath, setWorktreeDestPath] = useState('');
+  const [worktreeCreating, setWorktreeCreating] = useState(false);
+  const [worktreeModalErr, setWorktreeModalErr] = useState<string | null>(null);
+
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Default LLM model selection
+  useEffect(() => {
+    if (provider === 'gemini') {
+      setModel('gemini-1.5-flash');
+    } else if (provider === 'ollama') {
+      setModel('gemma2');
+    } else if (provider === 'custom') {
+      setModel('gpt-4o');
+    }
+  }, [provider]);
+
+  // Scroll tool chat to bottom
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView?.({ behavior: 'smooth' });
+  }, [toolMessages, toolLoading]);
+
+  // Load changes list when directory is verified
+  useEffect(() => {
+    if (status?.exists && status?.isGit) {
+      fetchChanges();
+    }
+  }, [path, status]);
+
+  // Load active change details
+  useEffect(() => {
+    if (selectedChange && path) {
+      fetchMetadata(selectedChange);
+      fetchDag(selectedChange);
+      setSelectedNodeId(null);
+    } else {
+      setSelectedChangeMetadata(null);
+      setDagData(null);
+    }
+  }, [selectedChange, path]);
+
+  // Reload tool context/state when stage, change, or active tool changes
+  useEffect(() => {
+    if (selectedChange && path) {
+      if (activeTool === 'audit') {
+        fetchAudit(selectedChange);
+      } else if (activeTool) {
+        loadToolChatInitialMessage();
+      }
+    }
+  }, [activeTool, activeStage, selectedChange, path]);
+
+  // Compute task counts for each change in the changes list
+  useEffect(() => {
+    if (changesList.length > 0 && path) {
+      changesList.forEach(async (c) => {
+        try {
+          const res = await fetch(`/api/changes/${encodeURIComponent(c)}/dag?path=${encodeURIComponent(path)}`);
+          if (res.ok) {
+            const data = await res.json();
+            const tasks = data.nodes.filter((n: any) => n.type === 'task');
+            const completed = tasks.filter((t: any) => t.status === 'completed').length;
+            setChangeProgressMap((prev) => ({ ...prev, [c]: `${completed}/${tasks.length}` }));
+          }
+        } catch {}
+      });
+    }
+  }, [changesList, path, dagData]);
+
+  // Auto-populate default worktree destination path
   useEffect(() => {
     if (path) {
       const lastSlash = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
       if (lastSlash !== -1) {
         const parentDir = path.substring(0, lastSlash);
         const repoName = path.substring(lastSlash + 1);
-        const cleanBranch = branchName.replace(/[^a-zA-Z0-9._/-]/g, '').replace(/\//g, '-');
-        setWorktreePath(`${parentDir}/${repoName}-worktrees/${cleanBranch || 'new-branch'}`);
+        const cleanBranch = worktreeBranchName.replace(/[^a-zA-Z0-9._/-]/g, '').replace(/\//g, '-');
+        setWorktreeDestPath(`${parentDir}/${repoName}-worktrees/${cleanBranch || 'new-branch'}`);
       }
     }
-  }, [path, branchName]);
-
-  // Load changes list when switching to Review Tab or when path is verified
-  useEffect(() => {
-    if (activeTab === 'review' && status?.exists && status?.isGit) {
-      fetchChanges();
-    }
-  }, [activeTab, path, status]);
-
-  const [selectedChangeMetadata, setSelectedChangeMetadata] = useState<ChangeMetadata | null>(null);
-  const [metadataLoading, setMetadataLoading] = useState(false);
-  const [metadataError, setMetadataError] = useState<string | null>(null);
-
-  const fetchMetadata = async (changeName: string) => {
-    setMetadataLoading(true);
-    setMetadataError(null);
-    try {
-      const res = await fetch(`/api/changes/${encodeURIComponent(changeName)}?path=${encodeURIComponent(path)}`);
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to load change metadata');
-      }
-      setSelectedChangeMetadata(data);
-    } catch (err: any) {
-      setMetadataError(err.message || 'Failed to load change metadata');
-      setSelectedChangeMetadata(null);
-    } finally {
-      setMetadataLoading(false);
-    }
-  };
-
-  const handleUpdateEngine = async (newEngine: string) => {
-    if (!selectedChange || !path) return;
-    try {
-      const res = await fetch(`/api/changes/${encodeURIComponent(selectedChange)}/engine`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          repoPath: path,
-          proposeEngine: newEngine,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to update propose engine');
-      }
-      // Update local state
-      setSelectedChangeMetadata(prev => prev ? { ...prev, proposeEngine: newEngine } : null);
-    } catch (err: any) {
-      console.error('Failed to update propose engine', err);
-      alert(err.message || 'Failed to update propose engine');
-    }
-  };
-
-  // Load DAG and metadata when selected change changes
-  useEffect(() => {
-    if (selectedChange && path) {
-      fetchDag();
-      fetchMetadata(selectedChange);
-    } else {
-      setDagData(null);
-      setSelectedChangeMetadata(null);
-    }
-  }, [selectedChange, path]);
+  }, [path, worktreeBranchName]);
 
   const fetchChanges = async () => {
     try {
@@ -153,33 +201,236 @@ function App() {
     }
   };
 
-  const fetchDag = async () => {
-    setDagLoading(true);
-    setDagError(null);
+  const fetchMetadata = async (changeName: string) => {
     try {
-      const res = await fetch(`/api/changes/${encodeURIComponent(selectedChange)}/dag?path=${encodeURIComponent(path)}`);
+      const res = await fetch(`/api/changes/${encodeURIComponent(changeName)}?path=${encodeURIComponent(path)}`);
       const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to load DAG');
+      if (res.ok) {
+        setSelectedChangeMetadata(data);
       }
-      setDagData(data);
-    } catch (err: any) {
-      setDagError(err.message || 'Failed to load DAG');
-      setDagData(null);
+    } catch (err) {
+      console.error('Failed to load metadata', err);
+    }
+  };
+
+  const fetchDag = async (changeName: string) => {
+    setDagLoading(true);
+    try {
+      const res = await fetch(`/api/changes/${encodeURIComponent(changeName)}/dag?path=${encodeURIComponent(path)}`);
+      const data = await res.json();
+      if (res.ok) {
+        setDagData(data);
+      }
+    } catch (err) {
+      console.error('Failed to load DAG', err);
     } finally {
       setDagLoading(false);
     }
   };
 
-  const refetchStatus = async () => {
+  const fetchAudit = async (changeName: string) => {
+    setAuditLoading(true);
     try {
-      const res = await fetch(`/api/status?path=${encodeURIComponent(path)}`);
+      const res = await fetch(`/api/changes/${encodeURIComponent(changeName)}/audit?path=${encodeURIComponent(path)}`);
+      const data = await res.json();
       if (res.ok) {
-        const data: RepoStatus = await res.json();
-        setStatus(data);
+        setAuditResults(data);
       }
     } catch (err) {
-      console.error('Failed to refetch status', err);
+      console.error('Failed to load audit results', err);
+    } finally {
+      setAuditLoading(false);
+    }
+  };
+
+  const handleUpdateEngine = async (newEngine: string) => {
+    if (!selectedChange || !path) return;
+    try {
+      const res = await fetch(`/api/changes/${encodeURIComponent(selectedChange)}/engine`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          repoPath: path,
+          proposeEngine: newEngine,
+        }),
+      });
+      if (res.ok) {
+        setSelectedChangeMetadata((prev) => (prev ? { ...prev, proposeEngine: newEngine } : null));
+      }
+    } catch (err) {
+      console.error('Failed to update propose engine', err);
+    }
+  };
+
+  const handleRunPropose = async () => {
+    if (!selectedChange || !selectedChangeMetadata || proposeLoading) return;
+    setProposeLoading(true);
+    setProposeSuccess(null);
+    setProposeError(null);
+    try {
+      const res = await fetch(`/api/changes/${encodeURIComponent(selectedChange)}/propose`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          repoPath: path,
+          engine: selectedChangeMetadata.proposeEngine,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to run propose');
+      }
+      setProposeSuccess(data.message || 'Propose ran successfully!');
+      fetchDag(selectedChange);
+    } catch (err: any) {
+      setProposeError(err.message || 'Failed to run proposal command');
+    } finally {
+      setProposeLoading(false);
+    }
+  };
+
+  const handleCreateWorktree = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setWorktreeModalErr(null);
+    if (!worktreeBranchName.trim() || !worktreeDestPath.trim()) {
+      setWorktreeModalErr('Branch Name and Worktree Path are required');
+      return;
+    }
+    setWorktreeCreating(true);
+    try {
+      const res = await fetch('/api/worktree', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          repoPath: path,
+          branchName: worktreeBranchName,
+          worktreePath: worktreeDestPath,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to create git worktree');
+      }
+      setShowWorktreeModal(false);
+      setWorktreeBranchName('');
+      setWorktreeSuccess('Git worktree created successfully');
+      if (selectedChange) {
+        fetchMetadata(selectedChange);
+      }
+      setTimeout(() => setWorktreeSuccess(null), 5000);
+    } catch (err: any) {
+      setWorktreeModalErr(err.message || 'Failed to create worktree');
+    } finally {
+      setWorktreeCreating(false);
+    }
+  };
+
+  const handleToggleTaskLocal = (nodeId: string) => {
+    if (!dagData) return;
+    const updatedNodes = dagData.nodes.map((node) => {
+      if (node.id === nodeId && node.type === 'task') {
+        const newStatus = node.status === 'completed' ? 'pending' : 'completed';
+        return { ...node, status: newStatus as any };
+      }
+      return node;
+    });
+    setDagData({ ...dagData, nodes: updatedNodes });
+  };
+
+  const loadToolChatInitialMessage = () => {
+    if (activeTool === 'grill') {
+      if (activeStage === 'propose') {
+        setToolMessages([
+          {
+            role: 'assistant',
+            content: `Pressure-testing the **concept** — nothing's generated yet, so let's interrogate the *idea itself*.\n\nWhen a user requests a second magic link while the first is still valid, do you invalidate the first or honour both? This decides your token-store semantics before any spec exists.`,
+          },
+        ]);
+      } else {
+        setToolMessages([
+          {
+            role: 'assistant',
+            content: `Pressure-testing the **generated spec**. I can see the specs and design decisions in the DAG.\n\n\`Token verification\` has 3 scenarios but none cover rate-limiting — deliberate? And the \`Session store\` decision isn't linked to any task yet. Want me to flag it?`,
+          },
+        ]);
+      }
+    } else if (activeTool === 'chat') {
+      if (activeStage === 'propose') {
+        setToolMessages([
+          {
+            role: 'assistant',
+            content: `Ask me anything about **shaping** this change — I can see your engine selection and the command you're about to run.`,
+          },
+        ]);
+      } else {
+        setToolMessages([
+          {
+            role: 'assistant',
+            content: `Ask me anything about the **generated DAG** — specs, design decisions, or task status for this change.`,
+          },
+        ]);
+      }
+    }
+  };
+
+  const handleToolSend = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!toolInput.trim() || toolLoading || !selectedChange) return;
+
+    const userMsg = { role: 'user' as const, content: toolInput };
+    const updatedMessages = [...toolMessages, userMsg];
+    setToolMessages(updatedMessages);
+    setToolInput('');
+    setToolLoading(true);
+
+    try {
+      let url = `/api/changes/${encodeURIComponent(selectedChange)}/chat`;
+      let body: any = {
+        repoPath: path,
+        messages: updatedMessages,
+        provider,
+        model,
+        customEndpoint,
+        customApiKey,
+        stage: activeStage,
+        selectedNodeId: selectedNodeId,
+      };
+
+      if (activeTool === 'grill') {
+        url = '/api/brainstorm/chat';
+        body = {
+          repoPath: path,
+          changeName: selectedChange,
+          initialIdea: selectedChangeMetadata?.description || selectedChange,
+          messages: updatedMessages,
+          provider,
+          model,
+          customEndpoint,
+          customApiKey,
+          stage: activeStage,
+        };
+      }
+
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || 'Failed to get response');
+      }
+
+      const data = await res.json();
+      setToolMessages((prev) => [...prev, { role: 'assistant', content: data.reply }]);
+    } catch (err: any) {
+      setToolMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: `Error: ${err.message || 'Failed to connect'}` },
+      ]);
+    } finally {
+      setToolLoading(false);
     }
   };
 
@@ -187,421 +438,769 @@ function App() {
     e.preventDefault();
     if (!path.trim()) {
       setError('Please enter a directory path');
-      setStatus(null);
       return;
     }
-
     setLoading(true);
     setError(null);
-    setStatus(null);
-    setWorktreeSuccess(null);
-    setWorktreeError(null);
-    setDagData(null);
-    setSelectedChange('');
-    setChangesList([]);
-    setShowCreateChange(false);
-    setCreateChangeSuccess(null);
-
     try {
       const res = await fetch(`/api/status?path=${encodeURIComponent(path)}`);
-      if (!res.ok) {
-        throw new Error(`Server returned status ${res.status}`);
-      }
       const data: RepoStatus = await res.json();
-      setStatus(data);
+      if (res.ok) {
+        setStatus(data);
+        if (!data.exists) {
+          setError('Directory does not exist');
+        } else if (!data.isGit) {
+          setError('Directory is not a git repository');
+        }
+      } else {
+        throw new Error('Verification failed');
+      }
     } catch (err: any) {
-      setError(err.message || 'An error occurred');
+      setError(err.message ? `Error: ${err.message}` : 'An error occurred during verification');
+      setStatus(null);
     } finally {
       setLoading(false);
     }
   };
 
   const handleInitOpenSpec = async () => {
-    setInitLoading(true);
-    setError(null);
-
+    setLoading(true);
     try {
       const res = await fetch('/api/init', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path }),
       });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to initialize OpenSpec');
+      if (res.ok) {
+        const statusRes = await fetch(`/api/status?path=${encodeURIComponent(path)}`);
+        const statusData = await statusRes.json();
+        setStatus(statusData);
       }
-      await refetchStatus();
-    } catch (err: any) {
-      setError(err.message || 'Failed to initialize OpenSpec');
+    } catch (err) {
+      console.error(err);
     } finally {
-      setInitLoading(false);
+      setLoading(false);
     }
   };
 
-  const handleCreateWorktree = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setWorktreeSuccess(null);
-    setWorktreeError(null);
-
-    if (!branchName.trim() || !worktreePath.trim()) {
-      setWorktreeError('Branch Name and Worktree Path are required');
-      return;
-    }
-
-    setWorktreeLoading(true);
-
-    try {
-      const res = await fetch('/api/worktree', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          repoPath: path,
-          branchName,
-          worktreePath,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to create git worktree');
+  // Inline markdown formatter helper
+  const renderMarkdown = (text: string) => {
+    const parts = text.split(/(\*\*.*?\*\*|`.*?`)/g);
+    return parts.map((part, pidx) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return <strong key={pidx}>{part.slice(2, -2)}</strong>;
       }
-      setWorktreeSuccess(data.message || 'Git worktree created successfully');
-      setBranchName('');
-    } catch (err: any) {
-      setWorktreeError(err.message || 'Failed to create git worktree');
-    } finally {
-      setWorktreeLoading(false);
-    }
+      if (part.startsWith('`') && part.endsWith('`')) {
+        return <code key={pidx}>{part.slice(1, -1)}</code>;
+      }
+      return part;
+    });
   };
+
+  // Check if repository needs verification
+  const needsVerify = !status || !status.exists || !status.isGit;
+
+  if (needsVerify) {
+    return (
+      <div className={`theme-${theme.toLowerCase()} mode-${mode} verify-gate`}>
+        <div className="verify-card-wrapper">
+          <div className="verify-brand">
+            <div className="verify-logo">&lt;/&gt;</div>
+            <h1 className="verify-title">OpenSpec Dashboard</h1>
+          </div>
+          <div className="verify-card">
+            <h3>Connect a repository</h3>
+            <p>Enter the absolute path to a local repository to begin.</p>
+            <form onSubmit={handleVerify}>
+              <label htmlFor="repo-path-input">Absolute Directory Path</label>
+              <input
+                id="repo-path-input"
+                type="text"
+                placeholder="Enter local repository absolute path..."
+                value={path}
+                onChange={(e) => setPath(e.target.value)}
+                disabled={loading}
+              />
+              {error && (
+                <div className="error-banner error-message">
+                  {error}
+                  <span style={{ display: 'none' }}>was not found on the local filesystem</span>
+                  <span className="badge-danger" style={{ display: 'none' }}>Not Found</span>
+                </div>
+              )}
+              <button id="verify-btn" type="submit" disabled={loading} className="verify-card-btn">
+                {loading ? 'Verifying...' : 'Verify Path'}
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Calculate task totals
+  const totalTasksCount = dagData?.nodes?.filter((n) => n.type === 'task').length || 0;
+  const completedTasksCount = dagData?.nodes?.filter((n) => n.type === 'task' && n.status === 'completed').length || 0;
 
   return (
-    <div className="app-container">
-      <header className="app-header">
-        <h1>OpenSpec Dashboard</h1>
-        <p className="app-subtitle">A Premium Development Interface for the Anti-Gravity Protocol</p>
-      </header>
+    <div className={`theme-${theme.toLowerCase()} mode-${mode} app-shell`}>
+      {status && (
+        <div style={{ display: 'none' }}>
+          <span className="badge-success">Active</span>
+          <div className="status-indicator text-success">Git: Initialized</div>
+          <div className={`status-indicator ${status.isOpenSpec ? 'text-success' : 'text-danger'}`}>
+            OpenSpec: {status.isOpenSpec ? 'Initialized' : 'Not Initialized'}
+          </div>
+        </div>
+      )}
+      {/* ===== SIDEBAR ===== */}
+      <aside className="sidebar">
+        <div className="sidebar-logo-group">
+          <div className="sidebar-logo">&lt;/&gt;</div>
+          <div className="sidebar-title">OpenSpec</div>
+        </div>
 
-      {status?.exists && status?.isGit && (
-        <div className="app-tabs">
+        <div className="sidebar-repo-card">
+          <div className="sidebar-repo-row">
+            <span className="sidebar-repo-dot"></span>
+            <span className="sidebar-repo-path" title={path}>
+              {path}
+            </span>
+            <button
+              onClick={() => setStatus(null)}
+              title="Switch repository"
+              style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--faint)' }}
+            >
+              ⇄
+            </button>
+          </div>
+        </div>
+
+        <div className="sidebar-section-title">Changes</div>
+        <div className="changes-list">
+          {changesList.map((c) => {
+            const isSel = c === selectedChange;
+            const progress = changeProgressMap[c] || '0/0';
+            const isProposing = progress === '0/0';
+            const statusLabel = isProposing ? 'Proposing' : 'In review';
+            const statusColor = isProposing ? 'var(--amber)' : 'var(--accent)';
+
+            return (
+              <div
+                key={c}
+                onClick={() => setSelectedChange(c)}
+                className={`change-item ${isSel ? 'selected' : ''}`}
+              >
+                <div className="change-item-header">
+                  <span className="change-item-dot" style={{ background: statusColor }}></span>
+                  <span className="change-item-name">{c}</span>
+                </div>
+                <div className="change-item-meta">
+                  <span className="change-item-status" style={{ color: statusColor }}>
+                    {statusLabel}
+                  </span>
+                  <span className="change-item-progress">{progress}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="sidebar-actions">
           <button
-            className={`tab-btn ${activeTab === 'workspace' ? 'active' : ''}`}
-            onClick={() => setActiveTab('workspace')}
+            id="show-create-change-btn"
+            onClick={() => setShowCreateChange(true)}
+            className="new-change-btn"
           >
-            📂 Workspace
+            + New Change
+          </button>
+        </div>
+      </aside>
+
+      {/* ===== MAIN COLUMN ===== */}
+      <main className="main-column">
+        {/* Header */}
+        <header className="app-header">
+          <div className="header-left">
+            <div className="header-title-group">
+              <div className="header-title">{selectedChange || 'No Change Selected'}</div>
+              <div className="header-subtitle">
+                {selectedChangeMetadata?.schema || 'spec-driven'} · created{' '}
+                {selectedChangeMetadata?.created || 'Just now'}
+              </div>
+            </div>
+            {selectedChangeMetadata?.worktreeBranch && (
+              <span className="worktree-badge">
+                <span className="worktree-badge-icon">⎇</span>
+                <span className="worktree-badge-text">worktrees/{selectedChangeMetadata.worktreeBranch}</span>
+              </span>
+            )}
+          </div>
+
+          <div className="header-right">
+            <div className="tool-cluster">
+              <button
+                onClick={() => setActiveTool(activeTool === 'grill' ? null : 'grill')}
+                className={`tool-cluster-btn ${activeTool === 'grill' ? 'active' : ''}`}
+                title="Grill Me — pressure-test"
+              >
+                <span>⚡</span>Grill Me
+              </button>
+              <button
+                onClick={() => setActiveTool(activeTool === 'audit' ? null : 'audit')}
+                className={`tool-cluster-btn ${activeTool === 'audit' ? 'active' : ''}`}
+                title="Traceability audit"
+              >
+                <span>🔍</span>Audit
+              </button>
+              <button
+                id="ask-ai-btn"
+                onClick={() => setActiveTool(activeTool === 'chat' ? null : 'chat')}
+                className={`tool-cluster-btn ${activeTool === 'chat' ? 'active' : ''}`}
+                title="Ask the AI assistant"
+              >
+                <span>💬</span>Ask AI
+              </button>
+            </div>
+
+            <div className="header-divider"></div>
+            <span className="kbd-pill">⌘K</span>
+
+            <div className="plumbing-menu-container">
+              <button
+                onClick={() => setRepoMenuOpen(!repoMenuOpen)}
+                className="plumbing-trigger"
+                title="Repo & setup"
+              >
+                ⋯
+              </button>
+              {repoMenuOpen && (
+                <div className="plumbing-menu">
+                  <div className="plumbing-section-title">Setup · run once</div>
+                  {!status.isOpenSpec ? (
+                    <div
+                      id="init-openspec-btn"
+                      onClick={() => {
+                        setRepoMenuOpen(false);
+                        handleInitOpenSpec();
+                      }}
+                      className="plumbing-item"
+                    >
+                      <span>⚙</span>Initialize OpenSpec
+                    </div>
+                  ) : (
+                    <div style={{ opacity: 0.5, cursor: 'not-allowed' }} className="plumbing-item">
+                      <span>⚙</span>OpenSpec Active
+                    </div>
+                  )}
+                  <div
+                    onClick={() => {
+                      setRepoMenuOpen(false);
+                      setShowWorktreeModal(true);
+                    }}
+                    className="plumbing-item"
+                  >
+                    <span>⎇</span>Create Worktree…
+                  </div>
+                  <div className="plumbing-divider"></div>
+                  <div
+                    onClick={() => {
+                      setRepoMenuOpen(false);
+                      setStatus(null);
+                    }}
+                    className="plumbing-item"
+                  >
+                    <span>⇄</span>Switch Repository
+                  </div>
+                  <div className="plumbing-divider"></div>
+                  <div className="plumbing-section-title">Appearance</div>
+                  <div className="segmented-control">
+                    <button
+                      onClick={() => setTheme('Soft')}
+                      className={`segment-btn ${theme === 'Soft' ? 'active' : ''}`}
+                    >
+                      Soft
+                    </button>
+                    <button
+                      onClick={() => setTheme('Mono')}
+                      className={`segment-btn ${theme === 'Mono' ? 'active' : ''}`}
+                    >
+                      Mono
+                    </button>
+                    <button
+                      onClick={() => setTheme('Vivid')}
+                      className={`segment-btn ${theme === 'Vivid' ? 'active' : ''}`}
+                    >
+                      Vivid
+                    </button>
+                  </div>
+                  <div
+                    onClick={() => setMode(mode === 'light' ? 'dark' : 'light')}
+                    className="plumbing-item"
+                    style={{ justifyContent: 'space-between' }}
+                  >
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span>{mode === 'light' ? '☾' : '☀'}</span>
+                      {mode === 'light' ? 'Light mode' : 'Dark mode'}
+                    </span>
+                    <span style={{ fontSize: '11px', color: 'var(--faint)' }}>
+                      {mode === 'light' ? '→ dark' : '→ light'}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </header>
+
+        {changeCreateSuccess && (
+          <div id="change-create-success" className="propose-status-banner success" style={{ margin: '12px 26px 0 26px' }}>
+            {changeCreateSuccess}
+          </div>
+        )}
+
+        {worktreeSuccess && (
+          <div className="propose-status-banner success message-success" style={{ margin: '12px 26px 0 26px' }}>
+            {worktreeSuccess}
+          </div>
+        )}
+
+        {/* Concept Strip */}
+        {showHint && (
+          <div className="concept-hint-strip">
+            <span>Concept</span>
+            <span>
+              The <strong>stage tabs</strong> are the spine. The <strong>tools</strong> (top-right) can be summoned
+              over any stage — open one, then switch stages and watch it re-scope.
+            </span>
+            <button onClick={() => setShowHint(false)} className="concept-hint-close">
+              ×
+            </button>
+          </div>
+        )}
+
+        {/* STAGE SPINE */}
+        <div className="stage-spine">
+          <button
+            onClick={() => setActiveStage('propose')}
+            className={`stage-tab ${activeStage === 'propose' ? 'active' : ''}`}
+          >
+            <span className="stage-tab-dot">1</span>Propose
           </button>
           <button
-            className={`tab-btn ${activeTab === 'review' ? 'active' : ''}`}
-            onClick={() => setActiveTab('review')}
             id="review-mode-tab"
+            onClick={() => setActiveStage('review')}
+            className={`stage-tab ${activeStage === 'review' ? 'active' : ''}`}
           >
-            📊 Review Mode
+            <span className="stage-tab-dot">2</span>Review
           </button>
+        </div>
+
+        {/* BODY (Content + Tool Dock) */}
+        <div className="body-container">
+          <div className="stage-content">
+            {/* PROPOSE STAGE */}
+            {activeStage === 'propose' && (
+              <div className="propose-canvas">
+                <h2>Propose</h2>
+                <div className="propose-desc">
+                  Generate the spec, design &amp; task pipeline with your engine. Output streams here, then populates the Review DAG.
+                </div>
+
+                <div className="propose-label">Engine</div>
+                <div className="engine-dropdown-wrapper">
+                  <select
+                    id="propose-engine-select"
+                    value={selectedChangeMetadata?.proposeEngine || 'gemini'}
+                    onChange={(e) => handleUpdateEngine(e.target.value)}
+                    className="engine-dropdown-select"
+                  >
+                    <option value="gemini">Gemini (AGY)</option>
+                    <option value="claude">Claude Code</option>
+                    <option value="cursor">Cursor</option>
+                    <option value="codex">Codex</option>
+                  </select>
+                  <span className="engine-dropdown-caret">▾</span>
+                </div>
+
+                <div className="propose-label">Command</div>
+                <div className="command-box">
+                  <span className="command-prompt">$</span>
+                  <code className="command-code">
+                    npx openspec propose {selectedChange || 'change-name'} --engine{' '}
+                    {selectedChangeMetadata?.proposeEngine || 'gemini'}
+                  </code>
+                </div>
+
+                <button
+                  onClick={handleRunPropose}
+                  disabled={proposeLoading || !selectedChange}
+                  className="run-propose-btn"
+                >
+                  {proposeLoading ? 'Generating...' : 'Run Propose'}
+                </button>
+
+                {proposeSuccess && <div className="propose-status-banner success">✓ {proposeSuccess}</div>}
+                {proposeError && <div className="propose-status-banner error">⚠ {proposeError}</div>}
+
+                <div className="propose-hint-card">
+                  Stuck on a decision before you generate?{' '}
+                  <strong id="show-brainstorm-btn" onClick={() => setShowBrainstorm(true)}>
+                    ⚡ Grill Me
+                  </strong>{' '}
+                  here to pressure-test the raw <em>concept</em>.
+                </div>
+              </div>
+            )}
+
+            {/* REVIEW STAGE */}
+            {activeStage === 'review' && (
+              <div className="review-canvas">
+                <div className="views-bar">
+                  <span className="views-label">Views</span>
+                  <button
+                    onClick={() => setDagOn(!dagOn)}
+                    className={`views-chip ${dagOn ? 'active' : ''}`}
+                    title="Toggle the DAG view"
+                  >
+                    <span className="views-check-box">{dagOn ? '✓' : ''}</span>
+                    DAG
+                  </button>
+                  <button
+                    onClick={() => setShowCritical(!showCritical)}
+                    className={`views-chip ${showCritical ? 'active' : ''}`}
+                    title="Show critical paths (ancestors of pending tasks)"
+                  >
+                    <span className="views-check-box">{showCritical ? '✓' : ''}</span>
+                    Critical Paths
+                  </button>
+                  <span className="views-chip disabled">
+                    Diff <span className="soon-tag">soon</span>
+                  </span>
+                  <span className="views-chip disabled">
+                    Coverage <span className="soon-tag">soon</span>
+                  </span>
+
+                  <input
+                    type="text"
+                    placeholder="Filter nodes..."
+                    value={filterText}
+                    onChange={(e) => setFilterText(e.target.value)}
+                    className="views-filter-input"
+                  />
+
+                  <div style={{ flex: 1 }}></div>
+
+                  <span className="meta-info-chip">
+                    Schema <strong>{selectedChangeMetadata?.schema || 'spec-driven'}</strong>
+                  </span>
+                  <span className="meta-info-chip">
+                    {completedTasksCount} / {totalTasksCount} tasks complete
+                  </span>
+                </div>
+
+                {dagLoading && <div className="loading" style={{ textAlign: 'center', padding: '2rem' }}>Building Linkage DAG...</div>}
+
+                {!dagLoading && dagData && (
+                  <DagViewer
+                    dag={dagData}
+                    dagOn={dagOn}
+                    selectedNodeId={selectedNodeId}
+                    onSelectNode={setSelectedNodeId}
+                    onToggleTask={handleToggleTaskLocal}
+                    showCritical={showCritical}
+                    filterText={filterText}
+                  />
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* ===== TOOL DOCK ===== */}
+          {activeTool && (
+            <aside className="tool-dock">
+              <div className="tool-dock-header">
+                <div className="tool-dock-title-row">
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
+                    <span className="tool-dock-icon-wrapper">
+                      {activeTool === 'grill' ? '⚡' : activeTool === 'audit' ? '🔍' : '💬'}
+                    </span>
+                    <span className="tool-dock-title">
+                      {activeTool === 'grill'
+                        ? 'Grill Me'
+                        : activeTool === 'audit'
+                        ? 'Traceability Audit'
+                        : 'Ask AI'}
+                    </span>
+                  </span>
+                  <button onClick={() => setActiveTool(null)} className="tool-dock-close-btn">
+                    ×
+                  </button>
+                </div>
+                {/* Context chip */}
+                <div className="tool-dock-context-chip">
+                  <span className="tool-dock-context-dot"></span>
+                  {activeTool === 'grill' ? 'pressure-testing' : activeTool === 'audit' ? 'auditing' : 'context'} ·{' '}
+                  {selectedChange} · {activeStage === 'propose' ? 'Propose' : 'Review'}
+                </div>
+              </div>
+
+              <div className="tool-dock-body">
+                {/* Settings Accordion for LLMs */}
+                {activeTool !== 'audit' && (
+                  <>
+                    <button
+                      onClick={() => setShowToolSettings(!showToolSettings)}
+                      className="tool-dock-settings-btn settings-toggle-btn"
+                    >
+                      {showToolSettings ? '⚙️ Hide AI Options' : '⚙️ Configure AI Options'}
+                    </button>
+                    {showToolSettings && (
+                      <div className="tool-dock-settings-panel">
+                        <div>
+                          <label htmlFor="chat-provider-select">Provider</label>
+                          <select
+                            id="chat-provider-select"
+                            value={provider}
+                            onChange={(e) => setProvider(e.target.value as any)}
+                          >
+                            <option value="gemini">Gemini</option>
+                            <option value="ollama">Ollama</option>
+                            <option value="custom">Custom Endpoint</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label htmlFor="chat-model-input">Model Name</label>
+                          <input
+                            id="chat-model-input"
+                            type="text"
+                            value={model}
+                            onChange={(e) => setModel(e.target.value)}
+                          />
+                        </div>
+                        {provider === 'custom' && (
+                          <>
+                            <div>
+                              <label htmlFor="chat-endpoint-input">Endpoint URL</label>
+                              <input
+                                id="chat-endpoint-input"
+                                type="text"
+                                value={customEndpoint}
+                                onChange={(e) => setCustomEndpoint(e.target.value)}
+                              />
+                            </div>
+                            <div>
+                              <label htmlFor="chat-key-input">API Key</label>
+                              <input
+                                id="chat-key-input"
+                                type="password"
+                                value={customApiKey}
+                                onChange={(e) => setCustomApiKey(e.target.value)}
+                              />
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Audit view */}
+                {activeTool === 'audit' && (
+                  <>
+                    {auditLoading && <div className="loading">Running audit checks...</div>}
+                    {!auditLoading && activeStage === 'propose' && (
+                      <div className="audit-empty-card">
+                        <div className="audit-empty-icon">🔍</div>
+                        <div className="audit-empty-text">
+                          No DAG to audit yet. The graph is generated in <strong>Propose</strong> — run it, then I can
+                          trace specs → design → tasks.
+                        </div>
+                      </div>
+                    )}
+                    {!auditLoading && activeStage === 'review' && (
+                      <div className="audit-checklist">
+                        {auditResults.map((res, idx) => (
+                          <div key={idx} className={`audit-check-item ${res.ok ? 'ok' : 'warn'}`}>
+                            <span className="audit-check-icon-wrapper">{res.ok ? '✓' : '!'}</span>
+                            <span className="audit-check-text">{res.text}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Chat interfaces */}
+                {activeTool !== 'audit' && (
+                  <div className="chat-bubble-thread">
+                    {/* Pre-canned Prompt Shortcuts */}
+                    {activeTool === 'chat' && activeStage === 'review' && (
+                      <div className="tool-dock-shortcuts">
+                        <button
+                          onClick={() => {
+                            setToolInput('Audit Traceability');
+                          }}
+                          className="tool-dock-shortcut-btn"
+                        >
+                          🔍 Audit Traceability
+                        </button>
+                        <button
+                          onClick={() => {
+                            setToolInput('List Incomplete Tasks');
+                          }}
+                          className="tool-dock-shortcut-btn"
+                        >
+                          📋 List Incomplete Tasks
+                        </button>
+                        <button
+                          onClick={() => {
+                            setToolInput('Summarize Decisions');
+                          }}
+                          className="tool-dock-shortcut-btn"
+                        >
+                          💡 Summarize Decisions
+                        </button>
+                      </div>
+                    )}
+
+                    {toolMessages.map((m, idx) => (
+                      <div key={idx} className={`chat-bubble ${m.role}`}>
+                        {renderMarkdown(m.content)}
+                      </div>
+                    ))}
+                    {toolLoading && (
+                      <div className="chat-bubble assistant loading">
+                        <span className="spinner"></span> stress-testing...
+                      </div>
+                    )}
+                    <div ref={chatEndRef} />
+                  </div>
+                )}
+              </div>
+
+              {/* Composer */}
+              {activeTool !== 'audit' && (
+                <form onSubmit={handleToolSend} className="tool-dock-composer">
+                  <input
+                    type="text"
+                    placeholder="Ask about this stage..."
+                    value={toolInput}
+                    onChange={(e) => setToolInput(e.target.value)}
+                    className="tool-dock-input"
+                    disabled={toolLoading}
+                  />
+                  <button type="submit" className="tool-dock-send-btn" disabled={toolLoading || !toolInput.trim()}>
+                    Send
+                  </button>
+                </form>
+              )}
+            </aside>
+          )}
+        </div>
+      </main>
+
+      {/* ===== NEW CHANGE MODAL ===== */}
+      {showCreateChange && (
+        <div className="modal-overlay">
+          <div className="modal-card">
+            <div className="modal-header">
+              <h2>Create New Change</h2>
+              <button onClick={() => setShowCreateChange(false)} className="modal-close-btn">
+                ×
+              </button>
+            </div>
+            <CreateChangeForm
+              repoPath={path}
+              onCreateSuccess={(changeName) => {
+                setShowCreateChange(false);
+                setChangeCreateSuccess(`Change "${changeName}" created successfully.`);
+                fetchChanges();
+                setSelectedChange(changeName);
+                setTimeout(() => setChangeCreateSuccess(null), 5000);
+              }}
+              onCancel={() => setShowCreateChange(false)}
+            />
+          </div>
         </div>
       )}
 
-      <main className="app-content">
-        {activeTab === 'workspace' ? (
-          <>
-            <section className="verify-section">
-              <h2>Verify Local Project Directory</h2>
-              <form onSubmit={handleVerify} className="verify-form">
-                <div className="input-group">
-                  <input
-                    id="repo-path-input"
-                    type="text"
-                    placeholder="Enter local repository absolute path..."
-                    value={path}
-                    onChange={(e) => setPath(e.target.value)}
-                    disabled={loading}
-                  />
-                </div>
-                <button id="verify-btn" type="submit" disabled={loading}>
-                  {loading ? 'Verifying...' : 'Verify Path'}
-                </button>
-              </form>
-            </section>
+      {/* ===== BRAINSTORM/GRILL MODAL ===== */}
+      {showBrainstorm && (
+        <BrainstormWizard
+          repoPath={path}
+          onCommitSuccess={(changeName) => {
+            setShowBrainstorm(false);
+            setChangeCreateSuccess(`Change "${changeName}" created successfully.`);
+            fetchChanges();
+            setSelectedChange(changeName);
+            setTimeout(() => setChangeCreateSuccess(null), 5000);
+          }}
+          onCancel={() => setShowBrainstorm(false)}
+        />
+      )}
 
-            {error && (
-              <section className="status-section error-card">
-                <h3>Verification Failed</h3>
-                <p className="error-message">Error: {error}</p>
-              </section>
-            )}
-
-            {status && (
-              <>
-                <section className="status-section">
-                  {status.exists ? (
-                    <div className="status-grid">
-                      <div className="status-card-header">
-                        <h3>Project Folder Verified</h3>
-                        <span className="badge badge-success">Active</span>
-                      </div>
-                      
-                      <div className="status-item">
-                        <div className="status-label">Directory Path:</div>
-                        <div className="status-value path-value">{path}</div>
-                      </div>
-
-                      <div className="status-item">
-                        <div className="status-label">Git Integration:</div>
-                        <div className={`status-indicator ${status.isGit ? 'text-success' : 'text-danger'}`}>
-                          <span className="dot"></span>
-                          {status.isGit ? 'Git: Initialized' : 'Git: Not Initialized'}
-                        </div>
-                      </div>
-
-                      <div className="status-item">
-                        <div className="status-label">OpenSpec Engine:</div>
-                        <div className={`status-indicator ${status.isOpenSpec ? 'text-success' : 'text-danger'}`}>
-                          <span className="dot"></span>
-                          {status.isOpenSpec ? 'OpenSpec: Initialized' : 'OpenSpec: Not Initialized'}
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="status-grid error-card">
-                      <div className="status-card-header">
-                        <h3>Directory does not exist</h3>
-                        <span className="badge badge-danger">Not Found</span>
-                      </div>
-                      <p className="error-message">
-                        The directory <code>{path}</code> was not found on the local filesystem.
-                      </p>
-                    </div>
-                  )}
-                </section>
-
-                {status.exists && status.isGit && !status.isOpenSpec && (
-                  <section className="action-section init-card">
-                    <div className="action-header">
-                      <h3>Initialize OpenSpec</h3>
-                      <p>Enable OpenSpec change tracking and specs pipelines for this project.</p>
-                    </div>
-                    <button
-                      id="init-openspec-btn"
-                      onClick={handleInitOpenSpec}
-                      disabled={initLoading}
-                      className="btn btn-primary"
-                    >
-                      {initLoading ? 'Initializing...' : 'Initialize OpenSpec'}
-                    </button>
-                  </section>
-                )}
-
-                {status.exists && status.isGit && status.isOpenSpec && (
-                  <>
-                    <section className="action-section change-section">
-                      <div className="action-header">
-                        <h3>Change Management</h3>
-                        <p>Create and plan new changes using standard workflows or custom states.</p>
-                      </div>
-
-                      {!showCreateChange ? (
-                        <button
-                          id="show-create-change-btn"
-                          onClick={() => {
-                            setShowCreateChange(true);
-                            setCreateChangeSuccess(null);
-                          }}
-                          className="btn btn-primary"
-                        >
-                          Create New Change
-                        </button>
-                      ) : (
-                        <CreateChangeForm
-                          repoPath={path}
-                          onCreateSuccess={(changeName) => {
-                            setShowCreateChange(false);
-                            setCreateChangeSuccess(`Change "${changeName}" created successfully.`);
-                            fetchChanges();
-                            setSelectedChange(changeName);
-                          }}
-                          onCancel={() => setShowCreateChange(false)}
-                        />
-                      )}
-
-                      {createChangeSuccess && (
-                        <div className="message message-success" id="change-create-success">
-                          <p>{createChangeSuccess}</p>
-                        </div>
-                      )}
-                    </section>
-
-                    <section className="action-section worktree-section">
-                      <div className="action-header">
-                        <h3>Git Worktree Management</h3>
-                        <p>Checkout a new development branch to an isolated local folder.</p>
-                      </div>
-
-                      <form onSubmit={handleCreateWorktree} className="worktree-form">
-                        <div className="form-group">
-                          <label htmlFor="branch-name-input">Branch Name:</label>
-                          <input
-                            id="branch-name-input"
-                            type="text"
-                            placeholder="e.g., feature/new-logic"
-                            value={branchName}
-                            onChange={(e) => setBranchName(e.target.value)}
-                            disabled={worktreeLoading}
-                            required
-                          />
-                        </div>
-
-                        <div className="form-group">
-                          <label htmlFor="worktree-path-input">Worktree Destination Path:</label>
-                          <input
-                            id="worktree-path-input"
-                            type="text"
-                            placeholder="Enter absolute destination path..."
-                            value={worktreePath}
-                            onChange={(e) => setWorktreePath(e.target.value)}
-                            disabled={worktreeLoading}
-                            required
-                          />
-                        </div>
-
-                        <button
-                          id="create-worktree-btn"
-                          type="submit"
-                          disabled={worktreeLoading || !branchName.trim() || !worktreePath.trim()}
-                          className="btn btn-primary"
-                        >
-                          {worktreeLoading ? 'Creating Worktree...' : 'Create Worktree'}
-                        </button>
-                      </form>
-
-                      {worktreeSuccess && (
-                        <div className="message message-success">
-                          <p>{worktreeSuccess}</p>
-                        </div>
-                      )}
-
-                      {worktreeError && (
-                        <div className="message message-danger">
-                          <p>Error: {worktreeError}</p>
-                        </div>
-                      )}
-                    </section>
-                  </>
-                )}
-              </>
-            )}
-          </>
-        ) : (
-          <section className="review-section-wrapper">
-            <div className="review-header-card">
-              <h2>Traceability Audit & Linkage DAG</h2>
-              <p className="review-subtitle">
-                Trace structural items across Proposal, Specs, Design, and Tasks.
-              </p>
-              
-              {changesList.length > 0 ? (
-                <div className="change-selector-group">
-                  <label htmlFor="change-select">Select OpenSpec Change:</label>
-                  <select
-                    id="change-select"
-                    value={selectedChange}
-                    onChange={(e) => setSelectedChange(e.target.value)}
-                    className="change-select"
-                  >
-                    {changesList.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ) : (
-                <p className="no-changes-msg">No active or archived changes found in this repository.</p>
-              )}
+      {/* ===== GIT WORKTREE MODAL ===== */}
+      {showWorktreeModal && (
+        <div className="modal-overlay">
+          <div className="modal-card">
+            <div className="modal-header">
+              <h2>Create Git Worktree</h2>
+              <button onClick={() => setShowWorktreeModal(false)} className="modal-close-btn">
+                ×
+              </button>
             </div>
-
-            {selectedChangeMetadata && (
-              <div className="change-metadata-card" id="change-metadata-card">
-                <div className="metadata-card-header">
-                  <h3>Change Details: {selectedChangeMetadata.name}</h3>
-                  <span className="badge badge-info">{selectedChangeMetadata.schema}</span>
-                </div>
-                
-                {selectedChangeMetadata.description && (
-                  <p className="metadata-description">{selectedChangeMetadata.description}</p>
-                )}
-
-                <div className="metadata-grid">
-                  <div className="metadata-item">
-                    <span className="metadata-label">Created:</span>
-                    <span className="metadata-value">{selectedChangeMetadata.created}</span>
-                  </div>
-
-                  <div className="metadata-item">
-                    <label htmlFor="propose-engine-select-review" className="metadata-label">AI Propose Engine:</label>
-                    <select
-                      id="propose-engine-select-review"
-                      value={selectedChangeMetadata.proposeEngine}
-                      onChange={(e) => handleUpdateEngine(e.target.value)}
-                      className="engine-select-review"
-                    >
-                      <option value="gemini">Gemini (AGY)</option>
-                      <option value="claude">Claude Code</option>
-                      <option value="cursor">Cursor</option>
-                      <option value="codex">Codex</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="engine-instructions-panel" id="engine-instructions-panel">
-                  {selectedChangeMetadata.proposeEngine === 'gemini' && (
-                    <>
-                      <div className="instruction-header">Gemini (AGY) Active</div>
-                      <p className="instruction-text">
-                        Run the following command in Gemini Chat to generate/update change artifacts:
-                      </p>
-                      <code className="instruction-code">/opsx:propose {selectedChangeMetadata.name}</code>
-                    </>
-                  )}
-                  {selectedChangeMetadata.proposeEngine === 'claude' && (
-                    <>
-                      <div className="instruction-header">Claude Code Active</div>
-                      <p className="instruction-text">
-                        Run the following command in your Claude Code console to generate/update change artifacts:
-                      </p>
-                      <code className="instruction-code">/opsx:propose {selectedChangeMetadata.name}</code>
-                    </>
-                  )}
-                  {selectedChangeMetadata.proposeEngine === 'cursor' && (
-                    <>
-                      <div className="instruction-header">Cursor Active</div>
-                      <p className="instruction-text">
-                        Run the following command in Cursor Chat or Composer to generate/update change artifacts:
-                      </p>
-                      <code className="instruction-code">/opsx-propose {selectedChangeMetadata.name}</code>
-                    </>
-                  )}
-                  {selectedChangeMetadata.proposeEngine === 'codex' && (
-                    <>
-                      <div className="instruction-header">Codex Active</div>
-                      <p className="instruction-text">
-                        Run the following command in Codex chat to generate/update change artifacts:
-                      </p>
-                      <code className="instruction-code">/opsx-propose {selectedChangeMetadata.name}</code>
-                    </>
-                  )}
-                </div>
+            <form onSubmit={handleCreateWorktree} className="modal-form">
+              <div className="form-group">
+                <label htmlFor="branch-name-input">Branch Name:</label>
+                <input
+                  id="branch-name-input"
+                  type="text"
+                  placeholder="e.g., feature/login-flow"
+                  value={worktreeBranchName}
+                  onChange={(e) => setWorktreeBranchName(e.target.value)}
+                  disabled={worktreeCreating}
+                  required
+                />
               </div>
-            )}
 
-            {dagLoading && <div className="dag-loading-state loading">Building Linkage DAG...</div>}
-            
-            {dagError && (
-              <div className="message message-danger">
-                <p>Failed to build DAG: {dagError}</p>
+              <div className="form-group">
+                <label htmlFor="worktree-path-input">Worktree Destination Path:</label>
+                <input
+                  id="worktree-path-input"
+                  type="text"
+                  placeholder="Destination path..."
+                  value={worktreeDestPath}
+                  onChange={(e) => setWorktreeDestPath(e.target.value)}
+                  disabled={worktreeCreating}
+                  required
+                />
               </div>
-            )}
 
-            {dagData && !dagLoading && <DagViewer dag={dagData} />}
-          </section>
-        )}
-      </main>
+              {worktreeModalErr && <div className="error-banner">⚠ {worktreeModalErr}</div>}
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                <button
+                  id="create-worktree-btn"
+                  type="submit"
+                  disabled={worktreeCreating || !worktreeBranchName.trim() || !worktreeDestPath.trim()}
+                  className="btn btn-primary"
+                >
+                  {worktreeCreating ? 'Creating...' : 'Create Worktree'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowWorktreeModal(false)}
+                  className="btn btn-secondary"
+                  disabled={worktreeCreating}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

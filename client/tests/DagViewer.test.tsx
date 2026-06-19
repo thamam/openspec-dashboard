@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeAll } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
+import React, { useState } from 'react';
 import DagViewer from '../src/components/DagViewer.js';
 
 // Mock getBoundingClientRect for layout calculations in test
@@ -19,6 +20,44 @@ beforeAll(() => {
   };
 });
 
+// A simple stateful wrapper to test DagViewer under controlled state mode
+const ControlledDagViewerWrapper: React.FC<{ dag: any }> = ({ dag }) => {
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [showCritical, setShowCritical] = useState(false);
+  const [filterText, setFilterText] = useState('');
+  const [dagOn] = useState(true);
+
+  return (
+    <div>
+      <div className="dag-controls">
+        <input
+          type="text"
+          placeholder="Filter nodes by name..."
+          value={filterText}
+          onChange={(e) => setFilterText(e.target.value)}
+        />
+        <label>
+          <input
+            type="checkbox"
+            checked={showCritical}
+            onChange={(e) => setShowCritical(e.target.checked)}
+          />
+          Show Critical Paths
+        </label>
+      </div>
+      <DagViewer
+        dag={dag}
+        dagOn={dagOn}
+        selectedNodeId={selectedNodeId}
+        onSelectNode={setSelectedNodeId}
+        onToggleTask={() => {}}
+        showCritical={showCritical}
+        filterText={filterText}
+      />
+    </div>
+  );
+};
+
 describe('DagViewer Component', () => {
   const mockDag = {
     nodes: [
@@ -36,7 +75,7 @@ describe('DagViewer Component', () => {
   };
 
   it('should render columns and node labels', () => {
-    render(<DagViewer dag={mockDag} />);
+    render(<ControlledDagViewerWrapper dag={mockDag} />);
     
     // Check column headers
     expect(screen.getByText('Proposal')).toBeInTheDocument();
@@ -53,7 +92,7 @@ describe('DagViewer Component', () => {
   });
 
   it('should highlight neighborhood nodes on click', async () => {
-    render(<DagViewer dag={mockDag} />);
+    render(<ControlledDagViewerWrapper dag={mockDag} />);
     
     const reqNode = screen.getByText('Req 1').closest('.dag-node');
     expect(reqNode).toBeInTheDocument();
@@ -67,14 +106,13 @@ describe('DagViewer Component', () => {
     // Connected neighbors (Cap 1 and Dec 1) should be highlighted
     const capNode = screen.getByText('Cap 1').closest('.dag-node');
     const decNode = screen.getByText('Dec 1').closest('.dag-node');
-    const taskNode1 = screen.getByText('Task 1').closest('.dag-node'); // indirectly connected or not immediate
     
     expect(capNode).toHaveClass('highlighted');
     expect(decNode).toHaveClass('highlighted');
   });
 
   it('should highlight critical path (nodes leading to pending tasks) when toggled', () => {
-    render(<DagViewer dag={mockDag} />);
+    render(<ControlledDagViewerWrapper dag={mockDag} />);
     
     const criticalToggle = screen.getByRole('checkbox', { name: 'Show Critical Paths' });
     fireEvent.click(criticalToggle);
@@ -92,7 +130,7 @@ describe('DagViewer Component', () => {
   });
 
   it('should filter nodes based on search input', () => {
-    render(<DagViewer dag={mockDag} />);
+    render(<ControlledDagViewerWrapper dag={mockDag} />);
     
     const searchInput = screen.getByPlaceholderText('Filter nodes by name...');
     fireEvent.change(searchInput, { target: { value: 'Dec' } });

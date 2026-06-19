@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import './DagViewer.css';
 
 interface DagNode {
@@ -6,6 +6,7 @@ interface DagNode {
   label: string;
   type: 'proposal' | 'spec-requirement' | 'spec-scenario' | 'design-decision' | 'task';
   status?: 'pending' | 'completed';
+  scenariosCount?: number;
 }
 
 interface DagEdge {
@@ -18,6 +19,12 @@ interface DagViewerProps {
     nodes: DagNode[];
     edges: DagEdge[];
   };
+  dagOn: boolean;
+  selectedNodeId: string | null;
+  onSelectNode: (nodeId: string | null) => void;
+  onToggleTask: (nodeId: string) => void;
+  showCritical: boolean;
+  filterText: string;
 }
 
 interface RenderLine {
@@ -28,10 +35,15 @@ interface RenderLine {
   isCritical: boolean;
 }
 
-const DagViewer: React.FC<DagViewerProps> = ({ dag }) => {
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const [showCritical, setShowCritical] = useState(false);
-  const [filterText, setFilterText] = useState('');
+const DagViewer: React.FC<DagViewerProps> = ({
+  dag,
+  dagOn = true,
+  selectedNodeId = null,
+  onSelectNode = () => {},
+  onToggleTask = () => {},
+  showCritical = false,
+  filterText = '',
+}) => {
   const [lines, setLines] = useState<RenderLine[]>([]);
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -126,8 +138,9 @@ const DagViewer: React.FC<DagViewerProps> = ({ dag }) => {
         const x2 = dstRect.left - containerRect.left;
         const y2 = dstRect.top + dstRect.height / 2 - containerRect.top;
 
-        const dx = x2 - x1;
-        const d = `M ${x1} ${y1} C ${x1 + dx / 2} ${y1}, ${x1 + dx / 2} ${y2}, ${x2} ${y2}`;
+        // Use the exact Cubic Bezier handles from the mockup
+        const dx = Math.max(34, (x2 - x1) * 0.55);
+        const d = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
 
         // Determine if line is highlighted
         const isHighlighted = selectedNodeId !== null && 
@@ -158,14 +171,14 @@ const DagViewer: React.FC<DagViewerProps> = ({ dag }) => {
       clearTimeout(timer);
       window.removeEventListener('resize', drawLines);
     };
-  }, [dag, selectedNodeId, showCritical, filterText]);
+  }, [dag, selectedNodeId, showCritical, filterText, dagOn]);
 
   // Handle node selection
   const handleNodeClick = (nodeId: string) => {
     if (selectedNodeId === nodeId) {
-      setSelectedNodeId(null);
+      onSelectNode(null);
     } else {
-      setSelectedNodeId(nodeId);
+      onSelectNode(nodeId);
     }
   };
 
@@ -198,10 +211,24 @@ const DagViewer: React.FC<DagViewerProps> = ({ dag }) => {
         <div className="node-content">
           <span className="node-type">{node.type.replace('spec-', '')}</span>
           <p className="node-label">{node.label}</p>
+          {node.type === 'spec-requirement' && node.scenariosCount !== undefined && (
+            <div className="node-scenarios-count">
+              {node.scenariosCount} scenario{node.scenariosCount !== 1 ? 's' : ''}
+            </div>
+          )}
           {node.type === 'task' && (
-            <span className={`task-status ${node.status}`}>
-              {node.status === 'completed' ? '✓ Done' : '○ Pending'}
-            </span>
+            <div className="task-checkbox-container" onClick={(e) => e.stopPropagation()}>
+              <input
+                type="checkbox"
+                checked={node.status === 'completed'}
+                onChange={() => onToggleTask(node.id)}
+                className="task-node-checkbox"
+                id={`task-check-${node.id}`}
+              />
+              <label htmlFor={`task-check-${node.id}`} className={`task-status ${node.status}`}>
+                {node.status === 'completed' ? '✓ Done' : '○ Pending'}
+              </label>
+            </div>
           )}
         </div>
       </div>
@@ -210,31 +237,9 @@ const DagViewer: React.FC<DagViewerProps> = ({ dag }) => {
 
   return (
     <div className="dag-container">
-      <div className="dag-controls">
-        <div className="control-group">
-          <input
-            type="text"
-            placeholder="Filter nodes by name..."
-            value={filterText}
-            onChange={(e) => setFilterText(e.target.value)}
-            className="dag-filter-input"
-          />
-        </div>
-        <div className="control-group checkbox-group">
-          <label>
-            <input
-              type="checkbox"
-              checked={showCritical}
-              onChange={(e) => setShowCritical(e.target.checked)}
-            />
-            Show Critical Paths
-          </label>
-        </div>
-      </div>
-
       <div className="dag-canvas-wrapper">
         <svg ref={svgRef} className="dag-svg-overlay">
-          {lines.map((line, idx) => {
+          {dagOn && lines.map((line, idx) => {
             let className = 'dag-edge-line';
             if (selectedNodeId !== null && line.isHighlighted) className += ' highlighted';
             if (selectedNodeId !== null && !line.isHighlighted) className += ' faded';
