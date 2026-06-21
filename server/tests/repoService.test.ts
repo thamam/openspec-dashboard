@@ -68,6 +68,19 @@ describe('repoService - checkRepoStatus', () => {
       isOpenSpec: true,
     });
   });
+
+  it('should return exists: true, isGit: true when path is a git worktree (where .git is a file)', async () => {
+    const worktreeDir = path.join(tempDir, 'worktree-dir');
+    fs.mkdirSync(worktreeDir);
+    fs.writeFileSync(path.join(worktreeDir, '.git'), 'gitdir: /path/to/original/.git/worktrees/worktree-dir');
+
+    const result = await checkRepoStatus(worktreeDir);
+    expect(result).toEqual({
+      exists: true,
+      isGit: true,
+      isOpenSpec: false,
+    });
+  });
 });
 
 describe('repoService - initializeOpenSpec & createGitWorktree', () => {

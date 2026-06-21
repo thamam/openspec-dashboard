@@ -30,7 +30,7 @@ export async function checkRepoStatus(dirPath: string): Promise<RepoStatus> {
   if (fs.existsSync(gitPath)) {
     try {
       const gitStat = fs.statSync(gitPath);
-      isGit = gitStat.isDirectory();
+      isGit = gitStat.isDirectory() || gitStat.isFile();
     } catch {
       isGit = false;
     }
