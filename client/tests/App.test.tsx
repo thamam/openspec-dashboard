@@ -271,6 +271,90 @@ describe('Frontend App - App.tsx', () => {
       expect(screen.queryByLabelText('Change Name (kebab-case):')).not.toBeInTheDocument();
     });
   });
+
+  it('should support manual change of the sidebar width via drag resizing', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ exists: true, isGit: true, isOpenSpec: true }),
+    });
+
+    const { container } = render(<App />);
+    const input = screen.getByPlaceholderText('Enter local repository absolute path...');
+    const button = screen.getByRole('button', { name: 'Verify Path' });
+
+    fireEvent.change(input, { target: { value: '/Users/test/my-repo' } });
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect(screen.queryByText('Connect a repository')).not.toBeInTheDocument();
+    });
+
+    const sidebar = container.querySelector('.sidebar') as HTMLElement;
+    expect(sidebar).toBeInTheDocument();
+    expect(sidebar.style.width).toBe('240px');
+
+    const resizer = container.querySelector('.sidebar-resizer') as HTMLElement;
+    expect(resizer).toBeInTheDocument();
+
+    // Mouse down on the resizer
+    fireEvent.mouseDown(resizer, { clientX: 240 });
+    // Mouse move on document to increase width (drag right by 60px)
+    fireEvent.mouseMove(document, { clientX: 300 });
+    fireEvent.mouseUp(document);
+
+    expect(sidebar.style.width).toBe('300px');
+
+    // Drag past bounds (e.g. down to 100px - min is 180px)
+    fireEvent.mouseDown(resizer, { clientX: 300 });
+    fireEvent.mouseMove(document, { clientX: 100 });
+    fireEvent.mouseUp(document);
+    // Should NOT have changed to 100px because min width is 180px
+    expect(sidebar.style.width).toBe('300px');
+  });
+
+  it('should support manual change of the tool dock width via drag resizing', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ exists: true, isGit: true, isOpenSpec: true }),
+    });
+
+    const { container } = render(<App />);
+    const input = screen.getByPlaceholderText('Enter local repository absolute path...');
+    const button = screen.getByRole('button', { name: 'Verify Path' });
+
+    fireEvent.change(input, { target: { value: '/Users/test/my-repo' } });
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect(screen.queryByText('Connect a repository')).not.toBeInTheDocument();
+    });
+
+    // Open the tool-dock by clicking "Grill Me" button
+    const grillBtn = screen.getByTitle('Grill Me — pressure-test');
+    fireEvent.click(grillBtn);
+
+    const toolDock = container.querySelector('.tool-dock') as HTMLElement;
+    expect(toolDock).toBeInTheDocument();
+    expect(toolDock.style.width).toBe('388px');
+
+    const resizer = container.querySelector('.tool-dock-resizer') as HTMLElement;
+    expect(resizer).toBeInTheDocument();
+
+    // Mouse down on the resizer
+    fireEvent.mouseDown(resizer, { clientX: 600 });
+    // Drag left by 100px (clientX: 500) to increase tool dock width (starts at right side, drag left increases width)
+    fireEvent.mouseMove(document, { clientX: 500 });
+    fireEvent.mouseUp(document);
+
+    expect(toolDock.style.width).toBe('488px');
+
+    // Drag past bounds (e.g. right by 500px, which would make currentWidth = 488 - 500 = -12px. min is 280px)
+    fireEvent.mouseDown(resizer, { clientX: 500 });
+    fireEvent.mouseMove(document, { clientX: 1000 });
+    fireEvent.mouseUp(document);
+    // Should NOT change because bounds are violated
+    expect(toolDock.style.width).toBe('488px');
+  });
 });
 
 

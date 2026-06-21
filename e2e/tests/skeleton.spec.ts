@@ -615,4 +615,74 @@ test.describe('Workspace Management - E2E Actions', () => {
     await expect(page.locator('.review-canvas')).toBeVisible();
     await expect(appShell).toHaveClass(/mode-dark/);
   });
+
+  test('should support manual change of the width of the panes via drag resizing', async ({ page }) => {
+    const gitDir = path.join(tempDir, 'git-repo-e2e-resizing');
+    fs.mkdirSync(gitDir);
+    execSync('git init -b main', { cwd: gitDir });
+    execSync('git config user.name "Test"', { cwd: gitDir });
+    execSync('git config user.email "test@test.com"', { cwd: gitDir });
+    fs.writeFileSync(path.join(gitDir, 'README.md'), '# Test');
+    execSync('git add README.md && git commit -m "Initial commit"', { cwd: gitDir });
+    execSync('openspec init --tools none', { cwd: gitDir });
+
+    await page.goto('/');
+    await page.locator('#repo-path-input').fill(gitDir);
+    await page.locator('#verify-btn').click();
+
+    // Verify sidebar starts at 240px
+    const sidebar = page.locator('.sidebar');
+    await expect(sidebar).toHaveCSS('width', '240px');
+
+    // Drag the sidebar resizer to the right by 60px
+    const sidebarResizer = page.locator('.sidebar-resizer');
+    const box = await sidebarResizer.boundingBox();
+    if (box) {
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(box.x + box.width / 2 + 60, box.y + box.height / 2);
+      await page.mouse.up();
+    }
+
+    // Verify sidebar is now 300px
+    await expect(sidebar).toHaveCSS('width', '300px');
+
+    // Try to drag sidebar past min bounds (drag left to less than 180px, e.g. -200px)
+    const newBox = await sidebarResizer.boundingBox();
+    if (newBox) {
+      await page.mouse.move(newBox.x + newBox.width / 2, newBox.y + newBox.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(newBox.x + newBox.width / 2 - 200, newBox.y + newBox.height / 2);
+      await page.mouse.up();
+    }
+    // Should still be 300px because bounds check fails
+    await expect(sidebar).toHaveCSS('width', '300px');
+
+    // Open tool dock
+    await page.locator('.tool-cluster-btn:has-text("Grill Me")').click();
+    const toolDock = page.locator('.tool-dock');
+    await expect(toolDock).toBeVisible();
+    await expect(toolDock).toHaveCSS('width', '388px');
+
+    // Drag the tool dock resizer left by 100px (increasing its width from 388 to 488px)
+    const dockResizer = page.locator('.tool-dock-resizer');
+    const dockBox = await dockResizer.boundingBox();
+    if (dockBox) {
+      await page.mouse.move(dockBox.x + dockBox.width / 2, dockBox.y + dockBox.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(dockBox.x + dockBox.width / 2 - 100, dockBox.y + dockBox.height / 2);
+      await page.mouse.up();
+    }
+    await expect(toolDock).toHaveCSS('width', '488px');
+
+    // Try to drag past bounds (e.g. right by 500px, which violates min dock width 280px)
+    const newDockBox = await dockResizer.boundingBox();
+    if (newDockBox) {
+      await page.mouse.move(newDockBox.x + newDockBox.width / 2, newDockBox.y + newDockBox.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(newDockBox.x + newDockBox.width / 2 + 500, newDockBox.y + newDockBox.height / 2);
+      await page.mouse.up();
+    }
+    await expect(toolDock).toHaveCSS('width', '488px');
+  });
 });
