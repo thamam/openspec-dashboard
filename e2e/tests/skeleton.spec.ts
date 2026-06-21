@@ -390,16 +390,24 @@ test.describe('Workspace Management - E2E Actions', () => {
     await expect(settingsToggleBtn).toHaveText('⚙️ Hide AI Options');
 
     const providerSelect = toolDock.locator('#chat-provider-select');
+    const modelSelect = toolDock.locator('#chat-model-select');
     const modelInput = toolDock.locator('#chat-model-input');
     await expect(providerSelect).toBeVisible();
-    await expect(modelInput).toBeVisible();
+    await expect(modelSelect).toBeVisible();
     await expect(providerSelect).toHaveValue('gemini');
-    await expect(modelInput).toHaveValue('gemini-1.5-flash');
+    await expect(modelSelect).toHaveValue('gemini-1.5-flash');
 
     await providerSelect.selectOption('ollama');
-    await expect(modelInput).toHaveValue('gemma2');
+    await expect(modelSelect).toBeVisible();
+    await expect(modelSelect).toHaveValue('qwen3-coder-next');
+
+    // Select custom model in Ollama and fill in a value
+    await modelSelect.selectOption('custom');
+    await expect(modelInput).toBeVisible();
+    await modelInput.fill('gemma2');
 
     await providerSelect.selectOption('custom');
+    await expect(modelInput).toBeVisible();
     await expect(modelInput).toHaveValue('gpt-4o');
     const endpointInput = toolDock.locator('#chat-endpoint-input');
     const keyInput = toolDock.locator('#chat-key-input');

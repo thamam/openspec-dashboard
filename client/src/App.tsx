@@ -49,6 +49,23 @@ interface Message {
   content: string;
 }
 
+const OLLAMA_MODELS = [
+  { value: 'qwen3-coder-next', label: 'Qwen3 Coder Next (Coding community favorite)' },
+  { value: 'qwen3.6:27b', label: 'Qwen 3.6 27B (Prosumer Developer Mac standard)' },
+  { value: 'qwen3:30b', label: 'Qwen3 30B (General Logic & reasoning sweet spot)' },
+  { value: 'glm-5.1', label: 'GLM 5.1 (Flagship Agentic reasoning)' },
+  { value: 'phi-4-mini', label: 'Phi-4 Mini (Lightweight logical reasoning)' },
+  { value: 'qwen2.5-coder:14b', label: 'Qwen 2.5 Coder 14B (Standard local developer)' }
+];
+
+const GEMINI_MODELS = [
+  { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash (Default fast)' },
+  { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro (Thorough reasoning)' },
+  { value: 'gemini-2.0-flash-exp', label: 'Gemini 2.0 Flash Experimental' },
+  { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+  { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' }
+];
+
 function App() {
   // Repository Path and Status
   const [path, setPath] = useState('');
@@ -163,7 +180,7 @@ function App() {
     if (provider === 'gemini') {
       setModel('gemini-1.5-flash');
     } else if (provider === 'ollama') {
-      setModel('gemma2');
+      setModel('qwen3-coder-next');
     } else if (provider === 'custom') {
       setModel('gpt-4o');
     }
@@ -1067,22 +1084,85 @@ function App() {
                           <select
                             id="chat-provider-select"
                             value={provider}
-                            onChange={(e) => setProvider(e.target.value as any)}
+                            onChange={(e) => {
+                              const newProvider = e.target.value as any;
+                              setProvider(newProvider);
+                              if (newProvider === 'gemini') {
+                                setModel('gemini-1.5-flash');
+                              } else if (newProvider === 'ollama') {
+                                setModel('qwen3-coder-next');
+                              } else {
+                                setModel('gpt-4o');
+                              }
+                            }}
                           >
                             <option value="gemini">Gemini</option>
                             <option value="ollama">Ollama</option>
                             <option value="custom">Custom Endpoint</option>
                           </select>
                         </div>
-                        <div>
-                          <label htmlFor="chat-model-input">Model Name</label>
-                          <input
-                            id="chat-model-input"
-                            type="text"
-                            value={model}
-                            onChange={(e) => setModel(e.target.value)}
-                          />
-                        </div>
+                        {provider === 'ollama' && (
+                          <div>
+                            <label htmlFor="chat-model-select">Model Name</label>
+                            <select
+                              id="chat-model-select"
+                              value={OLLAMA_MODELS.some(m => m.value === model) ? model : 'custom'}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (val === 'custom') {
+                                  setModel('');
+                                } else {
+                                  setModel(val);
+                                }
+                              }}
+                            >
+                              {OLLAMA_MODELS.map((m) => (
+                                <option key={m.value} value={m.value}>
+                                  {m.label}
+                                </option>
+                              ))}
+                              <option value="custom">Custom Model Name...</option>
+                            </select>
+                          </div>
+                        )}
+                        {provider === 'gemini' && (
+                          <div>
+                            <label htmlFor="chat-model-select">Model Name</label>
+                            <select
+                              id="chat-model-select"
+                              value={GEMINI_MODELS.some(m => m.value === model) ? model : 'custom'}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (val === 'custom') {
+                                  setModel('');
+                                } else {
+                                  setModel(val);
+                                }
+                              }}
+                            >
+                              {GEMINI_MODELS.map((m) => (
+                                <option key={m.value} value={m.value}>
+                                  {m.label}
+                                </option>
+                              ))}
+                              <option value="custom">Custom Model Name...</option>
+                            </select>
+                          </div>
+                        )}
+                        {(provider === 'custom' || 
+                          (provider === 'ollama' && !OLLAMA_MODELS.some(m => m.value === model)) ||
+                          (provider === 'gemini' && !GEMINI_MODELS.some(m => m.value === model))) && (
+                          <div>
+                            <label htmlFor="chat-model-input">Custom Model Name</label>
+                            <input
+                              id="chat-model-input"
+                              type="text"
+                              value={model}
+                              onChange={(e) => setModel(e.target.value)}
+                              placeholder="e.g. gemma2 or custom-model"
+                            />
+                          </div>
+                        )}
                         {provider === 'custom' && (
                           <>
                             <div>
