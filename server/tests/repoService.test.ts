@@ -38,6 +38,7 @@ describe('repoService - checkRepoStatus', () => {
       exists: true,
       isGit: false,
       isOpenSpec: false,
+      repoRoot: path.resolve(normalDir),
     });
   });
 
@@ -51,6 +52,7 @@ describe('repoService - checkRepoStatus', () => {
       exists: true,
       isGit: true,
       isOpenSpec: false,
+      repoRoot: path.resolve(gitDir),
     });
   });
 
@@ -66,6 +68,7 @@ describe('repoService - checkRepoStatus', () => {
       exists: true,
       isGit: true,
       isOpenSpec: true,
+      repoRoot: path.resolve(openspecDir),
     });
   });
 
@@ -79,6 +82,26 @@ describe('repoService - checkRepoStatus', () => {
       exists: true,
       isGit: true,
       isOpenSpec: false,
+      repoRoot: path.resolve(worktreeDir),
+    });
+  });
+
+  it('should traverse upwards to find git repository root from a subdirectory', async () => {
+    const gitDir = path.join(tempDir, 'traverse-git-dir');
+    fs.mkdirSync(gitDir);
+    fs.mkdirSync(path.join(gitDir, '.git'));
+    fs.mkdirSync(path.join(gitDir, 'openspec'));
+    fs.writeFileSync(path.join(gitDir, 'openspec', 'config.yaml'), 'schema: spec-driven');
+
+    const subDir = path.join(gitDir, 'openspec', 'changes');
+    fs.mkdirSync(subDir, { recursive: true });
+
+    const result = await checkRepoStatus(subDir);
+    expect(result).toEqual({
+      exists: true,
+      isGit: true,
+      isOpenSpec: true,
+      repoRoot: path.resolve(gitDir),
     });
   });
 });

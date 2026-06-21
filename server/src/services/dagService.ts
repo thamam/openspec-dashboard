@@ -114,8 +114,10 @@ export async function getChangeDag(
   // 1. Parse proposal.md
   const proposalPath = path.join(changeDir, 'proposal.md');
   const capIds: string[] = [];
+  let proposalFileExists = false;
   
   if (fs.existsSync(proposalPath)) {
+    proposalFileExists = true;
     const content = fs.readFileSync(proposalPath, 'utf8');
     // Extract capabilities (lines starting with - under ## Capabilities or ### New Capabilities)
     const lines = content.split('\n');
@@ -130,21 +132,37 @@ export async function getChangeDag(
       }
 
       if (inCapabilities) {
-        // Match: - `widget-feature`: ... or - `<name>`: ...
-        const capMatch = line.match(/^-\s+`([^`]+)`/);
+        // Match standard list items with backticks, bold, or plain text
+        const capMatch = line.match(/^[-*+]\s*(?:`|\*\*)?([a-zA-Z0-9._/-]+)(?:`|\*\*)?(?:\s*[:—-]\s*|\s*$)/);
         if (capMatch) {
-          const capName = capMatch[1];
-          const nodeId = makeId('proposal', capName);
-          nodes.push({
-            id: nodeId,
-            label: capName,
-            type: 'proposal'
-          });
-          capIds.push(capName);
-          nodeTokensMap.set(nodeId, getTokens(capName));
+          const capName = capMatch[1].trim();
+          if (capName && capName.toLowerCase() !== 'none' && capName.toLowerCase() !== '(none)') {
+            const nodeId = makeId('proposal', capName);
+            if (!nodes.some(n => n.id === nodeId)) {
+              nodes.push({
+                id: nodeId,
+                label: capName,
+                type: 'proposal'
+              });
+              capIds.push(capName);
+              nodeTokensMap.set(nodeId, getTokens(capName));
+            }
+          }
         }
       }
     }
+  }
+
+  // Fallback: If proposal.md exists, but we parsed no capability nodes,
+  // add a node representing proposal.md itself.
+  if (proposalFileExists && capIds.length === 0) {
+    const nodeId = 'proposal-doc';
+    nodes.push({
+      id: nodeId,
+      label: 'proposal.md',
+      type: 'proposal'
+    });
+    nodeTokensMap.set(nodeId, getTokens('proposal.md'));
   }
 
   // 2. Parse specs folder
@@ -182,6 +200,11 @@ export async function getChangeDag(
               if (capIds.includes(capName)) {
                 edges.push({
                   source: capNodeId,
+                  target: currentReqId
+                });
+              } else if (nodes.some(n => n.id === 'proposal-doc')) {
+                edges.push({
+                  source: 'proposal-doc',
                   target: currentReqId
                 });
               }

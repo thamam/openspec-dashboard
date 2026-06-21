@@ -8,6 +8,7 @@ interface RepoStatus {
   exists: boolean;
   isGit: boolean;
   isOpenSpec: boolean;
+  repoRoot?: string;
 }
 
 interface DagNode {
@@ -497,6 +498,8 @@ function App() {
           setError('Directory does not exist');
         } else if (!data.isGit) {
           setError('Directory is not a git repository');
+        } else if (data.repoRoot) {
+          setPath(data.repoRoot);
         }
       } else {
         throw new Error('Verification failed');
@@ -521,6 +524,9 @@ function App() {
         const statusRes = await fetch(`/api/status?path=${encodeURIComponent(path)}`);
         const statusData = await statusRes.json();
         setStatus(statusData);
+        if (statusData.repoRoot) {
+          setPath(statusData.repoRoot);
+        }
       }
     } catch (err) {
       console.error(err);

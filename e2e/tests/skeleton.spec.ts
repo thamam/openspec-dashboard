@@ -685,4 +685,63 @@ test.describe('Workspace Management - E2E Actions', () => {
     }
     await expect(toolDock).toHaveCSS('width', '488px');
   });
+
+  test('should resolve repository path to git root when given a subdirectory', async ({ page }) => {
+    const gitDir = path.join(tempDir, 'git-repo-e2e-subdir');
+    fs.mkdirSync(gitDir);
+    execSync('git init -b main', { cwd: gitDir });
+    execSync('openspec init --tools none', { cwd: gitDir });
+
+    const subDir = path.join(gitDir, 'openspec', 'changes');
+    fs.mkdirSync(subDir, { recursive: true });
+
+    await page.goto('/');
+    await page.locator('#repo-path-input').fill(subDir);
+    await page.locator('#verify-btn').click();
+
+    // Verify path in sidebar is updated to the gitDir root
+    await expect(page.locator('.sidebar-repo-path')).toHaveText(gitDir);
+
+    // Verify status displays active
+    await expect(page.locator('.badge-success')).toHaveText('Active');
+  });
+
+  test('should fallback to proposal-doc when proposal.md contains no explicit capabilities', async ({ page }) => {
+    const gitDir = path.join(tempDir, 'git-repo-e2e-fallback-doc');
+    const changeDir = path.join(gitDir, 'openspec', 'changes', 'fallback-change');
+    fs.mkdirSync(changeDir, { recursive: true });
+    execSync('git init -b main', { cwd: gitDir });
+
+    // Write proposal.md without capabilities
+    fs.writeFileSync(
+      path.join(changeDir, 'proposal.md'),
+      `## Why\nOnly description here, no capabilities section.\n`
+    );
+
+    // Write spec requirement
+    const specDir = path.join(changeDir, 'specs', 'some-feature');
+    fs.mkdirSync(specDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(specDir, 'spec.md'),
+      `## Requirements\n### Requirement: Some Requirement\nThis is a requirement.\n`
+    );
+
+    await page.goto('/');
+    await page.locator('#repo-path-input').fill(gitDir);
+    await page.locator('#verify-btn').click();
+
+    // Select change
+    await page.locator('.change-item:has-text("fallback-change")').click();
+
+    // Go to Review Mode
+    await page.locator('#review-mode-tab').click();
+
+    // Verify proposal-doc is visible in Proposal column
+    const proposalDocNode = page.locator('.dag-column:has-text("Proposal") .dag-node:has-text("proposal.md")');
+    await expect(proposalDocNode).toBeVisible();
+
+    // Verify Some Requirement is visible in Specs column
+    const specNode = page.locator('.dag-column:has-text("Specs") .dag-node:has-text("Some Requirement")');
+    await expect(specNode).toBeVisible();
+  });
 });

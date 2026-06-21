@@ -224,3 +224,84 @@ Play a beep sound.
     expect(edges.some(e => e.source === soundDecId && e.target === soundTaskId)).toBe(false);
   });
 });
+
+describe('dagService - getChangeDag with fallback proposal node and lenient parsing', () => {
+  let tempDir: string;
+  let changeDir: string;
+
+  beforeAll(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dag-test-fallback-'));
+    changeDir = path.join(tempDir, 'openspec', 'changes', 'fallback-change');
+    fs.mkdirSync(changeDir, { recursive: true });
+
+    // Write proposal.md with bold capability and plain capability
+    fs.writeFileSync(
+      path.join(changeDir, 'proposal.md'),
+      `## Capabilities\n- **bold-feature**: Bold feature details\n- plain-feature: Plain text feature details\n`
+    );
+
+    // Write specs
+    const specDir = path.join(changeDir, 'specs', 'bold-feature');
+    fs.mkdirSync(specDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(specDir, 'spec.md'),
+      `## Requirements\n### Requirement: Bold Requirement\n`
+    );
+  });
+
+  afterAll(() => {
+    if (fs.existsSync(tempDir)) {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('should parse bold and plain capabilities and link requirements', async () => {
+    const dag = await getChangeDag(tempDir, 'fallback-change');
+    const nodes = dag.nodes;
+    const edges = dag.edges;
+
+    expect(nodes.some(n => n.id === 'proposal-bold-feature' && n.type === 'proposal')).toBe(true);
+    expect(nodes.some(n => n.id === 'proposal-plain-feature' && n.type === 'proposal')).toBe(true);
+    expect(edges.some(e => e.source === 'proposal-bold-feature' && e.target === 'spec-req-bold-requirement')).toBe(true);
+  });
+});
+
+describe('dagService - getChangeDag fallback proposal.md document node', () => {
+  let tempDir: string;
+  let changeDir: string;
+
+  beforeAll(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dag-test-fallback-doc-'));
+    changeDir = path.join(tempDir, 'openspec', 'changes', 'fallback-doc-change');
+    fs.mkdirSync(changeDir, { recursive: true });
+
+    // Write proposal.md WITHOUT capabilities
+    fs.writeFileSync(
+      path.join(changeDir, 'proposal.md'),
+      `## Why\nOnly description here, no capabilities.\n`
+    );
+
+    // Write specs
+    const specDir = path.join(changeDir, 'specs', 'some-feature');
+    fs.mkdirSync(specDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(specDir, 'spec.md'),
+      `## Requirements\n### Requirement: Some Requirement\n`
+    );
+  });
+
+  afterAll(() => {
+    if (fs.existsSync(tempDir)) {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('should fallback to proposal-doc node and link requirements to it', async () => {
+    const dag = await getChangeDag(tempDir, 'fallback-doc-change');
+    const nodes = dag.nodes;
+    const edges = dag.edges;
+
+    expect(nodes.some(n => n.id === 'proposal-doc' && n.label === 'proposal.md' && n.type === 'proposal')).toBe(true);
+    expect(edges.some(e => e.source === 'proposal-doc' && e.target === 'spec-req-some-requirement')).toBe(true);
+  });
+});

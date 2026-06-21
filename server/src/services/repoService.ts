@@ -5,41 +5,59 @@ export interface RepoStatus {
   exists: boolean;
   isGit: boolean;
   isOpenSpec: boolean;
+  repoRoot?: string;
 }
 
 export async function checkRepoStatus(dirPath: string): Promise<RepoStatus> {
-  const resolvedPath = path.resolve(dirPath);
+  let resolvedPath = path.resolve(dirPath);
 
-  // 1. Check if path exists and is a directory
+  // 1. Check if path exists
   if (!fs.existsSync(resolvedPath)) {
     return { exists: false, isGit: false, isOpenSpec: false };
   }
 
+  // If path is a file, use its parent directory
   try {
     const stat = fs.statSync(resolvedPath);
     if (!stat.isDirectory()) {
-      return { exists: false, isGit: false, isOpenSpec: false };
+      resolvedPath = path.dirname(resolvedPath);
     }
   } catch {
     return { exists: false, isGit: false, isOpenSpec: false };
   }
 
-  // 2. Check if it is a Git repository
-  const gitPath = path.join(resolvedPath, '.git');
-  let isGit = false;
-  if (fs.existsSync(gitPath)) {
-    try {
-      const gitStat = fs.statSync(gitPath);
-      isGit = gitStat.isDirectory() || gitStat.isFile();
-    } catch {
-      isGit = false;
+  // Traverse upwards to find .git
+  let currentDir = resolvedPath;
+  let repoRoot: string | undefined = undefined;
+
+  while (true) {
+    const gitPath = path.join(currentDir, '.git');
+    if (fs.existsSync(gitPath)) {
+      try {
+        const gitStat = fs.statSync(gitPath);
+        if (gitStat.isDirectory() || gitStat.isFile()) {
+          repoRoot = currentDir;
+          break;
+        }
+      } catch {
+        // Ignore and check parent
+      }
     }
+
+    const parent = path.dirname(currentDir);
+    if (parent === currentDir) {
+      break; // Reached the root of the filesystem
+    }
+    currentDir = parent;
   }
 
-  // 3. Check if OpenSpec is initialized
+  const targetPath = repoRoot || resolvedPath;
+  const isGit = !!repoRoot;
+
+  // Check if OpenSpec is initialized at the repository root
   let isOpenSpec = false;
   if (isGit) {
-    const openspecDir = path.join(resolvedPath, 'openspec');
+    const openspecDir = path.join(targetPath, 'openspec');
     try {
       const openspecStat = fs.statSync(openspecDir);
       isOpenSpec = openspecStat.isDirectory();
@@ -52,6 +70,7 @@ export async function checkRepoStatus(dirPath: string): Promise<RepoStatus> {
     exists: true,
     isGit,
     isOpenSpec,
+    repoRoot: targetPath,
   };
 }
 
