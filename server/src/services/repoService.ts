@@ -66,11 +66,26 @@ export async function checkRepoStatus(dirPath: string): Promise<RepoStatus> {
     }
   }
 
+  // Check if target has the updated openspec flow (traceability rules/linkages configured)
+  let isTraceReady = false;
+  if (isGit) {
+    const proposeWorkflowPath = path.join(targetPath, '.agent', 'workflows', 'opsx-propose.md');
+    if (fs.existsSync(proposeWorkflowPath)) {
+      try {
+        const content = fs.readFileSync(proposeWorkflowPath, 'utf8');
+        isTraceReady = content.includes('Generate Explicit Linkages') || content.includes('linkages.json');
+      } catch {
+        isTraceReady = false;
+      }
+    }
+  }
+
   return {
     exists: true,
     isGit,
     isOpenSpec,
     repoRoot: targetPath,
+    isTraceReady,
   };
 }
 

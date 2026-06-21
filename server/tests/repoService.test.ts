@@ -39,6 +39,7 @@ describe('repoService - checkRepoStatus', () => {
       isGit: false,
       isOpenSpec: false,
       repoRoot: path.resolve(normalDir),
+      isTraceReady: false,
     });
   });
 
@@ -53,6 +54,7 @@ describe('repoService - checkRepoStatus', () => {
       isGit: true,
       isOpenSpec: false,
       repoRoot: path.resolve(gitDir),
+      isTraceReady: false,
     });
   });
 
@@ -69,6 +71,7 @@ describe('repoService - checkRepoStatus', () => {
       isGit: true,
       isOpenSpec: true,
       repoRoot: path.resolve(openspecDir),
+      isTraceReady: false,
     });
   });
 
@@ -83,6 +86,7 @@ describe('repoService - checkRepoStatus', () => {
       isGit: true,
       isOpenSpec: false,
       repoRoot: path.resolve(worktreeDir),
+      isTraceReady: false,
     });
   });
 
@@ -102,6 +106,7 @@ describe('repoService - checkRepoStatus', () => {
       isGit: true,
       isOpenSpec: true,
       repoRoot: path.resolve(gitDir),
+      isTraceReady: false,
     });
   });
 });
@@ -138,6 +143,7 @@ describe('repoService - initializeOpenSpec & createGitWorktree', () => {
 
     const status = await checkRepoStatus(gitDir);
     expect(status.isOpenSpec).toBe(true);
+    expect(status.isTraceReady).toBe(true);
   });
 
   it('should create a git worktree successfully', async () => {

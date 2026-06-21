@@ -9,6 +9,7 @@ interface RepoStatus {
   isGit: boolean;
   isOpenSpec: boolean;
   repoRoot?: string;
+  isTraceReady?: boolean;
 }
 
 interface DagNode {
@@ -535,6 +536,29 @@ function App() {
     }
   };
 
+  const handleUpdateInit = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/init', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path }),
+      });
+      if (res.ok) {
+        const statusRes = await fetch(`/api/status?path=${encodeURIComponent(path)}`);
+        const statusData = await statusRes.json();
+        setStatus(statusData);
+        if (statusData.repoRoot) {
+          setPath(statusData.repoRoot);
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Inline markdown formatter helper
   const renderMarkdown = (text: string) => {
     const parts = text.split(/(\*\*.*?\*\*|`.*?`)/g);
@@ -613,18 +637,45 @@ function App() {
         </div>
 
         <div className="sidebar-repo-card">
-          <div className="sidebar-repo-row">
-            <span className="sidebar-repo-dot"></span>
-            <span className="sidebar-repo-path" title={path}>
-              {path}
-            </span>
-            <button
-              onClick={() => setStatus(null)}
-              title="Switch repository"
-              style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--faint)' }}
-            >
-              ⇄
-            </button>
+          <div className="sidebar-repo-row" style={{ justifyContent: 'space-between', width: '100%', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden', flex: 1 }}>
+              <span
+                className="sidebar-repo-dot"
+                style={{ background: status?.isTraceReady ? 'var(--green)' : 'var(--red)' }}
+                title={status?.isTraceReady ? 'Traceability flow ready (Green)' : 'Outdated traceability templates (Red)'}
+              />
+              <span className="sidebar-repo-path" title={path}>
+                {path}
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+              {!status?.isTraceReady && (
+                <button
+                  onClick={handleUpdateInit}
+                  className="update-init-btn"
+                  title="Update OpenSpec templates to support real-time linkages"
+                  style={{
+                    border: 'none',
+                    background: 'var(--amber)',
+                    color: '#fff',
+                    borderRadius: '4px',
+                    padding: '2px 6px',
+                    fontSize: '10px',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  Update Init
+                </button>
+              )}
+              <button
+                onClick={() => setStatus(null)}
+                title="Switch repository"
+                style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--faint)' }}
+              >
+                ⇄
+              </button>
+            </div>
           </div>
         </div>
 

@@ -744,4 +744,41 @@ test.describe('Workspace Management - E2E Actions', () => {
     const specNode = page.locator('.dag-column:has-text("Specs") .dag-node:has-text("Some Requirement")');
     await expect(specNode).toBeVisible();
   });
+
+  test('should display red trace-readiness indicator and Update Init button when outdated, and update to green upon clicking Update Init', async ({ page }) => {
+    const gitDir = path.join(tempDir, 'git-repo-e2e-trace-readiness');
+    fs.mkdirSync(gitDir);
+    execSync('git init -b main', { cwd: gitDir });
+
+    // OpenSpec is initialized but lacks the updated .agent files, so isTraceReady should be false
+    fs.mkdirSync(path.join(gitDir, 'openspec'));
+
+    await page.goto('/');
+    await page.locator('#repo-path-input').fill(gitDir);
+    await page.locator('#verify-btn').click();
+
+    // Verify it is recognized as active
+    await expect(page.locator('.badge-success')).toHaveText('Active');
+
+    // Dot should be red (outdated)
+    const dot = page.locator('.sidebar-repo-dot');
+    await expect(dot).toBeVisible();
+    await expect(dot).toHaveAttribute('title', 'Outdated traceability templates (Red)');
+    await expect(dot).toHaveCSS('background-color', 'rgb(239, 68, 68)'); // --red: #ef4444
+
+    // Update Init button should be visible next to it
+    const updateBtn = page.locator('.update-init-btn');
+    await expect(updateBtn).toBeVisible();
+    await expect(updateBtn).toHaveText('Update Init');
+
+    // Click Update Init
+    await updateBtn.click();
+
+    // The dot should turn green
+    await expect(dot).toHaveAttribute('title', 'Traceability flow ready (Green)');
+    await expect(dot).toHaveCSS('background-color', 'rgb(16, 185, 129)'); // --green: #10b981
+
+    // Update Init button should be hidden
+    await expect(updateBtn).not.toBeVisible();
+  });
 });

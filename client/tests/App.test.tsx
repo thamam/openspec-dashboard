@@ -348,13 +348,59 @@ describe('Frontend App - App.tsx', () => {
 
     expect(toolDock.style.width).toBe('488px');
 
-    // Drag past bounds (e.g. right by 500px, which would make currentWidth = 488 - 500 = -12px. min is 280px)
+    // Drag past bounds (e.g. right by 500px, which violates min dock width 280px)
     fireEvent.mouseDown(resizer, { clientX: 500 });
     fireEvent.mouseMove(document, { clientX: 1000 });
     fireEvent.mouseUp(document);
     // Should NOT change because bounds are violated
     expect(toolDock.style.width).toBe('488px');
   });
+
+  it('should display red dot and Update Init button when isTraceReady is false, and update status on click', async () => {
+    // 1. Initial repo status check (exists: true, isGit: true, isOpenSpec: true, isTraceReady: false)
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ exists: true, isGit: true, isOpenSpec: true, isTraceReady: false }),
+    });
+
+    const { container } = render(<App />);
+    const input = screen.getByPlaceholderText('Enter local repository absolute path...');
+    const button = screen.getByRole('button', { name: 'Verify Path' });
+
+    fireEvent.change(input, { target: { value: '/Users/test/outdated-repo' } });
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect(screen.queryByText('Connect a repository')).not.toBeInTheDocument();
+    });
+
+    // Verify dot style has var(--red)
+    const dot = container.querySelector('.sidebar-repo-dot') as HTMLElement;
+    expect(dot).toBeInTheDocument();
+    expect(dot.style.background).toBe('var(--red)');
+
+    // Verify Update Init button is in the document
+    const updateBtn = screen.getByRole('button', { name: 'Update Init' });
+    expect(updateBtn).toBeInTheDocument();
+
+    // 2. Mock successful /api/init and then status check returning isTraceReady: true
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ exists: true, isGit: true, isOpenSpec: true, isTraceReady: true, repoRoot: '/Users/test/outdated-repo' }),
+      });
+
+    fireEvent.click(updateBtn);
+
+    // Verify dot style updates to var(--green) and button is hidden
+    await waitFor(() => {
+      expect(dot.style.background).toBe('var(--green)');
+    });
+
+    expect(screen.queryByRole('button', { name: 'Update Init' })).not.toBeInTheDocument();
+  });
 });
-
-
