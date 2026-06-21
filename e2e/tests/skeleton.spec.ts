@@ -789,4 +789,65 @@ test.describe('Workspace Management - E2E Actions', () => {
     // Update Init button should be hidden
     await expect(updateBtn).not.toBeVisible();
   });
+
+  test('should support worktree trace updates dialog with custom checkboxes selection', async ({ page }) => {
+    const gitDir = path.join(tempDir, 'git-wt-update-src');
+    fs.mkdirSync(gitDir);
+    execSync('git init -b main', { cwd: gitDir });
+    execSync('git config user.name "Test"', { cwd: gitDir });
+    execSync('git config user.email "test@test.com"', { cwd: gitDir });
+    fs.writeFileSync(path.join(gitDir, 'README.md'), '# Test');
+    execSync('git add README.md && git commit -m "Initial commit"', { cwd: gitDir });
+
+    // OpenSpec initialized but lacks traces in both main repo and worktree
+    fs.mkdirSync(path.join(gitDir, 'openspec'));
+
+    const wtDir = path.join(tempDir, 'git-wt-update-dest');
+    execSync(`git worktree add -b "wt-branch" "${wtDir}"`, { cwd: gitDir });
+    fs.mkdirSync(path.join(wtDir, 'openspec'));
+
+    // Go to dashboard, connect to worktree directory
+    await page.goto('/');
+    await page.locator('#repo-path-input').fill(wtDir);
+    await page.locator('#verify-btn').click();
+
+    // Verify dot is red
+    const dot = page.locator('.sidebar-repo-dot');
+    await expect(dot).toBeVisible();
+    await expect(dot).toHaveAttribute('title', 'Outdated traceability templates (Red)');
+
+    // Click Update Init
+    const updateBtn = page.locator('.update-init-btn');
+    await updateBtn.click();
+
+    // Verify modal is visible
+    await expect(page.locator('.worktree-update-modal')).toBeVisible();
+
+    // Click Custom Selection...
+    await page.locator('#wt-update-custom-btn').click();
+
+    // Verify wtDir checkbox is disabled (pre-selected/required), but main gitDir checkbox is enabled
+    // We use a regular expression or simple text to match gitDir
+    const gitDirCheckbox = page.locator(`.worktree-checkbox-item:has-text("${gitDir}") input[type="checkbox"]`);
+    await expect(gitDirCheckbox).toBeVisible();
+    await expect(gitDirCheckbox).not.toBeDisabled();
+    await expect(gitDirCheckbox).not.toBeChecked();
+
+    // Click to select gitDir as well
+    await gitDirCheckbox.click();
+    await expect(gitDirCheckbox).toBeChecked();
+
+    // Click Update Selected
+    await page.locator('#wt-update-submit-btn').click();
+
+    // Verify modal closes
+    await expect(page.locator('.worktree-update-modal')).not.toBeVisible();
+
+    // Verify status dot updates to green
+    await expect(dot).toHaveAttribute('title', 'Traceability flow ready (Green)');
+
+    // Verify both wtDir and gitDir now have the trace files copied
+    expect(fs.existsSync(path.join(wtDir, '.agent', 'workflows', 'opsx-propose.md'))).toBe(true);
+    expect(fs.existsSync(path.join(gitDir, '.agent', 'workflows', 'opsx-propose.md'))).toBe(true);
+  });
 });

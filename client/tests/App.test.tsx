@@ -403,4 +403,90 @@ describe('Frontend App - App.tsx', () => {
 
     expect(screen.queryByRole('button', { name: 'Update Init' })).not.toBeInTheDocument();
   });
+
+  it('should display worktree trace update selection modal when repo has multiple connected worktrees', async () => {
+    // 1. Initial repo status check with 3 connected worktrees (main and 2 sub-worktrees)
+    const mockWorktrees = [
+      { path: '/Users/test/outdated-repo', branch: 'main', isMain: true },
+      { path: '/Users/test/wt-1', branch: 'feature-1', isMain: false },
+      { path: '/Users/test/wt-2', branch: 'feature-2', isMain: false },
+    ];
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        exists: true,
+        isGit: true,
+        isOpenSpec: true,
+        isTraceReady: false,
+        repoRoot: '/Users/test/outdated-repo',
+        worktrees: mockWorktrees
+      }),
+    });
+
+    const { container } = render(<App />);
+    const input = screen.getByPlaceholderText('Enter local repository absolute path...');
+    const button = screen.getByRole('button', { name: 'Verify Path' });
+
+    fireEvent.change(input, { target: { value: '/Users/test/outdated-repo' } });
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect(screen.queryByText('Connect a repository')).not.toBeInTheDocument();
+    });
+
+    const updateBtn = screen.getByRole('button', { name: 'Update Init' });
+    expect(updateBtn).toBeInTheDocument();
+
+    // Click Update Init to show the worktree dialog modal
+    fireEvent.click(updateBtn);
+
+    // Verify modal is displayed
+    expect(screen.getByText('Update Connected Worktrees')).toBeInTheDocument();
+    expect(screen.getByText(/This repository has other connected Git worktrees/)).toBeInTheDocument();
+
+    // Click Custom Selection button to open checkbox selection list
+    const customBtn = screen.getByRole('button', { name: 'Custom Selection...' });
+    fireEvent.click(customBtn);
+
+    // Verify checkboxes are rendered for worktree paths
+    expect(screen.getByText('/Users/test/wt-1')).toBeInTheDocument();
+    expect(screen.getByText('/Users/test/wt-2')).toBeInTheDocument();
+
+    // Get the enabled checkbox
+    const checkboxes = screen.getAllByRole('checkbox');
+    const wt1CheckboxEnabled = checkboxes.filter(el => !el.hasAttribute('disabled'))[0] as HTMLInputElement;
+    expect(wt1CheckboxEnabled).toBeInTheDocument();
+
+    // Mock successful API response for init, and status check
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ success: true }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          exists: true,
+          isGit: true,
+          isOpenSpec: true,
+          isTraceReady: true,
+          repoRoot: '/Users/test/outdated-repo',
+          worktrees: mockWorktrees
+        }),
+      });
+
+    // Check one worktree and click Update Selected
+    fireEvent.click(wt1CheckboxEnabled);
+    const submitBtn = screen.getByRole('button', { name: /Update Selected/ });
+    fireEvent.click(submitBtn);
+
+    // Wait for modal to close and status dot to update to green
+    await waitFor(() => {
+      expect(screen.queryByText('Update Connected Worktrees')).not.toBeInTheDocument();
+    });
+
+    const dot = container.querySelector('.sidebar-repo-dot') as HTMLElement;
+    expect(dot.style.background).toBe('var(--green)');
+  });
 });

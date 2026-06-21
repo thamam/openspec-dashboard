@@ -1,11 +1,19 @@
 import fs from 'fs';
 import path from 'path';
 
+export interface WorktreeInfo {
+  path: string;
+  branch: string | null;
+  isMain: boolean;
+}
+
 export interface RepoStatus {
   exists: boolean;
   isGit: boolean;
   isOpenSpec: boolean;
   repoRoot?: string;
+  isTraceReady?: boolean;
+  worktrees?: WorktreeInfo[];
 }
 
 export async function checkRepoStatus(dirPath: string): Promise<RepoStatus> {
@@ -70,6 +78,7 @@ export async function checkRepoStatus(dirPath: string): Promise<RepoStatus> {
   let isTraceReady = false;
   if (isGit) {
     const proposeWorkflowPath = path.join(targetPath, '.agent', 'workflows', 'opsx-propose.md');
+    let worktrees: WorktreeInfo[] | undefined;
     if (fs.existsSync(proposeWorkflowPath)) {
       try {
         const content = fs.readFileSync(proposeWorkflowPath, 'utf8');
@@ -78,6 +87,15 @@ export async function checkRepoStatus(dirPath: string): Promise<RepoStatus> {
         isTraceReady = false;
       }
     }
+    worktrees = await getConnectedWorktrees(targetPath);
+    return {
+      exists: true,
+      isGit,
+      isOpenSpec,
+      repoRoot: targetPath,
+      isTraceReady,
+      worktrees,
+    };
   }
 
   return {
@@ -85,7 +103,7 @@ export async function checkRepoStatus(dirPath: string): Promise<RepoStatus> {
     isGit,
     isOpenSpec,
     repoRoot: targetPath,
-    isTraceReady,
+    isTraceReady: false,
   };
 }
 
@@ -101,6 +119,38 @@ function execPromise(command: string, cwd: string): Promise<string> {
       }
     });
   });
+}
+
+export async function getConnectedWorktrees(repoPath: string): Promise<WorktreeInfo[]> {
+  try {
+    const output = await execPromise('git worktree list --porcelain', repoPath);
+    const blocks = output.trim().split('\n\n');
+    const worktrees: WorktreeInfo[] = [];
+
+    blocks.forEach((block, index) => {
+      const lines = block.split('\n');
+      let wtPath = '';
+      let branch = '';
+      for (const line of lines) {
+        if (line.startsWith('worktree ')) {
+          wtPath = line.substring(9).trim();
+        } else if (line.startsWith('branch ')) {
+          branch = line.substring(7).trim().replace('refs/heads/', '');
+        }
+      }
+      if (wtPath) {
+        worktrees.push({
+          path: wtPath,
+          branch: branch || null,
+          isMain: index === 0
+        });
+      }
+    });
+    return worktrees;
+  } catch (err) {
+    console.error('Failed to list git worktrees:', err);
+    return [];
+  }
 }
 
 function copyDirSync(src: string, dest: string) {

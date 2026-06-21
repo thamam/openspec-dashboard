@@ -27,14 +27,18 @@ app.get('/api/status', async (req, res) => {
 
 // API route to initialize OpenSpec
 app.post('/api/init', async (req, res) => {
-  const { path } = req.body;
+  const { path, paths } = req.body;
 
-  if (!path || typeof path !== 'string') {
+  const targetPaths = paths && Array.isArray(paths) ? paths : (path ? [path] : []);
+
+  if (targetPaths.length === 0 || targetPaths.some(p => typeof p !== 'string')) {
     return res.status(400).json({ error: 'Missing parameter "path"' });
   }
 
   try {
-    await initializeOpenSpec(path);
+    for (const p of targetPaths) {
+      await initializeOpenSpec(p);
+    }
     return res.json({ success: true, message: 'OpenSpec initialized successfully' });
   } catch (err: any) {
     return res.status(500).json({ error: err.message || 'Failed to initialize OpenSpec' });

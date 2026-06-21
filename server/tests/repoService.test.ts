@@ -55,6 +55,7 @@ describe('repoService - checkRepoStatus', () => {
       isOpenSpec: false,
       repoRoot: path.resolve(gitDir),
       isTraceReady: false,
+      worktrees: [],
     });
   });
 
@@ -72,6 +73,7 @@ describe('repoService - checkRepoStatus', () => {
       isOpenSpec: true,
       repoRoot: path.resolve(openspecDir),
       isTraceReady: false,
+      worktrees: [],
     });
   });
 
@@ -87,6 +89,7 @@ describe('repoService - checkRepoStatus', () => {
       isOpenSpec: false,
       repoRoot: path.resolve(worktreeDir),
       isTraceReady: false,
+      worktrees: [],
     });
   });
 
@@ -107,6 +110,7 @@ describe('repoService - checkRepoStatus', () => {
       isOpenSpec: true,
       repoRoot: path.resolve(gitDir),
       isTraceReady: false,
+      worktrees: [],
     });
   });
 });
@@ -169,6 +173,15 @@ describe('repoService - initializeOpenSpec & createGitWorktree', () => {
     // Verify branch exists in the original repo
     const branches = execSync('git branch', { cwd: gitDir }).toString();
     expect(branches).toContain('feature/my-worktree');
+
+    // Verify status returns the connected worktrees (main repo + worktree)
+    const status = await checkRepoStatus(gitDir);
+    expect(status.worktrees).toBeDefined();
+    expect(status.worktrees!.length).toBe(2);
+    expect(status.worktrees![0].isMain).toBe(true);
+    expect(fs.realpathSync(status.worktrees![0].path)).toBe(fs.realpathSync(gitDir));
+    expect(status.worktrees![1].isMain).toBe(false);
+    expect(fs.realpathSync(status.worktrees![1].path)).toBe(fs.realpathSync(worktreeDest));
   });
 
   it('should throw validation error when branch name is invalid', async () => {

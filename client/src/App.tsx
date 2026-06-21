@@ -4,12 +4,19 @@ import DagViewer from './components/DagViewer.js';
 import CreateChangeForm from './components/CreateChangeForm.js';
 import BrainstormWizard from './components/BrainstormWizard.js';
 
+interface WorktreeInfo {
+  path: string;
+  branch: string | null;
+  isMain: boolean;
+}
+
 interface RepoStatus {
   exists: boolean;
   isGit: boolean;
   isOpenSpec: boolean;
   repoRoot?: string;
   isTraceReady?: boolean;
+  worktrees?: WorktreeInfo[];
 }
 
 interface DagNode {
@@ -128,6 +135,11 @@ function App() {
   const [worktreeDestPath, setWorktreeDestPath] = useState('');
   const [worktreeCreating, setWorktreeCreating] = useState(false);
   const [worktreeModalErr, setWorktreeModalErr] = useState<string | null>(null);
+
+  // Worktree trace update state
+  const [showWorktreeUpdateModal, setShowWorktreeUpdateModal] = useState(false);
+  const [customSelectionActive, setCustomSelectionActive] = useState(false);
+  const [worktreePathsToUpdate, setWorktreePathsToUpdate] = useState<string[]>([]);
 
   const handleSidebarMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -553,13 +565,13 @@ function App() {
     }
   };
 
-  const handleUpdateInit = async () => {
+  const executeInit = async (pathsToInit: string[]) => {
     setLoading(true);
     try {
       const res = await fetch('/api/init', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path }),
+        body: JSON.stringify({ paths: pathsToInit }),
       });
       if (res.ok) {
         const statusRes = await fetch(`/api/status?path=${encodeURIComponent(path)}`);
@@ -573,6 +585,16 @@ function App() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const triggerUpdateInit = () => {
+    if (status?.worktrees && status.worktrees.length > 1) {
+      setWorktreePathsToUpdate(status.worktrees.map(w => w.path));
+      setCustomSelectionActive(false);
+      setShowWorktreeUpdateModal(true);
+    } else {
+      executeInit([path]);
     }
   };
 
@@ -668,7 +690,7 @@ function App() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
               {!status?.isTraceReady && (
                 <button
-                  onClick={handleUpdateInit}
+                  onClick={triggerUpdateInit}
                   className="update-init-btn"
                   title="Update OpenSpec templates to support real-time linkages"
                   style={{
@@ -1383,6 +1405,127 @@ function App() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ===== WORKTREE UPDATE MODAL ===== */}
+      {showWorktreeUpdateModal && status?.worktrees && (
+        <div className="modal-overlay">
+          <div className="modal-card worktree-update-modal" style={{ maxWidth: '480px' }}>
+            <div className="modal-header">
+              <h2>Update Connected Worktrees</h2>
+              <button 
+                onClick={() => setShowWorktreeUpdateModal(false)} 
+                className="modal-close-btn"
+                aria-label="Close dialog"
+              >
+                ×
+              </button>
+            </div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '16px 20px' }}>
+              <p style={{ margin: 0, fontSize: '13px', color: 'var(--dim)', lineHeight: '1.5' }}>
+                This repository has other connected Git worktrees. Would you like to update the OpenSpec configurations and trace templates for all of them?
+              </p>
+
+              {!customSelectionActive ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px' }}>
+                  <button
+                    onClick={() => {
+                      executeInit(status.worktrees!.map(w => w.path));
+                      setShowWorktreeUpdateModal(false);
+                    }}
+                    className="btn btn-primary"
+                    id="wt-update-all-btn"
+                    style={{ justifyContent: 'center', padding: '10px' }}
+                  >
+                    Yes, Update All ({status.worktrees.length})
+                  </button>
+                  <button
+                    onClick={() => {
+                      executeInit([path]);
+                      setShowWorktreeUpdateModal(false);
+                    }}
+                    className="btn btn-secondary"
+                    id="wt-update-only-this-btn"
+                    style={{ justifyContent: 'center', padding: '10px' }}
+                  >
+                    No, Only This One
+                  </button>
+                  <button
+                    onClick={() => {
+                      setCustomSelectionActive(true);
+                      setWorktreePathsToUpdate([path]);
+                    }}
+                    className="btn btn-secondary"
+                    id="wt-update-custom-btn"
+                    style={{ justifyContent: 'center', padding: '10px' }}
+                  >
+                    Custom Selection...
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div className="worktree-checkbox-list" style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '200px', overflowY: 'auto', padding: '10px', background: 'var(--s2)', borderRadius: '6px', border: '1px solid var(--border)' }}>
+                    {status.worktrees.map((wt) => {
+                      const isSelected = worktreePathsToUpdate.includes(wt.path);
+                      return (
+                        <label 
+                          key={wt.path} 
+                          className="worktree-checkbox-item"
+                          style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px', userSelect: 'none', padding: '4px 0' }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            disabled={wt.path === path}
+                            onChange={() => {
+                              if (wt.path === path) return;
+                              if (isSelected) {
+                                setWorktreePathsToUpdate(worktreePathsToUpdate.filter(p => p !== wt.path));
+                              } else {
+                                setWorktreePathsToUpdate([...worktreePathsToUpdate, wt.path]);
+                              }
+                            }}
+                          />
+                          <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', flex: 1 }}>
+                            <span style={{ fontWeight: 600, color: 'var(--text)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }} title={wt.path}>
+                              {wt.path} {wt.isMain && <span style={{ fontSize: '10px', padding: '1px 4px', background: 'var(--accent-soft)', color: 'var(--accent)', borderRadius: '4px', marginLeft: '4px' }}>Main</span>}
+                            </span>
+                            {wt.branch && (
+                              <span style={{ fontSize: '11px', color: 'var(--dim)' }}>
+                                branch: {wt.branch}
+                              </span>
+                            )}
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button
+                      onClick={() => {
+                        executeInit(worktreePathsToUpdate);
+                        setShowWorktreeUpdateModal(false);
+                      }}
+                      className="btn btn-primary"
+                      id="wt-update-submit-btn"
+                      disabled={worktreePathsToUpdate.length === 0}
+                      style={{ flex: 1, justifyContent: 'center' }}
+                    >
+                      Update Selected ({worktreePathsToUpdate.length})
+                    </button>
+                    <button
+                      onClick={() => setCustomSelectionActive(false)}
+                      className="btn btn-secondary"
+                      style={{ flex: 1, justifyContent: 'center' }}
+                    >
+                      Back
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

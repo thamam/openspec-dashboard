@@ -1952,3 +1952,24 @@ code {
   opacity: 0.5;
 }
 
+/* Worktree Update Checklist Styling */
+.worktree-checkbox-list::-webkit-scrollbar {
+  width: 6px;
+}
+.worktree-checkbox-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.worktree-checkbox-list::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+.worktree-checkbox-item {
+  padding: 4px 6px;
+  border-radius: 4px;
+  transition: background 0.15s ease;
+}
+.worktree-checkbox-item:hover {
+  background: rgba(148, 163, 184, 0.08);
+}
+
+
