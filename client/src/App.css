@@ -1913,3 +1913,36 @@ code {
   cursor: not-allowed;
   box-shadow: none;
 }
+
+/* ==========================================================================
+   PANE RESIZER SYSTEM
+   ========================================================================== */
+.sidebar, .tool-dock {
+  position: relative;
+}
+
+.pane-resizer {
+  position: absolute;
+  top: 0;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 1000;
+  user-select: none;
+  background-color: transparent;
+  transition: background-color 0.15s ease;
+}
+
+.sidebar-resizer {
+  right: -3px;
+}
+
+.tool-dock-resizer {
+  left: -3px;
+}
+
+.pane-resizer:hover {
+  background-color: var(--accent);
+  opacity: 0.5;
+}
+

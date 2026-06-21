@@ -65,6 +65,8 @@ function App() {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [showCritical, setShowCritical] = useState(false);
   const [filterText, setFilterText] = useState('');
+  const [sidebarWidth, setSidebarWidth] = useState(240);
+  const [toolDockWidth, setToolDockWidth] = useState(388);
 
   // Changes
   const [changesList, setChangesList] = useState<string[]>([]);
@@ -107,6 +109,50 @@ function App() {
   const [worktreeDestPath, setWorktreeDestPath] = useState('');
   const [worktreeCreating, setWorktreeCreating] = useState(false);
   const [worktreeModalErr, setWorktreeModalErr] = useState<string | null>(null);
+
+  const handleSidebarMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = sidebarWidth;
+
+    const doDrag = (moveEvent: MouseEvent) => {
+      const currentWidth = startWidth + (moveEvent.clientX - startX);
+      if (currentWidth >= 180 && currentWidth <= 600) {
+        setSidebarWidth(currentWidth);
+        window.dispatchEvent(new Event('resize'));
+      }
+    };
+
+    const stopDrag = () => {
+      document.removeEventListener('mousemove', doDrag);
+      document.removeEventListener('mouseup', stopDrag);
+    };
+
+    document.addEventListener('mousemove', doDrag);
+    document.addEventListener('mouseup', stopDrag);
+  };
+
+  const handleToolDockMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = toolDockWidth;
+
+    const doDrag = (moveEvent: MouseEvent) => {
+      const currentWidth = startWidth - (moveEvent.clientX - startX);
+      if (currentWidth >= 280 && currentWidth <= 800) {
+        setToolDockWidth(currentWidth);
+        window.dispatchEvent(new Event('resize'));
+      }
+    };
+
+    const stopDrag = () => {
+      document.removeEventListener('mousemove', doDrag);
+      document.removeEventListener('mouseup', stopDrag);
+    };
+
+    document.addEventListener('mousemove', doDrag);
+    document.addEventListener('mouseup', stopDrag);
+  };
 
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -554,7 +600,7 @@ function App() {
         </div>
       )}
       {/* ===== SIDEBAR ===== */}
-      <aside className="sidebar">
+      <aside className="sidebar" style={{ width: `${sidebarWidth}px` }}>
         <div className="sidebar-logo-group">
           <div className="sidebar-logo">&lt;/&gt;</div>
           <div className="sidebar-title">OpenSpec</div>
@@ -615,6 +661,7 @@ function App() {
             + New Change
           </button>
         </div>
+        <div className="pane-resizer sidebar-resizer" onMouseDown={handleSidebarMouseDown} />
       </aside>
 
       {/* ===== MAIN COLUMN ===== */}
@@ -918,7 +965,8 @@ function App() {
 
           {/* ===== TOOL DOCK ===== */}
           {activeTool && (
-            <aside className="tool-dock">
+            <aside className="tool-dock" style={{ width: `${toolDockWidth}px` }}>
+              <div className="pane-resizer tool-dock-resizer" onMouseDown={handleToolDockMouseDown} />
               <div className="tool-dock-header">
                 <div className="tool-dock-title-row">
                   <span style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
