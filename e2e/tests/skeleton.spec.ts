@@ -395,7 +395,7 @@ test.describe('Workspace Management - E2E Actions', () => {
     await expect(providerSelect).toBeVisible();
     await expect(modelSelect).toBeVisible();
     await expect(providerSelect).toHaveValue('gemini');
-    await expect(modelSelect).toHaveValue('gemini-1.5-flash');
+    await expect(modelSelect).toHaveValue('gemini-3.5-flash');
 
     await providerSelect.selectOption('ollama');
     await expect(modelSelect).toBeVisible();

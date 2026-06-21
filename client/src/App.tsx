@@ -51,19 +51,19 @@ interface Message {
 
 const OLLAMA_MODELS = [
   { value: 'qwen3-coder-next', label: 'Qwen3 Coder Next (Coding community favorite)' },
+  { value: 'gemma4:12b', label: 'Gemma 4 12B (Google Coder & Agent sweet-spot)' },
+  { value: 'gemma4:26b', label: 'Gemma 4 26B (Google MoE flag-ship reasoning)' },
   { value: 'qwen3.6:27b', label: 'Qwen 3.6 27B (Prosumer Developer Mac standard)' },
-  { value: 'qwen3:30b', label: 'Qwen3 30B (General Logic & reasoning sweet spot)' },
   { value: 'glm-5.1', label: 'GLM 5.1 (Flagship Agentic reasoning)' },
-  { value: 'phi-4-mini', label: 'Phi-4 Mini (Lightweight logical reasoning)' },
-  { value: 'qwen2.5-coder:14b', label: 'Qwen 2.5 Coder 14B (Standard local developer)' }
+  { value: 'phi-4-mini', label: 'Phi-4 Mini (Lightweight logical reasoning)' }
 ];
 
 const GEMINI_MODELS = [
-  { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash (Default fast)' },
-  { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro (Thorough reasoning)' },
-  { value: 'gemini-2.0-flash-exp', label: 'Gemini 2.0 Flash Experimental' },
-  { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
-  { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' }
+  { value: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash (Recommended Default Coder)' },
+  { value: 'gemini-3.1-pro', label: 'Gemini 3.1 Pro (Flagship Reasoning)' },
+  { value: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash Lite (Cost-efficient)' },
+  { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash (Stable Legacy)' },
+  { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro (Stable Reasoning Legacy)' }
 ];
 
 function App() {
@@ -118,7 +118,7 @@ function App() {
 
   // LLM Configurations
   const [provider, setProvider] = useState<'gemini' | 'ollama' | 'custom'>('gemini');
-  const [model, setModel] = useState('gemini-1.5-flash');
+  const [model, setModel] = useState('gemini-3.5-flash');
   const [customEndpoint, setCustomEndpoint] = useState('');
   const [customApiKey, setCustomApiKey] = useState('');
   const [showToolSettings, setShowToolSettings] = useState(false);
@@ -178,7 +178,7 @@ function App() {
   // Default LLM model selection
   useEffect(() => {
     if (provider === 'gemini') {
-      setModel('gemini-1.5-flash');
+      setModel('gemini-3.5-flash');
     } else if (provider === 'ollama') {
       setModel('qwen3-coder-next');
     } else if (provider === 'custom') {
@@ -1088,7 +1088,7 @@ function App() {
                               const newProvider = e.target.value as any;
                               setProvider(newProvider);
                               if (newProvider === 'gemini') {
-                                setModel('gemini-1.5-flash');
+                                setModel('gemini-3.5-flash');
                               } else if (newProvider === 'ollama') {
                                 setModel('qwen3-coder-next');
                               } else {
