@@ -7,6 +7,8 @@ export interface DagNode {
   type: 'proposal' | 'spec-requirement' | 'spec-scenario' | 'design-decision' | 'task';
   status?: 'pending' | 'completed';
   scenariosCount?: number;
+  description?: string;
+  capability?: string;
 }
 
 export interface DagEdge {
@@ -132,17 +134,19 @@ export async function getChangeDag(
       }
 
       if (inCapabilities) {
-        // Match standard list items with backticks, bold, or plain text
-        const capMatch = line.match(/^[-*+]\s*(?:`|\*\*)?([a-zA-Z0-9._/-]+)(?:`|\*\*)?(?:\s*[:—-]\s*|\s*$)/);
+        // Match standard list items with backticks, bold, or plain text, optionally followed by a description
+        const capMatch = line.match(/^[-*+]\s*(?:`|\*\*)?([a-zA-Z0-9._/-]+)(?:`|\*\*)?(?:\s*[:—-]\s*(.*))?$/);
         if (capMatch) {
           const capName = capMatch[1].trim();
+          const capDesc = capMatch[2] ? capMatch[2].trim() : '';
           if (capName && capName.toLowerCase() !== 'none' && capName.toLowerCase() !== '(none)') {
             const nodeId = makeId('proposal', capName);
             if (!nodes.some(n => n.id === nodeId)) {
               nodes.push({
                 id: nodeId,
                 label: capName,
-                type: 'proposal'
+                type: 'proposal',
+                description: capDesc
               });
               capIds.push(capName);
               nodeTokensMap.set(nodeId, getTokens(capName));
@@ -157,10 +161,12 @@ export async function getChangeDag(
   // add a node representing proposal.md itself.
   if (proposalFileExists && capIds.length === 0) {
     const nodeId = 'proposal-doc';
+    const content = fs.readFileSync(proposalPath, 'utf8');
     nodes.push({
       id: nodeId,
       label: 'proposal.md',
-      type: 'proposal'
+      type: 'proposal',
+      description: content
     });
     nodeTokensMap.set(nodeId, getTokens('proposal.md'));
   }
@@ -181,6 +187,7 @@ export async function getChangeDag(
           
           let currentReqId: string | null = null;
           const capNodeId = makeId('proposal', capName);
+          const reqDescriptions = new Map<string, string[]>();
 
           for (const line of lines) {
             // Parse: ### Requirement: Verify Widget Display
@@ -192,8 +199,11 @@ export async function getChangeDag(
                 id: currentReqId,
                 label: reqLabel,
                 type: 'spec-requirement',
-                scenariosCount: 0
+                scenariosCount: 0,
+                capability: capName,
+                description: ''
               });
+              reqDescriptions.set(currentReqId, []);
               nodeTokensMap.set(currentReqId, getTokens(reqLabel));
 
               // Link to Capability
@@ -213,6 +223,8 @@ export async function getChangeDag(
                 reqMap.set(capName, []);
               }
               reqMap.get(capName)!.push(currentReqId);
+            } else if (currentReqId) {
+              reqDescriptions.get(currentReqId)!.push(line);
             }
 
             // Parse: #### Scenario: Display successful
@@ -224,6 +236,14 @@ export async function getChangeDag(
               }
             }
           }
+
+          // Populate spec requirement descriptions
+          reqDescriptions.forEach((descLines, reqId) => {
+            const reqNode = nodes.find(n => n.id === reqId);
+            if (reqNode) {
+              reqNode.description = descLines.join('\n').trim();
+            }
+          });
         }
       }
     }
@@ -238,14 +258,18 @@ export async function getChangeDag(
     const lines = content.split('\n');
 
     let inDecisionsSection = false;
+    let currentDecId: string | null = null;
+    const decDescriptions = new Map<string, string[]>();
 
     for (const line of lines) {
       const trimmed = line.trim();
       if (trimmed.match(/^##\s+(?:Design\s+)?Decisions/i)) {
         inDecisionsSection = true;
+        currentDecId = null;
         continue;
       } else if (trimmed.match(/^##\s+/)) {
         inDecisionsSection = false;
+        currentDecId = null;
       }
 
       if (!inDecisionsSection) {
@@ -274,16 +298,28 @@ export async function getChangeDag(
       }
 
       if (decisionLabel) {
-        const nodeId = makeId('design-decision', decisionLabel);
+        currentDecId = makeId('design-decision', decisionLabel);
         nodes.push({
-          id: nodeId,
+          id: currentDecId,
           label: decisionLabel,
-          type: 'design-decision'
+          type: 'design-decision',
+          description: ''
         });
-        designNodeIds.push(nodeId);
-        nodeTokensMap.set(nodeId, getTokens(decisionLabel));
+        designNodeIds.push(currentDecId);
+        decDescriptions.set(currentDecId, []);
+        nodeTokensMap.set(currentDecId, getTokens(decisionLabel));
+      } else if (currentDecId) {
+        decDescriptions.get(currentDecId)!.push(line);
       }
     }
+
+    // Populate design decision descriptions
+    decDescriptions.forEach((descLines, decId) => {
+      const decNode = nodes.find(n => n.id === decId);
+      if (decNode) {
+        decNode.description = descLines.join('\n').trim();
+      }
+    });
   }
 
   // 4. Parse tasks.md
@@ -306,7 +342,8 @@ export async function getChangeDag(
           id: nodeId,
           label: taskLabel,
           type: 'task',
-          status: checked ? 'completed' : 'pending'
+          status: checked ? 'completed' : 'pending',
+          description: `Task: ${taskLabel}`
         });
         taskNodeIds.push(nodeId);
         nodeTokensMap.set(nodeId, getTokens(taskLabel));

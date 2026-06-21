@@ -300,12 +300,12 @@ test.describe('Workspace Management - E2E Actions', () => {
     await expect(page.locator('.node-label').first()).toContainText('widget-feature');
 
     // 2. Select a node and verify highlighting
-    const nodeEl = page.locator('.dag-node:has-text("Verify Widget Display")');
+    const nodeEl = page.locator('#spec-req-verify-widget-display');
     await nodeEl.click();
     await expect(nodeEl).toHaveClass(/selected/);
     
     // Unrelated node should fade
-    const unrelatedNode = page.locator('.dag-node:has-text("unrelated-feature")');
+    const unrelatedNode = page.locator('#proposal-unrelated-feature');
     await expect(unrelatedNode).toHaveClass(/faded/);
 
     // Deselect node
@@ -850,4 +850,101 @@ test.describe('Workspace Management - E2E Actions', () => {
     expect(fs.existsSync(path.join(wtDir, '.agent', 'workflows', 'opsx-propose.md'))).toBe(true);
     expect(fs.existsSync(path.join(gitDir, '.agent', 'workflows', 'opsx-propose.md'))).toBe(true);
   });
+
+  test('should support Review Mode card details, markdown rendering, and path isolation', async ({ page }) => {
+    const gitDir = path.join(tempDir, 'git-repo-e2e-details');
+    const changeDir = path.join(gitDir, 'openspec', 'changes', 'details-change');
+    fs.mkdirSync(changeDir, { recursive: true });
+
+    execSync('git init -b main', { cwd: gitDir });
+
+    fs.writeFileSync(
+      path.join(changeDir, 'proposal.md'),
+      `## Capabilities\n### New Capabilities\n- \`widget-feature\`: Add widget logic\n- \`unrelated-feature\`: Unrelated capability\n`
+    );
+
+    const specDir = path.join(changeDir, 'specs', 'widget-feature');
+    fs.mkdirSync(specDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(specDir, 'spec.md'),
+      `## ADDED Requirements\n### Requirement: Verify Widget Display\nThe system SHALL show widget data.\n\n#### Scenario: Display successful\n- **WHEN** user loads widget\n- **THEN** data displays\n`
+    );
+
+    const unrelatedSpecDir = path.join(changeDir, 'specs', 'unrelated-feature');
+    fs.mkdirSync(unrelatedSpecDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(unrelatedSpecDir, 'spec.md'),
+      `## Requirements\n### Requirement: Unrelated Requirement\nThis is unrelated.\n`
+    );
+
+    fs.writeFileSync(
+      path.join(changeDir, 'design.md'),
+      `## Decisions\n### Decision 1: Widget Database Integration\nStore widget data in sqlite database.\n`
+    );
+
+    fs.writeFileSync(
+      path.join(changeDir, 'tasks.md'),
+      `## 1. Widget Setup\n- [ ] 1.1 Create database schema for widget data\n- [x] 1.2 Implement widget service\n`
+    );
+
+    fs.writeFileSync(
+      path.join(changeDir, 'linkages.json'),
+      JSON.stringify([
+        {
+          source: 'Verify Widget Display',
+          target: 'Decision 1: Widget Database Integration'
+        },
+        {
+          source: 'Decision 1: Widget Database Integration',
+          target: '1.1 Create database schema for widget data'
+        },
+        {
+          source: 'Decision 1: Widget Database Integration',
+          target: '1.2 Implement widget service'
+        }
+      ])
+    );
+
+    await page.goto('/');
+    await page.locator('#repo-path-input').fill(gitDir);
+    await page.locator('#verify-btn').click();
+
+    // Select change
+    await page.locator('.change-item-name:has-text("details-change")').click();
+
+    await page.locator('#review-mode-tab').click();
+
+    // 1. Verify card details tab opens on clicking a node
+    const specNode = page.locator('#spec-req-verify-widget-display');
+    await specNode.click();
+
+    const toolDock = page.locator('.tool-dock');
+    await expect(toolDock).toBeVisible();
+    await expect(toolDock.locator('.tool-dock-title')).toContainText('Card Details');
+
+    // 2. Verify badge, title, source file link, and markdown scenarios are displayed
+    await expect(toolDock.locator('.details-badge.spec-requirement')).toBeVisible();
+    await expect(toolDock.locator('.details-badge.capability')).toContainText('widget-feature');
+    await expect(toolDock.locator('.details-title')).toHaveText('Verify Widget Display');
+    await expect(toolDock.locator('.details-file-link a')).toContainText('specs/widget-feature/spec.md');
+
+    // Verify markdown scenarios render
+    await expect(toolDock.locator('.details-description-body')).toContainText('The system SHALL show widget data.');
+    await expect(toolDock.locator('.details-description-body')).toContainText('Scenario: Display successful');
+
+    // 3. Toggle "Isolate Path" and verify non-highlighted nodes are filtered out (hidden)
+    const unrelatedNode = page.locator('#proposal-unrelated-feature');
+    await expect(unrelatedNode).toBeVisible();
+
+    const isolateBtn = page.locator('#isolate-path-btn');
+    await isolateBtn.click();
+
+    // The unrelated node should be filtered out (hidden)
+    await expect(unrelatedNode).toHaveClass(/filtered-out/);
+
+    // Toggle off Isolate Path
+    await isolateBtn.click();
+    await expect(unrelatedNode).not.toHaveClass(/filtered-out/);
+  });
 });
+

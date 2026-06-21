@@ -204,3 +204,72 @@
   stroke-width: 2;
   stroke-dasharray: 4 2;
 }
+
+/* Collapsible Capability Groups */
+.dag-group-wrapper {
+  display: flex;
+  flex-direction: column;
+  background: rgba(148, 163, 184, 0.03);
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: 8px;
+  gap: 8px;
+}
+.dag-group-header {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  transition: all 0.15s ease;
+  user-select: none;
+}
+.dag-group-header:hover {
+  border-color: var(--accent);
+  background: var(--surface);
+}
+.dag-group-header.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+.dag-group-header.highlighted {
+  border-color: var(--accent);
+  border-width: 1.5px;
+}
+.group-header-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.group-toggle-arrow {
+  font-size: 10px;
+  color: var(--faint);
+  width: 12px;
+  text-align: center;
+}
+.group-title-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--fg);
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+  flex: 1;
+}
+.group-count-badge {
+  font-size: 10px;
+  font-weight: 600;
+  background: var(--border);
+  color: var(--dim);
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+.group-nodes-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-left: 8px;
+  border-left: 1px solid var(--border);
+  margin-left: 5px;
+}

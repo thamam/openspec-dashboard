@@ -82,7 +82,7 @@ function App() {
 
   // App Layout and Navigation State
   const [activeStage, setActiveStage] = useState<'propose' | 'review'>('propose');
-  const [activeTool, setActiveTool] = useState<'grill' | 'audit' | 'chat' | null>(null);
+  const [activeTool, setActiveTool] = useState<'grill' | 'audit' | 'chat' | 'details' | null>(null);
   const [theme, setTheme] = useState<'Soft' | 'Mono' | 'Vivid'>('Soft');
   const [mode, setMode] = useState<'light' | 'dark'>('light');
   const [repoMenuOpen, setRepoMenuOpen] = useState(false);
@@ -90,6 +90,8 @@ function App() {
   const [dagOn, setDagOn] = useState(true);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [showCritical, setShowCritical] = useState(false);
+  const [isolateSelection, setIsolateSelection] = useState(false);
+  const [collapsedCapabilities, setCollapsedCapabilities] = useState<Record<string, boolean>>({});
   const [filterText, setFilterText] = useState('');
   const [sidebarWidth, setSidebarWidth] = useState(240);
   const [toolDockWidth, setToolDockWidth] = useState(388);
@@ -216,11 +218,23 @@ function App() {
       fetchMetadata(selectedChange);
       fetchDag(selectedChange);
       setSelectedNodeId(null);
+      if (activeTool === 'details') {
+        setActiveTool(null);
+      }
     } else {
       setSelectedChangeMetadata(null);
       setDagData(null);
     }
   }, [selectedChange, path]);
+
+  const handleSelectNode = (nodeId: string | null) => {
+    setSelectedNodeId(nodeId);
+    if (nodeId) {
+      setActiveTool('details');
+    } else if (activeTool === 'details') {
+      setActiveTool(null);
+    }
+  };
 
   // Reload tool context/state when stage, change, or active tool changes
   useEffect(() => {
@@ -610,6 +624,46 @@ function App() {
       }
       return part;
     });
+  };
+
+  // Block-level markdown formatter helper
+  const renderMarkdownBlock = (text: string) => {
+    if (!text) return null;
+    const lines = text.split('\n');
+    return (
+      <div className="markdown-render">
+        {lines.map((line, idx) => {
+          const trimmed = line.trim();
+          if (!trimmed) {
+            return <div key={idx} className="md-spacing" />;
+          }
+
+          // Match headings
+          const h3Match = line.match(/^###\s+(.*)$/);
+          if (h3Match) {
+            return <h4 key={idx} className="md-h3">{renderMarkdown(h3Match[1])}</h4>;
+          }
+
+          const h4Match = line.match(/^####\s+(.*)$/);
+          if (h4Match) {
+            return <h5 key={idx} className="md-h4">{renderMarkdown(h4Match[1])}</h5>;
+          }
+
+          // Match bullet lists
+          const listMatch = line.match(/^\s*[-*+]\s+(.*)$/);
+          if (listMatch) {
+            return (
+              <li key={idx} className="md-li">
+                {renderMarkdown(listMatch[1])}
+              </li>
+            );
+          }
+
+          // Fallback to normal paragraph
+          return <p key={idx} className="md-p">{renderMarkdown(line)}</p>;
+        })}
+      </div>
+    );
   };
 
   // Check if repository needs verification
@@ -1017,6 +1071,15 @@ function App() {
                     <span className="views-check-box">{showCritical ? '✓' : ''}</span>
                     Critical Paths
                   </button>
+                  <button
+                    onClick={() => setIsolateSelection(!isolateSelection)}
+                    className={`views-chip ${isolateSelection ? 'active' : ''}`}
+                    title="Isolate selected path (hide non-connected nodes)"
+                    id="isolate-path-btn"
+                  >
+                    <span className="views-check-box">{isolateSelection ? '✓' : ''}</span>
+                    Isolate Path
+                  </button>
                   <span className="views-chip disabled">
                     Diff <span className="soon-tag">soon</span>
                   </span>
@@ -1049,9 +1112,17 @@ function App() {
                     dag={dagData}
                     dagOn={dagOn}
                     selectedNodeId={selectedNodeId}
-                    onSelectNode={setSelectedNodeId}
+                    onSelectNode={handleSelectNode}
                     onToggleTask={handleToggleTaskLocal}
                     showCritical={showCritical}
+                    isolateSelection={isolateSelection}
+                    collapsedCapabilities={collapsedCapabilities}
+                    onToggleCapability={(capName) =>
+                      setCollapsedCapabilities((prev) => ({
+                        ...prev,
+                        [capName]: !prev[capName],
+                      }))
+                    }
                     filterText={filterText}
                   />
                 )}
@@ -1067,13 +1138,15 @@ function App() {
                 <div className="tool-dock-title-row">
                   <span style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
                     <span className="tool-dock-icon-wrapper">
-                      {activeTool === 'grill' ? '⚡' : activeTool === 'audit' ? '🔍' : '💬'}
+                      {activeTool === 'grill' ? '⚡' : activeTool === 'audit' ? '🔍' : activeTool === 'details' ? '🗂️' : '💬'}
                     </span>
                     <span className="tool-dock-title">
                       {activeTool === 'grill'
                         ? 'Grill Me'
                         : activeTool === 'audit'
                         ? 'Traceability Audit'
+                        : activeTool === 'details'
+                        ? 'Card Details'
                         : 'Ask AI'}
                     </span>
                   </span>
@@ -1084,14 +1157,14 @@ function App() {
                 {/* Context chip */}
                 <div className="tool-dock-context-chip">
                   <span className="tool-dock-context-dot"></span>
-                  {activeTool === 'grill' ? 'pressure-testing' : activeTool === 'audit' ? 'auditing' : 'context'} ·{' '}
+                  {activeTool === 'grill' ? 'pressure-testing' : activeTool === 'audit' ? 'auditing' : activeTool === 'details' ? 'inspection' : 'context'} ·{' '}
                   {selectedChange} · {activeStage === 'propose' ? 'Propose' : 'Review'}
                 </div>
               </div>
 
               <div className="tool-dock-body">
                 {/* Settings Accordion for LLMs */}
-                {activeTool !== 'audit' && (
+                {activeTool !== 'audit' && activeTool !== 'details' && (
                   <>
                     <button
                       onClick={() => setShowToolSettings(!showToolSettings)}
@@ -1238,8 +1311,80 @@ function App() {
                   </>
                 )}
 
+                {/* Details view */}
+                {activeTool === 'details' && (
+                  <div className="card-details-panel">
+                    {(() => {
+                      if (!selectedNodeId || !dagData) {
+                        return <div className="details-empty">Select a card in the DAG to view its details.</div>;
+                      }
+                      const node = dagData.nodes.find((n) => n.id === selectedNodeId);
+                      if (!node) {
+                        return <div className="details-empty">Card not found.</div>;
+                      }
+
+                      // Build the relative source file path based on node type and capability
+                      let fileRelativePath = '';
+                      if (node.type === 'proposal') {
+                        fileRelativePath = 'proposal.md';
+                      } else if (node.type === 'spec-requirement' || node.type === 'spec-scenario') {
+                        fileRelativePath = `specs/${node.capability}/spec.md`;
+                      } else if (node.type === 'design-decision') {
+                        fileRelativePath = 'design.md';
+                      } else if (node.type === 'task') {
+                        fileRelativePath = 'tasks.md';
+                      }
+
+                      const fileAbsoluteUri = path
+                        ? `file://${path}/openspec/changes/${selectedChange}/${fileRelativePath}`
+                        : '';
+
+                      return (
+                        <div className="card-details-content">
+                          <div className="details-badge-row">
+                            <span className={`details-badge ${node.type}`}>
+                              {node.type.replace('spec-', '')}
+                            </span>
+                            {node.capability && (
+                              <span className="details-badge capability">
+                                📦 {node.capability}
+                              </span>
+                            )}
+                            {node.status && (
+                              <span className={`details-badge status ${node.status}`}>
+                                {node.status === 'completed' ? '✓ Done' : '○ Pending'}
+                              </span>
+                            )}
+                          </div>
+
+                          <h3 className="details-title">{node.label}</h3>
+
+                          {fileRelativePath && (
+                            <div className="details-file-link">
+                              <strong>Source File:</strong>{' '}
+                              <a href={fileAbsoluteUri} target="_blank" rel="noopener noreferrer">
+                                {fileRelativePath}
+                              </a>
+                            </div>
+                          )}
+
+                          <div className="details-divider" />
+
+                          <div className="details-description-body">
+                            {node.description ? (
+                              renderMarkdownBlock(node.description)
+                            ) : (
+                              <em className="details-no-desc">No additional details parsed from file.</em>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+
                 {/* Chat interfaces */}
-                {activeTool !== 'audit' && (
+                {activeTool !== 'audit' && activeTool !== 'details' && (
                   <div className="chat-bubble-thread">
                     {/* Pre-canned Prompt Shortcuts */}
                     {activeTool === 'chat' && activeStage === 'review' && (
@@ -1287,7 +1432,7 @@ function App() {
               </div>
 
               {/* Composer */}
-              {activeTool !== 'audit' && (
+              {activeTool !== 'audit' && activeTool !== 'details' && (
                 <form onSubmit={handleToolSend} className="tool-dock-composer">
                   <input
                     type="text"

@@ -7,6 +7,8 @@ interface DagNode {
   type: 'proposal' | 'spec-requirement' | 'spec-scenario' | 'design-decision' | 'task';
   status?: 'pending' | 'completed';
   scenariosCount?: number;
+  description?: string;
+  capability?: string;
 }
 
 interface DagEdge {
@@ -24,6 +26,9 @@ interface DagViewerProps {
   onSelectNode: (nodeId: string | null) => void;
   onToggleTask: (nodeId: string) => void;
   showCritical: boolean;
+  isolateSelection?: boolean;
+  collapsedCapabilities?: Record<string, boolean>;
+  onToggleCapability?: (capName: string) => void;
   filterText: string;
 }
 
@@ -42,6 +47,9 @@ const DagViewer: React.FC<DagViewerProps> = ({
   onSelectNode = () => {},
   onToggleTask = () => {},
   showCritical = false,
+  isolateSelection = false,
+  collapsedCapabilities = {},
+  onToggleCapability = () => {},
   filterText = '',
 }) => {
   const [lines, setLines] = useState<RenderLine[]>([]);
@@ -125,8 +133,35 @@ const DagViewer: React.FC<DagViewerProps> = ({
     const computedLines: RenderLine[] = [];
 
     dag.edges.forEach((edge) => {
-      const srcEl = document.getElementById(edge.source);
-      const dstEl = document.getElementById(edge.target);
+      let sourceId = edge.source;
+      let targetId = edge.target;
+
+      // Redirect edges if the source or target nodes are requirement cards inside collapsed capability groups
+      const sourceNode = dag.nodes.find((n) => n.id === sourceId);
+      if (
+        sourceNode &&
+        sourceNode.type === 'spec-requirement' &&
+        sourceNode.capability &&
+        collapsedCapabilities[sourceNode.capability]
+      ) {
+        sourceId = `group-${sourceNode.capability}`;
+      }
+
+      const targetNode = dag.nodes.find((n) => n.id === targetId);
+      if (
+        targetNode &&
+        targetNode.type === 'spec-requirement' &&
+        targetNode.capability &&
+        collapsedCapabilities[targetNode.capability]
+      ) {
+        targetId = `group-${targetNode.capability}`;
+      }
+
+      // Avoid drawing a self-connector if source and target collapse to the same group header
+      if (sourceId === targetId) return;
+
+      const srcEl = document.getElementById(sourceId);
+      const dstEl = document.getElementById(targetId);
 
       if (srcEl && dstEl) {
         const srcRect = srcEl.getBoundingClientRect();
@@ -143,16 +178,17 @@ const DagViewer: React.FC<DagViewerProps> = ({
         const d = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
 
         // Determine if line is highlighted
-        const isHighlighted = selectedNodeId !== null && 
-          highlightedNodes.has(edge.source) && 
-          highlightedNodes.has(edge.target);
+        const isHighlighted =
+          selectedNodeId !== null &&
+          (highlightedNodes.has(edge.source) || highlightedNodes.has(sourceId)) &&
+          (highlightedNodes.has(edge.target) || highlightedNodes.has(targetId));
 
         // Determine if line is on the critical path
         const isCritical = criticalNodes.has(edge.source) && criticalNodes.has(edge.target);
 
         computedLines.push({
-          sourceId: edge.source,
-          targetId: edge.target,
+          sourceId,
+          targetId,
           d,
           isHighlighted,
           isCritical,
@@ -171,7 +207,7 @@ const DagViewer: React.FC<DagViewerProps> = ({
       clearTimeout(timer);
       window.removeEventListener('resize', drawLines);
     };
-  }, [dag, selectedNodeId, showCritical, filterText, dagOn]);
+  }, [dag, selectedNodeId, showCritical, filterText, dagOn, isolateSelection, collapsedCapabilities]);
 
   // Handle node selection
   const handleNodeClick = (nodeId: string) => {
@@ -184,8 +220,13 @@ const DagViewer: React.FC<DagViewerProps> = ({
 
   // Determine if a node should be filtered out
   const isFiltered = (node: DagNode): boolean => {
-    if (!filterText.trim()) return false;
-    return !node.label.toLowerCase().includes(filterText.toLowerCase());
+    if (filterText.trim() && !node.label.toLowerCase().includes(filterText.toLowerCase())) {
+      return true;
+    }
+    if (isolateSelection && selectedNodeId !== null) {
+      return !highlightedNodes.has(node.id);
+    }
+    return false;
   };
 
   const renderNode = (node: DagNode) => {
@@ -235,6 +276,53 @@ const DagViewer: React.FC<DagViewerProps> = ({
     );
   };
 
+  // Group specs nodes by capability name
+  const capabilities = Array.from(
+    new Set(specNodes.map((n) => n.capability).filter((c): c is string => !!c))
+  );
+  const uncategorizedSpecs = specNodes.filter((n) => !n.capability);
+
+  const renderCapabilityGroup = (capName: string) => {
+    const capSpecs = specNodes.filter((n) => n.capability === capName);
+    const hasVisibleNodes = capSpecs.some((n) => !isFiltered(n));
+
+    const isCollapsed = collapsedCapabilities[capName] === true;
+    const isGroupSelected = selectedNodeId && capSpecs.some((n) => n.id === selectedNodeId);
+    const isGroupHighlighted = selectedNodeId && capSpecs.some((n) => highlightedNodes.has(n.id));
+
+    let headerClassName = 'dag-group-header';
+    if (isCollapsed) headerClassName += ' collapsed';
+    if (isGroupSelected) headerClassName += ' selected';
+    if (isGroupHighlighted) headerClassName += ' highlighted';
+
+    return (
+      <div 
+        key={`group-wrapper-${capName}`} 
+        className="dag-group-wrapper"
+        style={!hasVisibleNodes ? { display: 'none' } : undefined}
+      >
+        <div
+          id={`group-${capName}`}
+          className={headerClassName}
+          onClick={() => onToggleCapability(capName)}
+        >
+          <div className="group-header-content">
+            <span className="group-toggle-arrow">{isCollapsed ? '▶' : '▼'}</span>
+            <span className="group-title-label">{capName}</span>
+            <span className="group-count-badge">
+              {capSpecs.length} req{capSpecs.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+        </div>
+        {!isCollapsed && (
+          <div className="group-nodes-stack">
+            {capSpecs.map(renderNode)}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="dag-container">
       <div className="dag-canvas-wrapper">
@@ -262,7 +350,10 @@ const DagViewer: React.FC<DagViewerProps> = ({
           </div>
           <div className="dag-column">
             <h4>Specs</h4>
-            <div className="nodes-stack">{specNodes.map(renderNode)}</div>
+            <div className="nodes-stack">
+              {capabilities.map(renderCapabilityGroup)}
+              {uncategorizedSpecs.map(renderNode)}
+            </div>
           </div>
           <div className="dag-column">
             <h4>Design</h4>

@@ -101,10 +101,29 @@ Store widget data in sqlite database.
 
     // Verify Nodes
     const nodes = dag.nodes;
-    expect(nodes.some(n => n.id === 'proposal-widget-feature' && n.type === 'proposal')).toBe(true);
-    expect(nodes.some(n => n.id === 'spec-req-verify-widget-display' && n.type === 'spec-requirement')).toBe(true);
-    expect(nodes.some(n => n.id === 'design-decision-decision-1-widget-database-integration' && n.type === 'design-decision')).toBe(true);
-    expect(nodes.some(n => n.id === 'task-1-1-create-database-schema-for-widget-data' && n.type === 'task' && n.status === 'pending')).toBe(true);
+    const propNode = nodes.find(n => n.id === 'proposal-widget-feature');
+    expect(propNode).toBeDefined();
+    expect(propNode!.type).toBe('proposal');
+    expect(propNode!.description).toBe('Add widget logic');
+
+    const reqNode = nodes.find(n => n.id === 'spec-req-verify-widget-display');
+    expect(reqNode).toBeDefined();
+    expect(reqNode!.type).toBe('spec-requirement');
+    expect(reqNode!.capability).toBe('widget-feature');
+    expect(reqNode!.description).toContain('The system SHALL show widget data.');
+    expect(reqNode!.description).toContain('Scenario: Display successful');
+
+    const decNode = nodes.find(n => n.id === 'design-decision-decision-1-widget-database-integration');
+    expect(decNode).toBeDefined();
+    expect(decNode!.type).toBe('design-decision');
+    expect(decNode!.description).toContain('Store widget data in sqlite database.');
+
+    const taskNode = nodes.find(n => n.id === 'task-1-1-create-database-schema-for-widget-data');
+    expect(taskNode).toBeDefined();
+    expect(taskNode!.type).toBe('task');
+    expect(taskNode!.status).toBe('pending');
+    expect(taskNode!.description).toBe('Task: 1.1 Create database schema for widget data');
+
     expect(nodes.some(n => n.id === 'task-1-2-implement-widget-service' && n.type === 'task' && n.status === 'completed')).toBe(true);
 
     // Verify Edges

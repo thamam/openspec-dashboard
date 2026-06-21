@@ -489,4 +489,96 @@ describe('Frontend App - App.tsx', () => {
     const dot = container.querySelector('.sidebar-repo-dot') as HTMLElement;
     expect(dot.style.background).toBe('var(--green)');
   });
+
+  it('should support card details inspection in tool dock and path isolation toggling', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ exists: true, isGit: true, isOpenSpec: true, isTraceReady: true }),
+    });
+
+    const { container } = render(<App />);
+    const input = screen.getByPlaceholderText('Enter local repository absolute path...');
+    const button = screen.getByRole('button', { name: 'Verify Path' });
+
+    // Mock active changes fetch, metadata fetch, and DAG fetch in sequence
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => (['my-change']),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          name: 'my-change',
+          schema: 'spec-driven',
+          created: '2026-06-17',
+          description: '',
+          proposeEngine: 'gemini',
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          nodes: [
+            {
+              id: 'proposal-widget-feature',
+              label: 'widget-feature',
+              type: 'proposal',
+              description: 'Add widget logic'
+            },
+            {
+              id: 'spec-req-verify-widget-display',
+              label: 'Verify Widget Display',
+              type: 'spec-requirement',
+              capability: 'widget-feature',
+              description: '### Requirement: Verify Widget Display\nThe system SHALL show widget data.\n\n#### Scenario: Display successful\n- **WHEN** user loads widget\n- **THEN** data displays'
+            }
+          ],
+          edges: [
+            { source: 'proposal-widget-feature', target: 'spec-req-verify-widget-display' }
+          ]
+        }),
+      });
+
+    fireEvent.change(input, { target: { value: '/Users/test/details-repo' } });
+    fireEvent.click(button);
+
+    // Verify the change item is in the list
+    await waitFor(() => {
+      expect(container.querySelector('.change-item-name')).toBeInTheDocument();
+    });
+    const changeItem = container.querySelector('.change-item-name') as HTMLElement;
+
+    // Click the change item to load metadata & DAG, and switch to Review mode
+    fireEvent.click(changeItem);
+
+    // Switch to review tab
+    const reviewTab = screen.getByText('Review');
+    fireEvent.click(reviewTab);
+
+    // Verify DAG nodes are rendered
+    const nodeEl = await screen.findByText('Verify Widget Display');
+    expect(nodeEl).toBeInTheDocument();
+
+    // Click the node card to select it and trigger details pane in Tool Dock
+    fireEvent.click(nodeEl);
+
+    // Verify Tool Dock header updates to "Card Details"
+    expect(screen.getByText('Card Details')).toBeInTheDocument();
+    expect(screen.getByText(/inspection/)).toBeInTheDocument();
+
+    // Verify details content and markdown rendering
+    expect(screen.getAllByText('Verify Widget Display').length).toBeGreaterThan(0);
+    expect(screen.getByText(/The system SHALL show widget data/)).toBeInTheDocument();
+    expect(screen.getByText(/Scenario: Display successful/)).toBeInTheDocument();
+    expect(screen.getByText(/WHEN/)).toBeInTheDocument();
+
+    // Test Isolate Path toggle button in toolbar
+    const isolateBtn = screen.getByRole('button', { name: /Isolate Path/ });
+    expect(isolateBtn).toBeInTheDocument();
+    expect(isolateBtn).not.toHaveClass('active');
+
+    fireEvent.click(isolateBtn);
+    expect(isolateBtn).toHaveClass('active');
+  });
 });
