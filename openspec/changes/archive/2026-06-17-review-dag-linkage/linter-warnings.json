@@ -1,0 +1,50 @@
+{
+  "warnings": [
+    {
+      "taskId": "task-1-1-write-unit-tests-for-dagservice-parsing-and-jaccard-edge-mapping",
+      "taskLabel": "1.1 Write unit tests for dagService parsing and Jaccard edge mapping",
+      "complexityAlert": "This task contains multiple action verbs. We recommend splitting it to reduce cognitive load and execution risk."
+    },
+    {
+      "taskId": "task-1-2-implement-markdown-parser-and-dag-edge-builder-in-dagservice",
+      "taskLabel": "1.2 Implement markdown parser and DAG edge builder in dagService",
+      "complexityAlert": "This task appears to contain multiple steps. We recommend decomposing it into smaller sub-tasks."
+    },
+    {
+      "taskId": "task-1-3-write-integration-tests-for-get-api-changes-and-get-api-changes-change-dag",
+      "taskLabel": "1.3 Write integration tests for GET /api/changes and GET /api/changes/:change/dag",
+      "complexityAlert": "This task contains multiple action verbs. We recommend splitting it to reduce cognitive load and execution risk."
+    },
+    {
+      "taskId": "task-1-4-implement-changes-list-and-dag-endpoints-in-app-ts",
+      "taskLabel": "1.4 Implement changes list and DAG endpoints in app.ts",
+      "complexityAlert": "This task appears to contain multiple steps. We recommend decomposing it into smaller sub-tasks."
+    },
+    {
+      "taskId": "task-2-1-write-frontend-component-tests-for-dagviewer-rendering",
+      "taskLabel": "2.1 Write frontend component tests for DagViewer rendering",
+      "complexityAlert": "This task contains multiple action verbs. We recommend splitting it to reduce cognitive load and execution risk."
+    },
+    {
+      "taskId": "task-2-2-implement-dagviewer-rendering-click-interaction-and-svg-drawing",
+      "taskLabel": "2.2 Implement DagViewer rendering, click interaction, and SVG drawing",
+      "complexityAlert": "This task appears to contain multiple steps. We recommend decomposing it into smaller sub-tasks."
+    },
+    {
+      "taskId": "task-2-3-integrate-dagviewer-into-app-tsx-and-style-in-dagviewer-css",
+      "taskLabel": "2.3 Integrate DagViewer into App.tsx and style in DagViewer.css",
+      "complexityAlert": "This task appears to contain multiple steps. We recommend decomposing it into smaller sub-tasks."
+    },
+    {
+      "taskId": "task-3-1-write-playwright-e2e-tests-for-review-mode-and-screenshot-capture",
+      "taskLabel": "3.1 Write Playwright E2E tests for Review Mode and screenshot capture",
+      "complexityAlert": "This task contains multiple action verbs. We recommend splitting it to reduce cognitive load and execution risk."
+    },
+    {
+      "taskId": "task-3-2-run-and-verify-all-tests-copy-screenshot-and-update-walkthrough",
+      "taskLabel": "3.2 Run and verify all tests, copy screenshot, and update walkthrough",
+      "complexityAlert": "This task contains multiple action verbs. We recommend splitting it to reduce cognitive load and execution risk."
+    }
+  ],
+  "timestamp": "2026-06-23T15:16:31.980Z"
+}

@@ -1,8 +1,7 @@
 # dag-linkage Specification
 
-## Purpose
-TBD - created by archiving change review-dag-linkage. Update Purpose after archive.
-## Requirements
+## MODIFIED Requirements
+
 ### Requirement: Render Interactive DAG Linkages
 The system SHALL support loading and rendering a Directed Acyclic Graph mapping proposal, spec, design, and task items for a change.
 
@@ -21,4 +20,3 @@ The system SHALL support loading and rendering a Directed Acyclic Graph mapping 
 #### Scenario: Persisting DAG metrics as artifacts
 - **WHEN** the system builds/parses the DAG for a change
 - **THEN** the system SHALL automatically save `complexity.json` and `linter-warnings.json` inside the change folder to persist the parsed metrics
-

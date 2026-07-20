@@ -1,0 +1,15 @@
+{
+  "warnings": [
+    {
+      "taskId": "task-1-1-create-new-cli-workspace-package-and-configurations",
+      "taskLabel": "1.1 Create new cli workspace package and configurations",
+      "complexityAlert": "This task appears to contain multiple steps. We recommend decomposing it into smaller sub-tasks."
+    },
+    {
+      "taskId": "task-3-1-update-getchangedag-to-persist-complexity-json-and-linter-warnings-json",
+      "taskLabel": "3.1 Update getChangeDag to persist complexity.json and linter-warnings.json",
+      "complexityAlert": "This task appears to contain multiple steps. We recommend decomposing it into smaller sub-tasks."
+    }
+  ],
+  "timestamp": "2026-06-23T15:16:31.986Z"
+}

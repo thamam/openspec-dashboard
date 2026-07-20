@@ -87,7 +87,9 @@ describe('API Routes - POST /api/init', () => {
 
     const response = await request(app).post('/api/init').send({ path: '/my/git/repo' });
     expect(response.status).toBe(500);
-    expect(response.body).toEqual({ error: 'init failed' });
+    expect(response.body).toEqual({
+      error: 'Failed to initialize OpenSpec on all paths:\n- /my/git/repo: init failed'
+    });
   });
 });
 

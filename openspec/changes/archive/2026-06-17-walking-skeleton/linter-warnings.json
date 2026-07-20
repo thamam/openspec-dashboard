@@ -1,0 +1,55 @@
+{
+  "warnings": [
+    {
+      "taskId": "task-1-1-create-root-package-json-with-workspaces-and-root-scripts",
+      "taskLabel": "1.1 Create root package.json with workspaces and root scripts",
+      "complexityAlert": "This task appears to contain multiple steps. We recommend decomposing it into smaller sub-tasks."
+    },
+    {
+      "taskId": "task-1-3-initialize-the-server-directory-with-package-json-and-tsconfig-json",
+      "taskLabel": "1.3 Initialize the server directory with package.json and tsconfig.json",
+      "complexityAlert": "This task appears to contain multiple steps. We recommend decomposing it into smaller sub-tasks."
+    },
+    {
+      "taskId": "task-1-4-initialize-the-client-directory-with-vite-react-ts-package-json-and-tsconfig-json",
+      "taskLabel": "1.4 Initialize the client directory with Vite, React, TS, package.json, and tsconfig.json",
+      "complexityAlert": "This task appears to contain multiple steps. We recommend decomposing it into smaller sub-tasks."
+    },
+    {
+      "taskId": "task-2-1-write-reposervice-unit-tests-verifying-directory-status-checks",
+      "taskLabel": "2.1 Write repoService unit tests verifying directory status checks",
+      "complexityAlert": "This task contains multiple action verbs. We recommend splitting it to reduce cognitive load and execution risk."
+    },
+    {
+      "taskId": "task-2-2-implement-reposervice-checking-logic-to-satisfy-the-unit-tests",
+      "taskLabel": "2.2 Implement repoService checking logic to satisfy the unit tests",
+      "complexityAlert": "This task contains multiple action verbs. We recommend splitting it to reduce cognitive load and execution risk."
+    },
+    {
+      "taskId": "task-2-3-write-express-api-status-endpoint-integration-tests",
+      "taskLabel": "2.3 Write Express /api/status endpoint integration tests",
+      "complexityAlert": "This task contains multiple action verbs. We recommend splitting it to reduce cognitive load and execution risk."
+    },
+    {
+      "taskId": "task-3-1-write-frontend-component-tests-for-the-path-verification-form",
+      "taskLabel": "3.1 Write frontend component tests for the path verification form",
+      "complexityAlert": "This task contains multiple action verbs. We recommend splitting it to reduce cognitive load and execution risk."
+    },
+    {
+      "taskId": "task-3-2-implement-the-react-ui-in-app-tsx-to-select-input-folder-and-fetch-status",
+      "taskLabel": "3.2 Implement the React UI in App.tsx to select/input folder and fetch status",
+      "complexityAlert": "This task appears to contain multiple steps. We recommend decomposing it into smaller sub-tasks."
+    },
+    {
+      "taskId": "task-4-2-write-skeleton-spec-ts-e2e-test-verifying-full-system-path-checks",
+      "taskLabel": "4.2 Write skeleton.spec.ts E2E test verifying full-system path checks",
+      "complexityAlert": "This task contains multiple action verbs. We recommend splitting it to reduce cognitive load and execution risk."
+    },
+    {
+      "taskId": "task-4-3-run-e2e-test-suite-in-full-system-mode-to-verify-everything-works",
+      "taskLabel": "4.3 Run E2E test suite in full-system mode to verify everything works",
+      "complexityAlert": "This task contains multiple action verbs. We recommend splitting it to reduce cognitive load and execution risk."
+    }
+  ],
+  "timestamp": "2026-06-23T15:16:31.983Z"
+}

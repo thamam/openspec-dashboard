@@ -1,0 +1,12 @@
+{
+  "questions": [
+    "How will you verify and test the main requirements of this change?",
+    "Are there any edge cases or error conditions in the proposed design, and how does the system handle them?",
+    "Are there any potential side-effects or coupling risks with other capabilities in the codebase?"
+  ],
+  "answers": {
+    "How will you verify and test the main requirements of this change?": "By running automated Jest/Vitest tests and manual CLI testing."
+  },
+  "completed": false,
+  "updatedAt": "2026-06-22T16:47:52.606Z"
+}

@@ -1,0 +1,30 @@
+[
+  {
+    "source": "Requirement: OpenSpec CLI Commands",
+    "target": "Decision 1: Hybrid Workspace Structure"
+  },
+  {
+    "source": "Requirement: Stdio Model Context Protocol Server",
+    "target": "Decision 2: Stdio-based MCP Communication"
+  },
+  {
+    "source": "Requirement: Render Interactive DAG Linkages",
+    "target": "Decision 3: Dynamic Metric Persistency in getChangeDag"
+  },
+  {
+    "source": "Decision 1: Hybrid Workspace Structure",
+    "target": "1.1 Create new cli workspace package and configurations"
+  },
+  {
+    "source": "Decision 1: Hybrid Workspace Structure",
+    "target": "1.2 Implement CLI commands status, lint, complexity, interrogate"
+  },
+  {
+    "source": "Decision 2: Stdio-based MCP Communication",
+    "target": "2.1 Implement stdio-based MCP Server wrapper"
+  },
+  {
+    "source": "Decision 3: Dynamic Metric Persistency in getChangeDag",
+    "target": "3.1 Update getChangeDag to persist complexity.json and linter-warnings.json"
+  }
+]

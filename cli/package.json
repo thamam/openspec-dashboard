@@ -1,0 +1,28 @@
+{
+  "name": "openspec-cli-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "openspec-cli": "./dist/cli.js",
+    "openspec-mcp": "./dist/mcp.js"
+  },
+  "scripts": {
+    "dev:cli": "tsx src/cli.ts",
+    "dev:mcp": "tsx src/mcp.ts",
+    "build": "tsc",
+    "start:cli": "node dist/cli.js",
+    "start:mcp": "node dist/mcp.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.6.0",
+    "commander": "^12.1.0",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.12",
+    "tsx": "^4.11.0",
+    "typescript": "^5.4.5"
+  }
+}

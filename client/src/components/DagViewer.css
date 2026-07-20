@@ -273,3 +273,42 @@
   border-left: 1px solid var(--border);
   margin-left: 5px;
 }
+
+/* Node Warning Alerts */
+.node-alerts {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.node-alert {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: help;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.node-alert.complexity {
+  background-color: rgba(245, 158, 11, 0.1);
+  color: #b45309;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.node-alert.coupling {
+  background-color: rgba(239, 68, 68, 0.08);
+  color: #b91c1c;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.node-alert:hover {
+  transform: scale(1.03);
+  filter: brightness(0.95);
+}
+

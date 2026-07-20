@@ -1,0 +1,45 @@
+{
+  "warnings": [
+    {
+      "taskId": "task-1-1-write-unit-tests-for-reposervice-command-executions",
+      "taskLabel": "1.1 Write unit tests for repoService command executions",
+      "complexityAlert": "This task contains multiple action verbs. We recommend splitting it to reduce cognitive load and execution risk."
+    },
+    {
+      "taskId": "task-1-2-implement-initializeopenspec-and-creategitworktree-logic",
+      "taskLabel": "1.2 Implement initializeOpenSpec and createGitWorktree logic",
+      "complexityAlert": "This task appears to contain multiple steps. We recommend decomposing it into smaller sub-tasks."
+    },
+    {
+      "taskId": "task-1-3-write-integration-tests-for-post-api-init-and-post-api-worktree",
+      "taskLabel": "1.3 Write integration tests for POST /api/init and POST /api/worktree",
+      "complexityAlert": "This task contains multiple action verbs. We recommend splitting it to reduce cognitive load and execution risk."
+    },
+    {
+      "taskId": "task-1-4-implement-post-api-init-and-post-api-worktree-routes",
+      "taskLabel": "1.4 Implement POST /api/init and POST /api/worktree routes",
+      "complexityAlert": "This task appears to contain multiple steps. We recommend decomposing it into smaller sub-tasks."
+    },
+    {
+      "taskId": "task-2-1-write-frontend-tests-for-init-button-and-worktree-form",
+      "taskLabel": "2.1 Write frontend tests for Init button and Worktree form",
+      "complexityAlert": "This task contains multiple action verbs. We recommend splitting it to reduce cognitive load and execution risk."
+    },
+    {
+      "taskId": "task-2-2-implement-react-ui-updates-for-init-card-and-worktree-form",
+      "taskLabel": "2.2 Implement React UI updates for Init card and Worktree form",
+      "complexityAlert": "This task contains multiple action verbs. We recommend splitting it to reduce cognitive load and execution risk."
+    },
+    {
+      "taskId": "task-3-1-write-e2e-tests-for-init-and-worktree-creation",
+      "taskLabel": "3.1 Write E2E tests for Init and Worktree creation",
+      "complexityAlert": "This task contains multiple action verbs. We recommend splitting it to reduce cognitive load and execution risk."
+    },
+    {
+      "taskId": "task-3-2-run-and-verify-all-unit-and-e2e-tests",
+      "taskLabel": "3.2 Run and verify all unit and E2E tests",
+      "complexityAlert": "This task contains multiple action verbs. We recommend splitting it to reduce cognitive load and execution risk."
+    }
+  ],
+  "timestamp": "2026-06-23T15:16:31.985Z"
+}

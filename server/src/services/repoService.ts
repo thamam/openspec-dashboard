@@ -110,8 +110,45 @@ export async function checkRepoStatus(dirPath: string): Promise<RepoStatus> {
 import { exec } from 'child_process';
 
 function execPromise(command: string, cwd: string): Promise<string> {
+  const extraPaths = [
+    '/opt/homebrew/bin',
+    '/usr/local/bin',
+    '/usr/bin',
+    '/bin',
+    '/usr/sbin',
+    '/sbin',
+  ];
+
+  // Dynamically locate NVM installations
+  const homeDir = process.env.HOME || '/Users/tomerhamam';
+  const nvmDir = process.env.NVM_DIR || path.join(homeDir, '.nvm');
+  try {
+    if (fs.existsSync(nvmDir)) {
+      const versionsDir = path.join(nvmDir, 'versions', 'node');
+      if (fs.existsSync(versionsDir)) {
+        const versions = fs.readdirSync(versionsDir);
+        for (const ver of versions) {
+          extraPaths.push(path.join(versionsDir, ver, 'bin'));
+        }
+      }
+    }
+  } catch (e) {
+    // Ignore and proceed
+  }
+
+  const currentPath = process.env.PATH || '';
+  const mergedPath = [...extraPaths, ...currentPath.split(':')]
+    .filter((val, idx, self) => val && self.indexOf(val) === idx)
+    .join(':');
+
   return new Promise((resolve, reject) => {
-    exec(command, { cwd }, (error, stdout, stderr) => {
+    exec(command, { 
+      cwd,
+      env: {
+        ...process.env,
+        PATH: mergedPath
+      }
+    }, (error, stdout, stderr) => {
       if (error) {
         reject(new Error(stderr.trim() || stdout.trim() || error.message));
       } else {
