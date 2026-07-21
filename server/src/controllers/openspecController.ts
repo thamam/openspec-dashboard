@@ -23,8 +23,10 @@ export class OpenSpecController {
       const cwd = req.body.repoPath || process.env.REPO_PATH || process.cwd();
 
       if (command === 'opsx-new') {
-        const name = changeName || args?.[0] || 'default';
-        const child = spawn('npx', ['openspec', 'new', 'change', name], { cwd, shell: true });
+        const rawName = args?.[0] || 'default';
+        // Force the name to lowercase kebab-case to satisfy openspec CLI constraints
+        const kebabName = rawName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+        const child = spawn('npx', ['openspec', 'new', 'change', kebabName], { cwd, shell: true });
         
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
         res.setHeader('Transfer-Encoding', 'chunked');
