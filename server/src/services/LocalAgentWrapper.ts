@@ -1,5 +1,6 @@
 import { spawn } from 'child_process';
 import path from 'path';
+import fs from 'fs';
 
 export class LocalAgentWrapper {
   /**
@@ -10,6 +11,16 @@ export class LocalAgentWrapper {
    * @returns A promise that resolves to the final structured JSON output (or null if it failed)
    */
   public async analyzeFile(repoPath: string, filePath: string, onChunk: (chunk: string) => void): Promise<any> {
+    if (process.env.TEST_MODE === 'true') {
+      onChunk('> Mocking analysis stream for testing...\n');
+      onChunk('> Found a violation of Progressive Disclosure.\n');
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          resolve({ status: 'warning', message: 'Test Mode Warning' });
+        }, 500);
+      });
+    }
+
     return new Promise((resolve, reject) => {
       const fileName = path.basename(filePath);
       
@@ -70,6 +81,13 @@ export class LocalAgentWrapper {
    * @param onChunk Callback when the agent streams stdout
    */
   public async chat(repoPath: string, message: string, context: any, onChunk: (chunk: string) => void): Promise<void> {
+    if (process.env.TEST_MODE === 'true') {
+      return new Promise((resolve) => {
+        onChunk(`Mocked reply to: "${message}"`);
+        setTimeout(() => resolve(), 500);
+      });
+    }
+
     return new Promise((resolve) => {
       // Inject dashboard state directly into the agent's prompt
       const prompt = `You are the embedded native Agent Harness for the OpenSpec Dashboard. 
@@ -99,6 +117,14 @@ Respond helpfully and concisely. If the user asks you to do something with the a
    * Invokes the local agent to automatically rewrite a file to fix a violation.
    */
   public async autofix(filePath: string, warningMessage: string): Promise<void> {
+    if (process.env.TEST_MODE === 'true') {
+      return new Promise((resolve) => {
+        fs.writeFileSync(filePath, `# Fixed in Test Mode\nOriginal warning: ${warningMessage}`);
+        console.log(`[LocalAgentWrapper] Autofixed ${filePath} (Test Mode)`);
+        setTimeout(() => resolve(), 500);
+      });
+    }
+
     return new Promise((resolve) => {
       const fileName = path.basename(filePath);
       const repoPath = path.dirname(filePath); // Approximate, but sufficient for cwd
