@@ -120,14 +120,14 @@ program
       // getChangeDag automatically parses tasks and linkages, enrich task nodes with alerts, and writes to linter-warnings.json
       const dag = await getChangeDag(repoPath, options.change);
       const warnings = dag.nodes
-        .filter(n => n.type === 'task' && (n.complexityAlert || n.couplingAlert));
+        .filter((n: any) => n.type === 'task' && (n.complexityAlert || n.couplingAlert));
 
       console.log(`=== Task Complexity Audit for "${options.change}" ===`);
       if (warnings.length === 0) {
         console.log('✔ Success: No task complexity or coupling warnings found.');
       } else {
         console.log(`Found ${warnings.length} warning(s):\n`);
-        warnings.forEach((w, idx) => {
+        warnings.forEach((w: any, idx: number) => {
           console.log(`${idx + 1}. Task: "${w.label}"`);
           if (w.complexityAlert) {
             console.log(`   - Complexity Warning: ${w.complexityAlert}`);
@@ -229,8 +229,8 @@ program
     // Generate questions if not present
     if (questions.length === 0) {
       const dag = await getChangeDag(repoPath, options.change);
-      const specs = dag.nodes.filter(n => n.type === 'spec-requirement' || n.type === 'spec-scenario');
-      const designs = dag.nodes.filter(n => n.type === 'design-decision');
+      const specs = dag.nodes.filter((n: any) => n.type === 'spec-requirement' || n.type === 'spec-scenario');
+      const designs = dag.nodes.filter((n: any) => n.type === 'design-decision');
       
       const fallbackQuestions = [
         specs.length > 0 
@@ -259,10 +259,10 @@ Do not return any markdown wraps or commentary outside the JSON array.`;
 
           const prompt = `Generate 3 comprehension questions for this change.
 Requirements:
-${specs.slice(0, 5).map(s => `- ${s.label}`).join('\n')}
+${specs.slice(0, 5).map((s: any) => `- ${s.label}`).join('\n')}
 
 Design Decisions:
-${designs.slice(0, 5).map(d => `- ${d.label}`).join('\n')}`;
+${designs.slice(0, 5).map((d: any) => `- ${d.label}`).join('\n')}`;
 
           const reply = await queryGemini(apiKey, systemInstruction, prompt);
           let cleanReply = reply.trim();

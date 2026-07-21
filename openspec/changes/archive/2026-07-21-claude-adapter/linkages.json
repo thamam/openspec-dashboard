@@ -1,0 +1,42 @@
+[
+  {
+    "source": "Requirement: Claude Provider Implementation",
+    "target": "Decision 1: Interactive Execution via TMUX"
+  },
+  {
+    "source": "Requirement: Claude Provider Implementation",
+    "target": "Decision 3: Provider-Specific Session Spawning"
+  },
+  {
+    "source": "Requirement: Dynamic Provider Selection",
+    "target": "Decision 2: Dynamic Provider Resolution"
+  },
+  {
+    "source": "Requirement: Claude Auto Mode by Default",
+    "target": "Decision 1: Interactive Execution via TMUX"
+  },
+  {
+    "source": "Decision 1: Interactive Execution via TMUX",
+    "target": "1.1 Create ClaudeProvider implementing IAgentProvider with tmux spawning and --permission-mode auto"
+  },
+  {
+    "source": "Decision 1: Interactive Execution via TMUX",
+    "target": "1.2 Refactor AntiGravityProvider to handle tmux session spawning internally for lifecycle execution"
+  },
+  {
+    "source": "Decision 2: Dynamic Provider Resolution",
+    "target": "2.1 Implement provider resolution service reading .openspec.yaml config and AGENT_PROVIDER environment variable"
+  },
+  {
+    "source": "Decision 3: Provider-Specific Session Spawning",
+    "target": "1.1 Create ClaudeProvider implementing IAgentProvider with tmux spawning and --permission-mode auto"
+  },
+  {
+    "source": "Decision 3: Provider-Specific Session Spawning",
+    "target": "1.2 Refactor AntiGravityProvider to handle tmux session spawning internally for lifecycle execution"
+  },
+  {
+    "source": "Decision 3: Provider-Specific Session Spawning",
+    "target": "2.2 Refactor openspecController.ts to resolve the active provider and delegate command execution to it"
+  }
+]

@@ -1,36 +1,82 @@
 import React, { useState } from 'react';
-import { Artifacts, TaskItem } from '../types';
+import { Artifacts, TaskItem } from '../../types';
+import { RawView } from './views/RawView';
+import { MatrixView } from './views/MatrixView';
+import { DashboardView } from './views/DashboardView';
+import { WizardView } from './views/WizardView';
 
 interface Props {
   artifacts: Artifacts;
   tasks: TaskItem[];
+  files: string[];
+  activeChange: string;
 }
 
-export const ArtifactViewer: React.FC<Props> = ({ artifacts, tasks }) => {
-  const [activeTab, setActiveTab] = useState('Tasks');
-  const [evalOverlay, setEvalOverlay] = useState(false);
+export const ArtifactViewer: React.FC<Props> = ({ artifacts, tasks: _tasks, files, activeChange }) => {
+  const [viewMode, setViewMode] = useState<'raw' | 'matrix' | 'dashboard' | 'wizard'>('raw');
+
+  const renderView = () => {
+    switch (viewMode) {
+      case 'matrix': return <MatrixView artifacts={artifacts} />;
+      case 'dashboard': return <DashboardView artifacts={artifacts} />;
+      case 'wizard': return <WizardView artifacts={artifacts} />;
+      case 'raw':
+      default:
+        return <RawView artifacts={artifacts} activeChange={activeChange} />;
+    }
+  };
 
   return (
     <div className="main-pane">
-      <div className="tabs">
-        {['Proposal', 'Specs', 'Design', 'Tasks'].map(tab => (
-          <div 
-            key={tab} 
-            className={`tab ${activeTab === tab ? 'active' : ''}`}
-            onClick={() => setActiveTab(tab)}
-            id={`tab-${tab.toLowerCase()}`}
-          >
-            {tab}
-          </div>
-        ))}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 20px', backgroundColor: '#0d1117', borderBottom: '1px solid #30363d' }}>
+        <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#8b949e' }}>Artifact Viewer</div>
+        <div style={{ display: 'flex', gap: '5px' }}>
+          {[
+            { id: 'raw', icon: '📝', label: 'Raw' },
+            { id: 'matrix', icon: '🌳', label: 'Matrix' },
+            { id: 'dashboard', icon: '📊', label: 'Dashboard' },
+            { id: 'wizard', icon: '🧙‍♂️', label: 'Wizard' }
+          ].map(v => (
+            <button
+              key={v.id}
+              onClick={() => setViewMode(v.id as any)}
+              style={{
+                padding: '4px 10px',
+                backgroundColor: viewMode === v.id ? '#1f6feb' : 'transparent',
+                color: viewMode === v.id ? 'white' : '#c9d1d9',
+                border: '1px solid',
+                borderColor: viewMode === v.id ? '#388bfd' : '#30363d',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px'
+              }}
+            >
+              <span>{v.icon}</span> {v.label}
+            </button>
+          ))}
+        </div>
       </div>
-      <div className="artifact-content markdown-preview" id="artifact-content">
-        {activeTab === 'Tasks' && (
-          <pre>{artifacts.tasks || 'No tasks found.'}</pre>
+      
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+        {/* We only show the file explorer in raw view to save horizontal space in others */}
+        {viewMode === 'raw' && (
+          <div className="file-explorer">
+            <div className="file-explorer-header">GENERATED FILES</div>
+            {files.length === 0 && <div className="file-explorer-empty">No files yet...</div>}
+            {files.map(f => (
+              <div key={f} className="file-item">
+                📄 {f}
+              </div>
+            ))}
+          </div>
         )}
-        {activeTab === 'Proposal' && <pre>{artifacts.proposal}</pre>}
-        {activeTab === 'Specs' && <pre>{artifacts.spec}</pre>}
-        {activeTab === 'Design' && <pre>{artifacts.design}</pre>}
+        
+        <div style={{ flex: 1, display: 'flex', overflow: 'hidden', backgroundColor: '#010409' }}>
+          {renderView()}
+        </div>
       </div>
     </div>
   );

@@ -2,7 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
-import { checkRepoStatus, initializeOpenSpec, createGitWorktree, createLocalSchema, createNewChange, getChangeMetadata } from './services/repoService.js';
+import { spawn } from 'child_process';
+import { checkRepoStatus, initializeOpenSpec } from './services/repoService.js';
 import { OpenSpecController } from './controllers/openspecController.js';
 import { parseTasks } from './services/markdownParser.js';
 
@@ -15,40 +16,53 @@ app.use(express.json());
 // Legacy endpoints retained for workspace initialization
 app.get('/api/status', async (req, res) => {
   const repoPath = req.query.path as string;
-  if (!repoPath) return res.status(400).json({ error: 'Missing query parameter "path"' });
+  if (!repoPath) {
+    res.status(400).json({ error: 'Missing query parameter "path"' });
+    return;
+  }
   try {
-    return res.json(await checkRepoStatus(repoPath));
+    const status = await checkRepoStatus(repoPath);
+    res.json(status);
   } catch (err: any) {
-    return res.status(500).json({ error: err.message });
+    res.status(500).json({ error: err.message });
   }
 });
 
 app.post('/api/init', async (req, res) => {
   const { path: repoPath } = req.body;
-  if (!repoPath) return res.status(400).json({ error: 'Missing path' });
+  if (!repoPath) {
+    res.status(400).json({ error: 'Missing path' });
+    return;
+  }
   try {
     await initializeOpenSpec(repoPath);
-    return res.json({ success: true });
+    res.json({ success: true });
   } catch (err: any) {
-    return res.status(500).json({ error: err.message });
+    res.status(500).json({ error: err.message });
   }
 });
 
 app.get('/api/changes', async (req, res) => {
   const repoPath = req.query.path as string;
-  if (!repoPath) return res.status(400).json({ error: 'Missing path' });
+  if (!repoPath) {
+    res.status(400).json({ error: 'Missing path' });
+    return;
+  }
   try {
     const changesDir = path.join(repoPath, 'openspec', 'changes');
-    if (!fs.existsSync(changesDir)) return res.json([]);
+    if (!fs.existsSync(changesDir)) {
+      res.json([]);
+      return;
+    }
     const dirs = fs.readdirSync(changesDir, { withFileTypes: true });
     const changes = dirs.filter(d => d.isDirectory()).map(d => ({
       id: d.name,
       title: d.name,
       status: 'In Progress'
     }));
-    return res.json(changes);
+    res.json(changes);
   } catch (err: any) {
-    return res.status(500).json({ error: err.message });
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -59,53 +73,121 @@ app.get('/api/artifacts', async (req, res) => {
   const repoPath = req.query.path as string;
   const changeName = req.query.change as string;
   
-  if (!repoPath || !changeName) return res.status(400).json({ error: 'Missing path or change' });
+  if (!repoPath || !changeName) {
+    res.status(400).json({ error: 'Missing path or change' });
+    return;
+  }
 
   try {
     const changeDir = path.join(repoPath, 'openspec', 'changes', changeName);
-    if (!fs.existsSync(changeDir)) return res.status(404).json({ error: 'Change not found' });
-
-    const artifacts: Record<string, string> = {};
-    const filesToRead = ['proposal.md', 'spec.md', 'design.md', 'tasks.md'];
-    
-    for (const file of filesToRead) {
-      const filePath = path.join(changeDir, file);
-      artifacts[file.replace('.md', '')] = fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf-8') : '';
+    if (!fs.existsSync(changeDir)) {
+      res.status(404).json({ error: 'Change not found' });
+      return;
     }
 
-    // Deterministically parse Tasks
+    const artifacts: Record<string, string> = { proposal: '', spec: '', design: '', tasks: '' };
+    let files: string[] = [];
     let parsedTasks: any[] = [];
-    if (artifacts['tasks']) {
-      parsedTasks = parseTasks(artifacts['tasks']);
+    let linkages: any[] = [];
+
+    if (fs.existsSync(changeDir)) {
+      const allPaths = fs.readdirSync(changeDir, { recursive: true }) as string[];
+      files = allPaths.filter(f => {
+        try {
+          return fs.statSync(path.join(changeDir, f)).isFile();
+        } catch (e) {
+          return false;
+        }
+      });
+
+      for (const f of files) {
+        const filePath = path.join(changeDir, f);
+        if (f === 'proposal.md') {
+          artifacts['proposal'] = fs.readFileSync(filePath, 'utf-8');
+        } else if (f === 'design.md') {
+          artifacts['design'] = fs.readFileSync(filePath, 'utf-8');
+        } else if (f === 'tasks.md') {
+          artifacts['tasks'] = fs.readFileSync(filePath, 'utf-8');
+        } else if (f.endsWith('spec.md')) {
+          const content = fs.readFileSync(filePath, 'utf-8');
+          artifacts['spec'] = artifacts['spec'] ? artifacts['spec'] + '\n\n---\n\n' + content : content;
+        } else if (f === 'linkages.json') {
+          try {
+            linkages = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+          } catch (e) {
+            console.error('Failed to parse linkages.json', e);
+          }
+        }
+      }
+
+      // Deterministically parse Tasks
+      if (artifacts['tasks']) {
+        parsedTasks = parseTasks(artifacts['tasks']);
+      }
     }
 
-    return res.json({ artifacts, parsedTasks });
+    res.json({ artifacts, parsedTasks, files, linkages });
   } catch (err: any) {
-    return res.status(500).json({ error: err.message });
+    res.status(500).json({ error: err.message });
   }
 });
 
 // Endpoint: Execute CLI command
-app.post('/api/execute', async (req, res) => {
-  const { repoPath, command, args } = req.body;
-  if (!repoPath || !command) return res.status(400).json({ error: 'Missing repoPath or command' });
+app.post('/api/execute', openspecController.executeCommand.bind(openspecController));
 
-  // Stream execution headers
-  res.setHeader('Content-Type', 'text/plain');
-  res.setHeader('Transfer-Encoding', 'chunked');
+// Endpoint: Open Terminal natively (Mac only)
+app.post('/api/open-terminal', (req, res) => {
+  const { command } = req.body;
+  if (!command) {
+    res.status(400).json({ error: 'Missing command' });
+    return;
+  }
+  
+  const script = `osascript -e 'tell application "iTerm"
+    activate
+    if (count of windows) = 0 then
+      create window with default profile
+    else
+      tell current window to create tab with default profile
+    end if
+    tell current session of current window to write text "${command.replace(/"/g, '\\"')}"
+  end tell'`;
+  
+  const child = spawn(script, { shell: true });
+  child.on('close', () => {
+    res.json({ success: true });
+  });
+  child.on('error', (err) => {
+    res.status(500).json({ error: err.message });
+  });
+});
 
+// Endpoint: Send a raw text message to an existing agent tmux session
+app.post('/api/send-message', (req, res) => {
+  const { changeName, message } = req.body;
+  if (!changeName || !message) {
+    res.status(400).json({ error: 'Missing changeName or message' });
+    return;
+  }
+
+  const sessionName = `agent-${changeName}`;
   try {
-    const stream = await openspecController.executeCommand(command, args || [], repoPath);
+    // Escape double quotes and backslashes for bash
+    const escapedMessage = message.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
     
-    stream.onData((data) => res.write(data));
-    stream.onError((data) => res.write(`ERROR: ${data}`));
-    stream.onExit((code) => {
-      res.write(`\nPROCESS EXITED WITH CODE ${code}\n`);
-      res.end();
+    // We send the message surrounded by quotes, and follow it with C-m (Enter)
+    const cmd = `tmux send-keys -t ${sessionName} "${escapedMessage}" C-m`;
+    const child = spawn(cmd, { shell: true });
+    
+    child.on('close', (code) => {
+      if (code === 0) {
+        res.json({ success: true });
+      } else {
+        res.status(500).json({ error: 'Failed to send message to tmux session' });
+      }
     });
   } catch (err: any) {
-    res.write(`ERROR FAILED TO SPAWN: ${err.message}\n`);
-    res.end();
+    res.status(500).json({ error: err.message });
   }
 });
 

@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { spawn } from 'child_process';
-import path from 'path';
+import { resolveProvider } from '../agents/ProviderResolver.js';
 
 export class OpenSpecController {
   
@@ -20,33 +20,51 @@ export class OpenSpecController {
     }
 
     try {
-      // In a real implementation, this would trigger the AgentProvider
-      // For basic CLI execution, we spawn it here.
-      const processArgs = changeName ? [changeName, ...(args || [])] : (args || []);
-      
-      const child = spawn(command, processArgs, {
-        cwd: process.env.REPO_PATH || process.cwd(),
-        shell: true
-      });
+      const cwd = req.body.repoPath || process.env.REPO_PATH || process.cwd();
 
-      let stdout = '';
-      let stderr = '';
+      if (command === 'opsx-new') {
+        const name = changeName || args?.[0] || 'default';
+        const child = spawn('npx', ['openspec', 'new', 'change', name], { cwd, shell: true });
+        
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.setHeader('Transfer-Encoding', 'chunked');
 
-      child.stdout.on('data', (data) => {
-        stdout += data.toString();
-      });
+        child.stdout.on('data', (data) => res.write(data));
+        child.stderr.on('data', (data) => res.write(data));
+        child.on('close', (code) => res.end(`\n[Process exited with code ${code}]`));
+        child.on('error', (err) => {
+          res.write(`\nFailed to start subprocess: ${err.message}`);
+          res.end();
+        });
+      } else if (command === 'opsx-verify') {
+        const target = changeName || args?.[0] || 'main';
+        const child = spawn('npx', ['openspec', 'status', '--change', target], { cwd, shell: true });
+        
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.setHeader('Transfer-Encoding', 'chunked');
 
-      child.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
+        child.stdout.on('data', (data) => res.write(data));
+        child.stderr.on('data', (data) => res.write(data));
+        child.on('close', (code) => res.end(`\n[Process exited with code ${code}]`));
+        child.on('error', (err) => {
+          res.write(`\nFailed to start subprocess: ${err.message}`);
+          res.end();
+        });
+      } else {
+        // Resolve active provider dynamically
+        const provider = resolveProvider(cwd, changeName || args?.[0]);
+        
+        // Execute the lifecycle command via the provider
+        const processArgs = args || (changeName ? [changeName] : []);
+        const stream = await provider.executeLifecycle(command, processArgs, cwd);
 
-      child.on('close', (code) => {
-        if (code === 0) {
-          res.status(200).json({ success: true, stdout });
-        } else {
-          res.status(500).json({ success: false, error: stderr || stdout, code });
-        }
-      });
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.setHeader('Transfer-Encoding', 'chunked');
+
+        stream.onData((data) => res.write(data));
+        stream.onError((data) => res.write(data));
+        stream.onExit((code) => res.end(`\n[Process exited with code ${code}]`));
+      }
 
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : 'Unknown error' });

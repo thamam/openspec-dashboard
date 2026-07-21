@@ -130,41 +130,104 @@ header {
   font-weight: 600;
 }
 
-/* Main Pane: Artifact Viewer */
+/* Right Pane: Main Body */
 .main-pane {
   grid-column: 2;
   grid-row: 2 / 3;
-  background-color: var(--bg-color);
+  background-color: var(--bg-primary);
+  border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 .tabs {
   display: flex;
+  background-color: #161b22;
   border-bottom: 1px solid var(--border-color);
-  background-color: var(--panel-bg);
+  padding: 0 10px;
 }
 
 .tab {
   padding: 12px 20px;
-  font-size: 14px;
-  cursor: pointer;
   color: var(--text-muted);
+  cursor: pointer;
   border-bottom: 2px solid transparent;
-  position: relative;
+  font-size: 14px;
+}
+
+.tab:hover {
+  color: var(--text-primary);
 }
 
 .tab.active {
-  color: var(--text-main);
-  border-bottom-color: var(--accent);
+  color: var(--text-primary);
+  border-bottom-color: #f78166;
+}
+
+.tab.completed {
+  color: #3fb950;
+  font-weight: 500;
+}
+
+.tab.pending {
+  color: var(--text-muted);
+  opacity: 0.6;
+  border-bottom-style: dashed;
+  border-bottom-width: 1px;
+}
+
+.file-explorer {
+  width: 250px;
+  background-color: #0d1117;
+  border-right: 1px solid var(--border-color);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.file-explorer-header {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+  margin-bottom: 10px;
+}
+
+.file-item {
+  font-size: 13px;
+  color: #c9d1d9;
+  padding: 8px 12px;
+  background-color: #161b22;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.file-explorer-empty {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-style: italic;
 }
 
 .artifact-content {
   padding: 40px;
   max-width: 800px;
-  margin: 0 auto;
+  margin-left: 0;
   line-height: 1.6;
+}
+
+.artifact-content pre {
+  white-space: pre-wrap;       /* css-3 */
+  white-space: -moz-pre-wrap;  /* Mozilla, since 1999 */
+  white-space: -pre-wrap;      /* Opera 4-6 */
+  white-space: -o-pre-wrap;    /* Opera 7 */
+  word-wrap: break-word;       /* Internet Explorer 5.5+ */
+  font-family: inherit;
+  margin: 0;
 }
 
 /* Right Pane: Task Hub */

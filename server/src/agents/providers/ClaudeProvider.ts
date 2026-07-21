@@ -1,20 +1,27 @@
 import { spawn } from 'child_process';
 import { IAgentProvider, ExecutionStream } from '../AgentProvider.js';
 
-export class AntiGravityProvider implements IAgentProvider {
+export class ClaudeProvider implements IAgentProvider {
   
   public async executeLifecycle(command: string, args: string[], workspacePath: string): Promise<ExecutionStream> {
+    const changeName = args[0] || 'default';
     const sessionName = `agent-${Date.now()}`;
-    const slashArg = args[0] || '';
-    const targetCommand = `agy -i '/${command} ${slashArg}' --dangerously-skip-permissions`;
     
+    let instruction = '';
+    if (command === 'opsx-continue') {
+      instruction = `Please follow the workflow instructions in .agent/workflows/opsx-continue.md to continue change ${changeName}`;
+    } else {
+      instruction = `Please run the OpenSpec command /${command} ${args.join(' ')}`;
+    }
+    
+    const targetCommand = `claude --permission-mode auto "${instruction}"`;
     return this.spawnTmux(sessionName, targetCommand, workspacePath);
   }
 
   public async executeTask(taskContext: string, workspacePath: string): Promise<ExecutionStream> {
     const sessionName = `agent-${Date.now()}`;
     const prompt = `Please complete the following task from the OpenSpec tasks.md:\n\n${taskContext}`;
-    const targetCommand = `agy run "${prompt}"`;
+    const targetCommand = `claude --permission-mode auto "${prompt}"`;
     
     return this.spawnTmux(sessionName, targetCommand, workspacePath);
   }

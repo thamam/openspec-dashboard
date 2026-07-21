@@ -12,9 +12,15 @@ export interface TaskItem {
   lineNumber: number;
 }
 
+export interface Linkage {
+  source: string;
+  target: string;
+}
+
 export interface Artifacts {
   proposal: string;
   spec: string;
   design: string;
   tasks: string;
+  linkages?: Linkage[];
 }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChangeItem } from '../types';
+import { ChangeItem } from '../../types';
 
 interface Props {
   changes: ChangeItem[];
@@ -31,6 +31,17 @@ export const CommandCenter: React.FC<Props> = ({ changes, activeChange, setActiv
       </div>
 
       <div className="pane-header" style={{ marginTop: 'auto', borderTop: '1px solid var(--border-color)', borderBottom: 'none' }}>Lifecycle Actions</div>
+      <button 
+        className="lifecycle-btn" 
+        style={{ border: '1px dashed var(--accent-color)' }}
+        onClick={() => {
+          const name = window.prompt('Enter new change name (e.g. my-new-feature):');
+          if (name) executeCommand('opsx-new', [name]);
+        }} 
+        id="btn-opsx-new"
+      >
+        + New Change (opsx-new)
+      </button>
       <button className="lifecycle-btn primary" onClick={() => executeCommand('opsx-continue')} id="btn-opsx-continue">▶ Continue (opsx-continue)</button>
       <button className="lifecycle-btn" onClick={() => executeCommand('opsx-verify')} id="btn-opsx-verify">Verify Specs (opsx-verify)</button>
       <button className="lifecycle-btn" onClick={() => executeCommand('opsx-sync')} id="btn-opsx-sync">Sync Specs (opsx-sync)</button>

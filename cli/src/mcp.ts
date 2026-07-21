@@ -150,8 +150,8 @@ async function getOrGenerateQuestions(repoPath: string, changeName: string): Pro
 
   // Generate fallback/Gemini questions
   const dag = await getChangeDag(repoPath, changeName);
-  const specs = dag.nodes.filter(n => n.type === 'spec-requirement' || n.type === 'spec-scenario');
-  const designs = dag.nodes.filter(n => n.type === 'design-decision');
+  const specs = dag.nodes.filter((n: any) => n.type === 'spec-requirement' || n.type === 'spec-scenario');
+  const designs = dag.nodes.filter((n: any) => n.type === 'design-decision');
   
   const fallbackQuestions = [
     specs.length > 0 
@@ -177,10 +177,10 @@ Do not return any markdown wraps or commentary outside the JSON array.`;
 
       const prompt = `Generate 3 comprehension questions for this change.
 Requirements:
-${specs.slice(0, 5).map(s => `- ${s.label}`).join('\n')}
+${specs.slice(0, 5).map((s: any) => `- ${s.label}`).join('\n')}
 
 Design Decisions:
-${designs.slice(0, 5).map(d => `- ${d.label}`).join('\n')}`;
+${designs.slice(0, 5).map((d: any) => `- ${d.label}`).join('\n')}`;
 
       const response = await fetch(url, {
         method: 'POST',
@@ -267,8 +267,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const changeName = (args as any).changeName;
         const dag = await getChangeDag(targetPath, changeName);
         const warnings = dag.nodes
-          .filter(n => n.type === 'task' && (n.complexityAlert || n.couplingAlert))
-          .map(w => ({
+          .filter((n: any) => n.type === 'task' && (n.complexityAlert || n.couplingAlert))
+          .map((w: any) => ({
             taskId: w.id,
             label: w.label,
             complexityAlert: w.complexityAlert,
