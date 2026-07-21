@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './App.css';
 import { CommandCenter } from './components/CommandCenter';
 import { ArtifactViewer } from './components/ArtifactViewer';
 import { TaskHub } from './components/TaskHub';
 import { TerminalPane } from './components/TerminalPane';
+import { AgentHarness } from './components/AgentHarness';
 import { ChangeItem, TaskItem, Artifacts } from './types';
 
 // For E2E testing, we allow passing the repo path via query param
@@ -20,6 +21,26 @@ function App() {
   const [files, setFiles] = useState<string[]>([]);
   const [terminalLines, setTerminalLines] = useState<string[]>(['OpenSpec CLI v1.2.0 (Deterministic Engine)']);
   const [agentProvider, setAgentProvider] = useState<string>('antigravity');
+  const [rightPaneWidth, setRightPaneWidth] = useState(320);
+
+  const startResizing = useCallback((mouseDownEvent: React.MouseEvent) => {
+    const startX = mouseDownEvent.clientX;
+    const startWidth = rightPaneWidth;
+
+    const onMouseMove = (mouseMoveEvent: MouseEvent) => {
+      // Moving mouse left increases width of the right pane
+      const deltaX = startX - mouseMoveEvent.clientX;
+      setRightPaneWidth(Math.max(250, Math.min(800, startWidth + deltaX)));
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, [rightPaneWidth]);
 
   const loadChanges = async () => {
     try {
@@ -115,7 +136,10 @@ function App() {
   };
 
   return (
-    <div className="workspace">
+    <div 
+      className="workspace"
+      style={{ gridTemplateColumns: `260px 1fr ${rightPaneWidth}px` }}
+    >
       <header>
         <div className="header-logo">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
@@ -156,7 +180,11 @@ function App() {
         onProviderChange={handleProviderChange}
       />
       <ArtifactViewer artifacts={artifacts} tasks={tasks} files={files} activeChange={activeChange} />
-      <TaskHub tasks={tasks} />
+      <div className="right-pane">
+        <div className="pane-resizer" onMouseDown={startResizing} />
+        <TaskHub tasks={tasks} />
+        <AgentHarness repoPath={repoPath} activeChange={activeChange} />
+      </div>
       <TerminalPane lines={terminalLines} />
     </div>
   );

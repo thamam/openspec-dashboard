@@ -238,6 +238,23 @@ header {
   border-left: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
+  position: relative;
+}
+
+.pane-resizer {
+  position: absolute;
+  left: -4px;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: col-resize;
+  z-index: 10;
+  background-color: transparent;
+  transition: background-color 0.2s;
+}
+
+.pane-resizer:hover, .pane-resizer:active {
+  background-color: var(--accent);
 }
 
 .task-list {

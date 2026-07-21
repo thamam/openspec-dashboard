@@ -7,7 +7,7 @@ interface Props {
 
 export const TaskHub: React.FC<Props> = ({ tasks }) => {
   return (
-    <div className="right-pane">
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
       <div className="pane-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
         Task Hub
         <span className="badge" id="task-count">{tasks.length} Total</span>
