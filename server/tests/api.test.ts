@@ -8,6 +8,8 @@ vi.mock('../src/services/repoService.js', () => {
   return {
     checkRepoStatus: vi.fn(),
     initializeOpenSpec: vi.fn(),
+    updateChangeProvider: vi.fn(),
+    getChangeMetadata: vi.fn(),
   };
 });
 
@@ -50,5 +52,23 @@ describe('API Routes - POST /api/init', () => {
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ success: true });
     expect(repoService.initializeOpenSpec).toHaveBeenCalledWith('/my/git/repo');
+  });
+});
+
+describe('API Routes - POST /api/changes/:change/provider', () => {
+  it('should return 400 when body parameters are missing', async () => {
+    const response = await request(app).post('/api/changes/my-change/provider').send({});
+    expect(response.status).toBe(400);
+  });
+
+  it('should call updateChangeProvider and return 200 on success', async () => {
+    vi.mocked(repoService.updateChangeProvider).mockResolvedValueOnce(undefined);
+
+    const response = await request(app)
+      .post('/api/changes/my-change/provider')
+      .send({ path: '/my/git/repo', provider: 'claude' });
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ success: true });
+    expect(repoService.updateChangeProvider).toHaveBeenCalledWith('/my/git/repo', 'my-change', 'claude');
   });
 });

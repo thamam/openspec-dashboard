@@ -19,6 +19,7 @@ function App() {
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [files, setFiles] = useState<string[]>([]);
   const [terminalLines, setTerminalLines] = useState<string[]>(['OpenSpec CLI v1.2.0 (Deterministic Engine)']);
+  const [agentProvider, setAgentProvider] = useState<string>('antigravity');
 
   const loadChanges = async () => {
     try {
@@ -45,6 +46,9 @@ function App() {
         });
         setTasks(data.parsedTasks || []);
         setFiles(data.files || []);
+        if (data.agentProvider) {
+          setAgentProvider(data.agentProvider);
+        }
       }
     } catch (e) {
       console.error(e);
@@ -96,6 +100,20 @@ function App() {
     }
   };
 
+  const handleProviderChange = async (provider: string) => {
+    setAgentProvider(provider);
+    if (activeChange === 'main') return;
+    try {
+      await fetch(`http://localhost:3011/api/changes/${encodeURIComponent(activeChange)}/provider`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: repoPath, provider })
+      });
+    } catch (e) {
+      console.error('Failed to update agent provider', e);
+    }
+  };
+
   return (
     <div className="workspace">
       <header>
@@ -134,6 +152,8 @@ function App() {
         activeChange={activeChange} 
         setActiveChange={setActiveChange}
         executeCommand={executeCommand}
+        agentProvider={agentProvider}
+        onProviderChange={handleProviderChange}
       />
       <ArtifactViewer artifacts={artifacts} tasks={tasks} files={files} activeChange={activeChange} />
       <TaskHub tasks={tasks} />

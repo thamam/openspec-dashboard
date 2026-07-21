@@ -19,6 +19,7 @@ test.describe('V1 Workspace - Deterministic E2E Verification', () => {
     fs.writeFileSync(path.join(changesDir, 'proposal.md'), '# Proposal\nMock proposal content.');
     fs.writeFileSync(path.join(changesDir, 'spec.md'), '# Specs\nMock specs.');
     fs.writeFileSync(path.join(changesDir, 'design.md'), '# Design\nMock design.');
+    fs.writeFileSync(path.join(changesDir, '.openspec.yaml'), 'schema: spec-driven');
     
     // GFM Task format
     fs.writeFileSync(path.join(changesDir, 'tasks.md'), `
@@ -106,5 +107,27 @@ test.describe('V1 Workspace - Deterministic E2E Verification', () => {
     // Verify Terminal gets the command
     const terminal = page.locator('#terminal-pane');
     await expect(terminal).toContainText('$ opsx-continue');
+  });
+
+  test('P0: Model Selection - Selector updates active provider config', async ({ page }) => {
+    await page.locator('#nav-item-auth-refactor').click();
+
+    // Verify select element exists
+    const select = page.locator('#select-agent-provider');
+    await expect(select).toBeVisible();
+
+    // The default mocked change doesn't have agentProvider, so it defaults to "antigravity"
+    await expect(select).toHaveValue('antigravity');
+
+    // Change to claude
+    await select.selectOption('claude');
+
+    // Check if .openspec.yaml has been updated to agentProvider: "claude"
+    const configPath = path.join(repoPath, 'openspec', 'changes', 'auth-refactor', '.openspec.yaml');
+    await expect.poll(async () => {
+      if (!fs.existsSync(configPath)) return false;
+      const content = fs.readFileSync(configPath, 'utf8');
+      return content.includes('agentProvider: "claude"');
+    }, { timeout: 5000 }).toBe(true);
   });
 });

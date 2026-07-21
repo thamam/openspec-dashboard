@@ -1,0 +1,50 @@
+[
+  {
+    "source": "GUI Agent Provider Selector",
+    "target": "Decision 1: GUI Dropdown Placement"
+  },
+  {
+    "source": "Persist Provider Selection",
+    "target": "Decision 2: Backend Persistence API"
+  },
+  {
+    "source": "Load Active Provider on Change Switch",
+    "target": "Decision 3: Exposing Current Provider to Frontend"
+  },
+  {
+    "source": "Decision 1: GUI Dropdown Placement",
+    "target": "2.1 Add Agent Provider select dropdown UI to CommandCenter sidebar component"
+  },
+  {
+    "source": "Decision 1: GUI Dropdown Placement",
+    "target": "2.3 Verify styling and dropdown positioning fits properly into the dark/light design systems"
+  },
+  {
+    "source": "Decision 2: Backend Persistence API",
+    "target": "1.1 Implement change config writing utility in repoService.ts to write agentProvider setting"
+  },
+  {
+    "source": "Decision 2: Backend Persistence API",
+    "target": "1.2 Add POST /api/changes/:change/provider endpoint in server/src/app.ts to persist the provider"
+  },
+  {
+    "source": "Decision 2: Backend Persistence API",
+    "target": "3.1 Write unit tests for the new persistence API endpoint in api.test.ts"
+  },
+  {
+    "source": "Decision 3: Exposing Current Provider to Frontend",
+    "target": "1.3 Update GET /api/artifacts in server/src/app.ts to read and return the configured agentProvider"
+  },
+  {
+    "source": "Decision 3: Exposing Current Provider to Frontend",
+    "target": "2.2 Wire up local state and change handler in App.tsx to load and POST active provider values"
+  },
+  {
+    "source": "Decision 1: GUI Dropdown Placement",
+    "target": "3.2 Add E2E test verifying provider dropdown updates config file dynamically"
+  },
+  {
+    "source": "Decision 2: Backend Persistence API",
+    "target": "3.2 Add E2E test verifying provider dropdown updates config file dynamically"
+  }
+]

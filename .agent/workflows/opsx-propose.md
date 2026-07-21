@@ -99,6 +99,10 @@ After completing all artifacts, summarize:
   - This file logs the linkages in real-time between Spec Requirements, Design Decisions, and Tasks.
   - Format: A JSON array of link objects containing `"source"` and `"target"` fields.
   - E.g., when creating a decision in `design.md`, write a link mapping the related requirement heading label to that decision heading label. When creating tasks in `tasks.md`, write links mapping decisions to tasks.
+- **Generate Level 1 Summary (`summary.json`)**:
+  - When completing the `proposal.md` and `design.md`, you MUST generate `openspec/changes/<name>/summary.json`.
+  - This powers the high-level dashboard view.
+  - Format: `{ "alignment": "A 1-2 sentence summary of what is being built", "risks": ["Key architectural decision 1", "Risk 2"] }`
 
 **Guardrails**
 - Create ALL artifacts needed for implementation (as defined by schema's `apply.requires`)

@@ -6,9 +6,18 @@ interface Props {
   activeChange: string;
   setActiveChange: (id: string) => void;
   executeCommand: (cmd: string, args?: string[]) => void;
+  agentProvider: string;
+  onProviderChange: (provider: string) => void;
 }
 
-export const CommandCenter: React.FC<Props> = ({ changes, activeChange, setActiveChange, executeCommand }) => {
+export const CommandCenter: React.FC<Props> = ({ 
+  changes, 
+  activeChange, 
+  setActiveChange, 
+  executeCommand,
+  agentProvider,
+  onProviderChange
+}) => {
   return (
     <div className="left-pane">
       <div className="pane-header">Changes</div>
@@ -30,7 +39,31 @@ export const CommandCenter: React.FC<Props> = ({ changes, activeChange, setActiv
         ))}
       </div>
 
-      <div className="pane-header" style={{ marginTop: 'auto', borderTop: '1px solid var(--border-color)', borderBottom: 'none' }}>Lifecycle Actions</div>
+      <div className="pane-header" style={{ marginTop: 'auto', borderTop: '1px solid var(--border-color)', borderBottom: 'none' }}>Agent Configuration</div>
+      <div style={{ padding: '0 12px 12px 12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        <label style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 'bold' }}>AGENT PROVIDER</label>
+        <select 
+          value={agentProvider} 
+          onChange={(e) => onProviderChange(e.target.value)}
+          disabled={activeChange === 'main'}
+          style={{
+            background: 'var(--bg-secondary)',
+            border: '1px solid var(--border-color)',
+            color: 'var(--text-primary)',
+            padding: '6px 8px',
+            borderRadius: '4px',
+            fontSize: '13px',
+            width: '100%',
+            cursor: activeChange === 'main' ? 'not-allowed' : 'pointer'
+          }}
+          id="select-agent-provider"
+        >
+          <option value="antigravity">Anti-Gravity</option>
+          <option value="claude">Claude Code</option>
+        </select>
+      </div>
+
+      <div className="pane-header" style={{ borderTop: '1px solid var(--border-color)', borderBottom: 'none' }}>Lifecycle Actions</div>
       <button 
         className="lifecycle-btn" 
         style={{ border: '1px dashed var(--accent-color)' }}

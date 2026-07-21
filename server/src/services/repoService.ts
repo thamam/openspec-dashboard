@@ -375,6 +375,7 @@ export interface ChangeMetadata {
   created: string;
   description: string;
   proposeEngine: string;
+  agentProvider: string;
   worktreeBranch?: string | null;
 }
 
@@ -435,6 +436,7 @@ export async function getChangeMetadata(
   let created = '';
   let description = '';
   let proposeEngine = 'gemini';
+  let agentProvider = 'antigravity';
 
   if (fs.existsSync(changeConfigFile)) {
     const yamlContent = fs.readFileSync(changeConfigFile, 'utf8');
@@ -443,6 +445,7 @@ export async function getChangeMetadata(
     if (data.created) created = data.created;
     if (data.description) description = data.description;
     if (data.proposeEngine) proposeEngine = data.proposeEngine;
+    if (data.agentProvider) agentProvider = data.agentProvider;
   }
 
   // If description was not in yaml, we can check if it exists in README.md
@@ -463,6 +466,7 @@ export async function getChangeMetadata(
     created,
     description,
     proposeEngine,
+    agentProvider,
     worktreeBranch,
   };
 }
@@ -486,6 +490,28 @@ export async function updateProposeEngine(
   const yamlContent = fs.readFileSync(changeConfigFile, 'utf8');
   const data = parseYaml(yamlContent);
   data.proposeEngine = proposeEngine;
+  fs.writeFileSync(changeConfigFile, stringifyYaml(data), 'utf8');
+}
+
+export async function updateChangeProvider(
+  repoPath: string,
+  changeName: string,
+  agentProvider: string
+): Promise<void> {
+  const resolvedRepoPath = path.resolve(repoPath);
+  const nameRegex = /^[a-zA-Z0-9.-]+$/;
+  if (!nameRegex.test(agentProvider)) {
+    throw new Error('Invalid agent provider format');
+  }
+
+  const changeConfigFile = path.join(resolvedRepoPath, 'openspec', 'changes', changeName, '.openspec.yaml');
+  if (!fs.existsSync(changeConfigFile)) {
+    throw new Error(`Change configuration file not found for change: ${changeName}`);
+  }
+
+  const yamlContent = fs.readFileSync(changeConfigFile, 'utf8');
+  const data = parseYaml(yamlContent);
+  data.agentProvider = agentProvider;
   fs.writeFileSync(changeConfigFile, stringifyYaml(data), 'utf8');
 }
 

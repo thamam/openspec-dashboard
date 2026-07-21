@@ -3,7 +3,7 @@ import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
 import { spawn } from 'child_process';
-import { checkRepoStatus, initializeOpenSpec } from './services/repoService.js';
+import { checkRepoStatus, initializeOpenSpec, updateChangeProvider, getChangeMetadata } from './services/repoService.js';
 import { OpenSpecController } from './controllers/openspecController.js';
 import { parseTasks } from './services/markdownParser.js';
 
@@ -120,13 +120,21 @@ app.get('/api/artifacts', async (req, res) => {
         }
       }
 
-      // Deterministically parse Tasks
+    // Deterministically parse Tasks
       if (artifacts['tasks']) {
         parsedTasks = parseTasks(artifacts['tasks']);
       }
     }
 
-    res.json({ artifacts, parsedTasks, files, linkages });
+    let agentProvider = 'antigravity';
+    try {
+      const metadata = await getChangeMetadata(repoPath, changeName);
+      agentProvider = metadata.agentProvider;
+    } catch (e) {
+      console.error('Failed to get change metadata', e);
+    }
+
+    res.json({ artifacts, parsedTasks, files, linkages, agentProvider });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -186,6 +194,24 @@ app.post('/api/send-message', (req, res) => {
         res.status(500).json({ error: 'Failed to send message to tmux session' });
       }
     });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/changes/:change/provider', async (req, res) => {
+  const changeName = req.params.change;
+  const repoPath = req.body.path as string;
+  const agentProvider = req.body.provider as string;
+
+  if (!repoPath || !agentProvider) {
+    res.status(400).json({ error: 'Missing path or provider parameter' });
+    return;
+  }
+
+  try {
+    await updateChangeProvider(repoPath, changeName, agentProvider);
+    res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
