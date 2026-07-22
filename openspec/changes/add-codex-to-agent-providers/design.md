@@ -1,54 +1,57 @@
 ## Context
 
-The OpenSpec dashboard provides a unified web interface for managing codebase changes, executing agent workflows, and monitoring task progression. Historically, the dashboard supported the `AntiGravityProvider` (using the `agy` CLI). Recently, support was introduced for the `ClaudeProvider` (using the `claude` CLI). To offer developers even more flexibility, we want to integrate Codex as a supported agent provider.
+The OpenSpec dashboard provides a unified web interface for managing codebase changes, executing agent workflows, and monitoring task progression. Historically the dashboard supported the `AntiGravityProvider` (using the `agy` CLI). Support was later added for the `ClaudeProvider` (using the `claude` CLI). To offer developers more flexibility — and per product direction to make Codex the default — we integrate Codex (OpenAI's `codex` CLI) as a supported agent provider and as the default.
 
 This requires:
 1. Creating a new `CodexProvider` implementing the `IAgentProvider` interface.
-2. Enabling dynamic provider resolution based on environment variables or `.openspec.yaml` files.
-3. Exposing Codex as a selectable option in the frontend interface.
+2. Enabling dynamic provider resolution based on environment variables or `.openspec.yaml`, with Codex as the default when nothing is configured.
+3. Exposing Codex as a selectable option in the frontend interface and reflecting the Codex default in the UI.
 
 ## Goals / Non-Goals
 
 **Goals:**
-- Implement `CodexProvider` using the `codex` CLI to execute lifecycle commands and task executions.
-- Run `codex` commands inside a detached `tmux` session, automatically adding the `--dangerously-bypass-approvals-and-sandbox` flag.
-- Add dynamic resolution of `CodexProvider` when `agentProvider: codex` or `AGENT_PROVIDER=codex` is set.
-- Update UI dropdowns in CommandCenter and CreateChangeForm to support selecting the Codex provider.
+- Implement `CodexProvider` using the `codex` CLI to execute lifecycle commands and tasks in a detached `tmux` session.
+- Run `codex` non-interactively with `--ask-for-approval never --sandbox workspace-write` (least-privilege auto-approval).
+- Add dynamic resolution of `CodexProvider` when `agentProvider: codex` or `AGENT_PROVIDER=codex` is set, and make Codex the default fallback.
+- Update UI dropdowns (CommandCenter, CreateChangeForm) to support selecting Codex, and default the client selection to Codex.
 
 **Non-Goals:**
-- Implementing actual task-execution or command-handling logic within the dashboard; the CLI handles the execution.
+- Implementing actual task-execution or command-handling logic within the dashboard; the CLI handles execution.
 - Supporting execution without `tmux` or on environments lacking the `codex` or `tmux` binaries.
+- Per-change tuning of the Codex model, sandbox scope, or approval policy (fixed defaults; future work).
 
 ## Decisions
 
 ### Decision 1: Codex CLI Execution via Detached TMUX
-- **Rationale**: The Codex CLI operates interactively. Spawning it directly as a background process would fail if it requires user prompt interaction or a TTY. Spawning in a detached `tmux` session allows the command to run asynchronously while letting developers manually attach via terminal (`tmux attach -t agent-<timestamp>`) to inspect progress or troubleshoot.
-- **Alternatives considered**: Spawning a direct child process. This was rejected because it does not provide TTY emulation or an easy way for developers to interact with the running agent.
+- **Rationale**: The Codex CLI operates interactively. Spawning it directly as a background process would fail if it requires prompt interaction or a TTY. Spawning in a detached `tmux` session lets the command run asynchronously while developers manually attach (`tmux attach -t <session>`) to inspect progress or troubleshoot — matching the existing `ClaudeProvider` pattern.
+- **Alternatives considered**: Spawning a direct child process — rejected; no TTY emulation and no easy way to interact with the running agent.
 
-### Decision 2: Bypass Approvals and Sandbox
-- **Rationale**: Dashboard-initiated runs must execute seamlessly without hanging for permissions or approval confirmations. Therefore, `codex` CLI runs will unconditionally include the `--dangerously-bypass-approvals-and-sandbox` flag.
-- **Alternatives considered**: Interactive prompt forwarding, which is highly complex and out of scope for the current design.
+### Decision 2: Auto-Approval via `--ask-for-approval never --sandbox workspace-write`
+- **Rationale**: Dashboard-initiated runs must proceed without hanging for approval prompts. `--ask-for-approval never` removes the prompts; pairing it with `--sandbox workspace-write` (rather than full access) keeps writes confined to the workspace — the least-privilege choice that still lets OpenSpec lifecycle work proceed. This is the Codex analog of Claude's `--permission-mode auto`.
+- **Alternatives considered**: `--dangerously-bypass-approvals-and-sandbox` (yolo) — rejected as an unsafe default; it removes the sandbox entirely. `--sandbox danger-full-access` — broader than needed; deferred to future per-change config.
 
-### Decision 3: Dynamically Resolve Codex Provider
-- **Rationale**: `ProviderResolver.ts` will resolve `codex` by checking for the `agentProvider: codex` value in the active change's `.openspec.yaml` first, falling back to the `AGENT_PROVIDER` environment variable.
-- **Alternatives considered**: Hardcoding the provider at start time, which would prevent different changes from using different providers.
+### Decision 3: Dynamically Resolve Codex Provider, with Codex as the Default
+- **Rationale**: `ProviderResolver.ts` resolves the provider by precedence — change config (`agentProvider:` in the active change's `.openspec.yaml`) first, then the `AGENT_PROVIDER` environment variable. When neither selects a provider, resolution falls back to `CodexProvider` (Codex is the default). This required refactoring the resolver's sentinel: previously `providerType` was initialised to `'antigravity'` and that same string doubled as "config didn't set it". It is now initialised unset (`undefined`), then config → env → `'codex'` default, then mapped to a class (`claude`→Claude, `antigravity`→AntiGravity, `codex`/unknown→Codex). Anti-Gravity and Claude remain explicitly selectable.
+- **Alternatives considered**: Keeping Anti-Gravity as the default — rejected per product direction. Hardcoding the provider at start time — rejected; prevents per-change provider choice.
 
-### Decision 4: Frontend UI Options
-- **Rationale**: The user must be able to select Codex from CommandCenter and CreateChangeForm. We will add option elements with value `codex` and display label `Codex`.
-- **Alternatives considered**: CLI-only configuration, which defeats the purpose of the dashboard UI.
+### Decision 4: Frontend UI Options and Default
+- **Rationale**: Users must be able to select Codex from CommandCenter and CreateChangeForm; option elements use value `codex` and label `Codex`. The client's initial provider state also defaults to `codex` (`App.tsx` `agentProvider`, `CreateChangeForm` `proposeEngine`) so the UI reflects the server default when a change has no persisted provider. When a change does specify a provider, the existing load-on-switch logic overrides this initial value.
+- **Alternatives considered**: CLI-only configuration — rejected; defeats the dashboard UI. Leaving the UI default at Anti-Gravity — rejected; the selector would show Anti-Gravity while the backend runs Codex.
 
 ## Risks / Trade-offs
 
-- **[Risk]**: The `--dangerously-bypass-approvals-and-sandbox` flag bypasses safety prompts.
-  - **Mitigation**: Users must be aware that running Codex via the dashboard runs with full local access. Document this clearly in the change instructions or UI labels.
-- **[Risk]**: Missing `tmux` or `codex` CLI on the host machine.
-  - **Mitigation**: Standard error propagation from process spawning will log missing command issues, which can be viewed in the server console or dashboard output.
+- **[Risk]**: Silent default flip surprises existing users — changes that relied on the implicit Anti-Gravity default now run Codex, which must be installed/authenticated.
+  - **Mitigation**: documented behavior change; Anti-Gravity remains one explicit selection away; Codex is the intended default per product direction.
+- **[Risk]**: `workspace-write` sandbox blocks a legitimate out-of-workspace action.
+  - **Mitigation**: accept the least-privilege default now; expose sandbox/approval overrides via change config as future work.
+- **[Risk]**: Missing `tmux` or `codex` CLI on the host.
+  - **Mitigation**: standard error propagation from process spawning surfaces missing-command errors in the server console / dashboard output; the tmux session stays attachable so the operator sees the error directly.
 
 ## Migration Plan
 
-- **Deployment**: Deploy the server changes alongside the client updates. The new option will appear in the UI, and if a change configures `agentProvider: codex`, the server will seamlessly invoke the `codex` CLI.
-- **Rollback**: To rollback, set the provider back to `antigravity` or `claude` in the UI or environment variables.
+- **Deployment**: Deploy the server changes alongside the client updates. The new option appears in the UI; when nothing is configured the server now delegates to Codex by default. Existing changes that pin `agentProvider:` are unaffected.
+- **Rollback**: Revert the resolver default to `antigravity` (and the client defaults) to restore the prior behavior; no persisted state depends on the new default beyond opt-in `.openspec.yaml` entries.
 
 ## Open Questions
 
-- *None.*
+- Should the default sandbox be `workspace-write` (chosen) or configurable per change from day one? Deferred unless an early user hits the limit.
