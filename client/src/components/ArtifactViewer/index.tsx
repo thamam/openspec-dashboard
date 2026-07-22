@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Artifacts, TaskItem } from '../../types';
+import { SkylineCard } from './views/SkylineCard';
 import { RawView } from './views/RawView';
 import { MatrixView } from './views/MatrixView';
 import { DashboardView } from './views/DashboardView';
@@ -13,13 +14,18 @@ interface Props {
 }
 
 export const ArtifactViewer: React.FC<Props> = ({ artifacts, tasks: _tasks, files, activeChange }) => {
-  const [viewMode, setViewMode] = useState<'raw' | 'matrix' | 'dashboard' | 'wizard'>('raw');
+  const [viewMode, setViewMode] = useState<'skyline' | 'raw' | 'matrix' | 'dashboard' | 'wizard'>('skyline');
 
   const renderView = () => {
     switch (viewMode) {
-      case 'matrix': return <MatrixView artifacts={artifacts} />;
-      case 'dashboard': return <DashboardView artifacts={artifacts} />;
-      case 'wizard': return <WizardView artifacts={artifacts} />;
+      case 'skyline':
+        return <SkylineCard artifacts={artifacts} activeChange={activeChange} onSwitchView={v => setViewMode(v)} />;
+      case 'matrix':
+        return <MatrixView artifacts={artifacts} />;
+      case 'dashboard':
+        return <DashboardView artifacts={artifacts} />;
+      case 'wizard':
+        return <WizardView artifacts={artifacts} />;
       case 'raw':
       default:
         return <RawView artifacts={artifacts} activeChange={activeChange} />;
@@ -32,9 +38,10 @@ export const ArtifactViewer: React.FC<Props> = ({ artifacts, tasks: _tasks, file
         <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#8b949e' }}>Artifact Viewer</div>
         <div style={{ display: 'flex', gap: '5px' }}>
           {[
-            { id: 'raw', icon: '📝', label: 'Raw' },
-            { id: 'matrix', icon: '🌳', label: 'Matrix' },
-            { id: 'dashboard', icon: '📊', label: 'Dashboard' },
+            { id: 'skyline', icon: '⚡', label: 'Skyline (L1)' },
+            { id: 'dashboard', icon: '📊', label: 'Neighborhoods (L2)' },
+            { id: 'matrix', icon: '🌳', label: 'Matrix (L3)' },
+            { id: 'raw', icon: '📝', label: 'Raw Diffs (L4)' },
             { id: 'wizard', icon: '🧙‍♂️', label: 'Wizard' }
           ].map(v => (
             <button
@@ -81,3 +88,4 @@ export const ArtifactViewer: React.FC<Props> = ({ artifacts, tasks: _tasks, file
     </div>
   );
 };
+

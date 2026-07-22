@@ -3,6 +3,8 @@ import path from 'path';
 import { IAgentProvider } from './AgentProvider.js';
 import { AntiGravityProvider } from './providers/AntiGravityProvider.js';
 import { ClaudeProvider } from './providers/ClaudeProvider.js';
+import { CodexProvider } from './providers/CodexProvider.js';
+import { CodexProvider } from './providers/CodexProvider.js';
 
 function parseSimpleYaml(content: string): Record<string, string> {
   const result: Record<string, string> = {};
@@ -52,6 +54,9 @@ export function resolveProvider(workspacePath: string, changeName?: string): IAg
   // 3. Instantiate resolved provider
   if (providerType.toLowerCase() === 'claude') {
     return new ClaudeProvider();
+  }
+  if (providerType.toLowerCase() === 'codex') {
+    return new CodexProvider();
   }
 
   return new AntiGravityProvider();

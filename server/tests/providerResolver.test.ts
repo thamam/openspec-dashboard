@@ -5,6 +5,7 @@ import os from 'os';
 import { resolveProvider } from '../src/agents/ProviderResolver.js';
 import { AntiGravityProvider } from '../src/agents/providers/AntiGravityProvider.js';
 import { ClaudeProvider } from '../src/agents/providers/ClaudeProvider.js';
+import { CodexProvider } from '../src/agents/providers/CodexProvider.js';
 
 describe('Provider Resolver', () => {
   let tempDir: string;
@@ -41,6 +42,12 @@ describe('Provider Resolver', () => {
     expect(provider).toBeInstanceOf(ClaudeProvider);
   });
 
+  it('should resolve CodexProvider when AGENT_PROVIDER env variable is set to codex', () => {
+    vi.stubEnv('AGENT_PROVIDER', 'codex');
+    const provider = resolveProvider(mockWorkspace);
+    expect(provider).toBeInstanceOf(CodexProvider);
+  });
+
   it('should resolve ClaudeProvider when change config .openspec.yaml contains agentProvider: claude', () => {
     const changeName = 'mock-change';
     const changeDir = path.join(mockWorkspace, 'openspec', 'changes', changeName);
@@ -51,6 +58,20 @@ describe('Provider Resolver', () => {
 
     const provider = resolveProvider(mockWorkspace, changeName);
     expect(provider).toBeInstanceOf(ClaudeProvider);
+
+    fs.rmSync(changeDir, { recursive: true, force: true });
+  });
+
+  it('should resolve CodexProvider when change config .openspec.yaml contains agentProvider: codex', () => {
+    const changeName = 'mock-codex-change';
+    const changeDir = path.join(mockWorkspace, 'openspec', 'changes', changeName);
+    fs.mkdirSync(changeDir, { recursive: true });
+    
+    const configPath = path.join(changeDir, '.openspec.yaml');
+    fs.writeFileSync(configPath, 'agentProvider: codex\n', 'utf8');
+
+    const provider = resolveProvider(mockWorkspace, changeName);
+    expect(provider).toBeInstanceOf(CodexProvider);
 
     fs.rmSync(changeDir, { recursive: true, force: true });
   });

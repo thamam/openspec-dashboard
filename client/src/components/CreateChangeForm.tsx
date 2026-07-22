@@ -164,6 +164,7 @@ export default function CreateChangeForm({
         >
           <option value="antigravity">Anti-Gravity</option>
           <option value="claude">Claude Code</option>
+          <option value="codex">Codex</option>
         </select>
       </div>
 
