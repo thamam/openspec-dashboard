@@ -4,7 +4,6 @@ import { IAgentProvider } from './AgentProvider.js';
 import { AntiGravityProvider } from './providers/AntiGravityProvider.js';
 import { ClaudeProvider } from './providers/ClaudeProvider.js';
 import { CodexProvider } from './providers/CodexProvider.js';
-import { CodexProvider } from './providers/CodexProvider.js';
 
 function parseSimpleYaml(content: string): Record<string, string> {
   const result: Record<string, string> = {};
@@ -28,7 +27,8 @@ function parseSimpleYaml(content: string): Record<string, string> {
 }
 
 export function resolveProvider(workspacePath: string, changeName?: string): IAgentProvider {
-  let providerType = 'antigravity';
+  // Precedence: change config (.openspec.yaml) -> AGENT_PROVIDER env -> default (codex).
+  let providerType: string | undefined;
 
   // 1. Resolve from change config (.openspec.yaml)
   if (changeName) {
@@ -47,17 +47,23 @@ export function resolveProvider(workspacePath: string, changeName?: string): IAg
   }
 
   // 2. Resolve from environment if not specified in change config
-  if (providerType === 'antigravity' && process.env.AGENT_PROVIDER) {
+  if (!providerType && process.env.AGENT_PROVIDER) {
     providerType = process.env.AGENT_PROVIDER;
   }
 
-  // 3. Instantiate resolved provider
-  if (providerType.toLowerCase() === 'claude') {
-    return new ClaudeProvider();
-  }
-  if (providerType.toLowerCase() === 'codex') {
-    return new CodexProvider();
+  // 3. Default to Codex when nothing is configured
+  if (!providerType) {
+    providerType = 'codex';
   }
 
-  return new AntiGravityProvider();
+  // 4. Instantiate resolved provider (Anti-Gravity and Claude remain explicitly selectable)
+  switch (providerType.toLowerCase()) {
+    case 'claude':
+      return new ClaudeProvider();
+    case 'antigravity':
+      return new AntiGravityProvider();
+    case 'codex':
+    default:
+      return new CodexProvider();
+  }
 }

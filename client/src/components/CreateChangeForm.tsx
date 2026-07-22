@@ -16,7 +16,7 @@ export default function CreateChangeForm({
   const [description, setDescription] = useState('');
   const [mode, setMode] = useState<'predefined' | 'custom'>('predefined');
   const [schemaName, setSchemaName] = useState('spec-driven');
-  const [proposeEngine, setProposeEngine] = useState('antigravity');
+  const [proposeEngine, setProposeEngine] = useState('codex');
   const [artifacts, setArtifacts] = useState({
     proposal: true,
     specs: true,

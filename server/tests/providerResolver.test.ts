@@ -31,7 +31,13 @@ describe('Provider Resolver', () => {
     vi.unstubAllEnvs();
   });
 
-  it('should fallback to AntiGravityProvider by default', () => {
+  it('should default to CodexProvider when nothing is configured', () => {
+    const provider = resolveProvider(mockWorkspace);
+    expect(provider).toBeInstanceOf(CodexProvider);
+  });
+
+  it('should resolve AntiGravityProvider when AGENT_PROVIDER env variable is set to antigravity', () => {
+    vi.stubEnv('AGENT_PROVIDER', 'antigravity');
     const provider = resolveProvider(mockWorkspace);
     expect(provider).toBeInstanceOf(AntiGravityProvider);
   });

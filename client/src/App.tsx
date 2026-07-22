@@ -22,7 +22,7 @@ function App() {
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [files, setFiles] = useState<string[]>([]);
   const [terminalLines, setTerminalLines] = useState<string[]>(['OpenSpec CLI v1.2.0 (Deterministic Engine)']);
-  const [agentProvider, setAgentProvider] = useState<string>('antigravity');
+  const [agentProvider, setAgentProvider] = useState<string>('codex');
   const [rightPaneWidth, setRightPaneWidth] = useState(320);
   const [terminalHeight, setTerminalHeight] = useState(220);
   const [showCreateChange, setShowCreateChange] = useState(false);

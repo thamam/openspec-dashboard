@@ -14,14 +14,15 @@ export class CodexProvider implements IAgentProvider {
       instruction = `Please run the OpenSpec command /${command} ${args.join(' ')}`;
     }
 
-    const targetCommand = `codex --dangerously-bypass-approvals-and-sandbox "${instruction}"`;
+    // Non-interactive (no approval prompts), scoped to workspace writes — the Codex analog of Claude's --permission-mode auto.
+    const targetCommand = `codex --ask-for-approval never --sandbox workspace-write "${instruction}"`;
     return this.spawnTmux(sessionName, targetCommand, workspacePath);
   }
 
   public async executeTask(taskContext: string, workspacePath: string): Promise<ExecutionStream> {
     const sessionName = `openspec-session-${Date.now()}`;
     const prompt = `Please complete the following task from the OpenSpec tasks.md:\n\n${taskContext}`;
-    const targetCommand = `codex --dangerously-bypass-approvals-and-sandbox "${prompt}"`;
+    const targetCommand = `codex --ask-for-approval never --sandbox workspace-write "${prompt}"`;
 
     return this.spawnTmux(sessionName, targetCommand, workspacePath);
   }
