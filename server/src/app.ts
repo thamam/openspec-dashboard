@@ -2,8 +2,9 @@ import express from 'express';
 import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
-import { spawn } from 'child_process';
-import { checkRepoStatus, initializeOpenSpec, updateChangeProvider, getChangeMetadata } from './services/repoService.js';
+import os from 'os';
+import { spawn, exec } from 'child_process';
+import { checkRepoStatus, initializeOpenSpec, updateChangeProvider, getChangeMetadata, createLocalSchema, createNewChange, resolvePath } from './services/repoService.js';
 import { OpenSpecController } from './controllers/openspecController.js';
 import { parseTasks } from './services/markdownParser.js';
 
@@ -49,7 +50,8 @@ app.get('/api/changes', async (req, res) => {
     return;
   }
   try {
-    const changesDir = path.join(repoPath, 'openspec', 'changes');
+    const resolvedPath = resolvePath(repoPath);
+    const changesDir = path.join(resolvedPath, 'openspec', 'changes');
     if (!fs.existsSync(changesDir)) {
       res.json([]);
       return;
@@ -61,6 +63,34 @@ app.get('/api/changes', async (req, res) => {
       status: 'In Progress'
     }));
     res.json(changes);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/changes', async (req, res) => {
+  const { repoPath, changeName, schemaName, description, proposeEngine } = req.body;
+  if (!repoPath || !changeName) {
+    res.status(400).json({ error: 'Missing repoPath or changeName' });
+    return;
+  }
+  try {
+    await createNewChange(repoPath, changeName, schemaName, description, proposeEngine);
+    res.json({ success: true, changeName });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/schema', async (req, res) => {
+  const { repoPath, schemaName, artifacts } = req.body;
+  if (!repoPath || !schemaName || !artifacts || !Array.isArray(artifacts)) {
+    res.status(400).json({ error: 'Missing repoPath, schemaName, or artifacts array' });
+    return;
+  }
+  try {
+    await createLocalSchema(repoPath, schemaName, artifacts);
+    res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -79,7 +109,8 @@ app.get('/api/artifacts', async (req, res) => {
   }
 
   try {
-    const changeDir = path.join(repoPath, 'openspec', 'changes', changeName);
+    const resolvedPath = resolvePath(repoPath);
+    const changeDir = path.join(resolvedPath, 'openspec', 'changes', changeName);
     if (!fs.existsSync(changeDir)) {
       res.status(404).json({ error: 'Change not found' });
       return;
@@ -143,7 +174,7 @@ app.get('/api/artifacts', async (req, res) => {
 // Endpoint: Execute CLI command
 app.post('/api/execute', openspecController.executeCommand.bind(openspecController));
 
-// Endpoint: Open Terminal natively (Mac only)
+// Endpoint: Open Terminal natively (Mac only with iTerm + Terminal.app fallback)
 app.post('/api/open-terminal', (req, res) => {
   const { command } = req.body;
   if (!command) {
@@ -151,34 +182,71 @@ app.post('/api/open-terminal', (req, res) => {
     return;
   }
   
-  const script = `osascript -e 'tell application "iTerm"
-    activate
-    if (count of windows) = 0 then
-      create window with default profile
-    else
-      tell current window to create tab with default profile
-    end if
-    tell current session of current window to write text "${command.replace(/"/g, '\\"')}"
-  end tell'`;
+  const escapedCmd = command.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  const script = `osascript -e '
+    try
+      tell application "iTerm"
+        activate
+        if (count of windows) = 0 then
+          create window with default profile
+        else
+          tell current window to create tab with default profile
+        end if
+        tell current session of current window to write text "${escapedCmd}"
+      end tell
+    on error
+      tell application "Terminal"
+        activate
+        do script "${escapedCmd}"
+      end tell
+    end try
+  '`;
   
-  const child = spawn(script, { shell: true });
-  child.on('close', () => {
-    res.json({ success: true });
+  exec(script, (err) => {
+    if (err) {
+      console.error('Failed to open native terminal:', err.message);
+      res.status(500).json({ error: err.message });
+    } else {
+      res.json({ success: true });
+    }
   });
-  child.on('error', (err) => {
-    res.status(500).json({ error: err.message });
+});
+
+// Endpoint: Native folder chooser dialog defaulting to home directory or provided path
+app.post('/api/browse-directory', (req, res) => {
+  const rawPath = req.body?.defaultPath || '';
+  const resolved = rawPath ? resolvePath(rawPath) : os.homedir();
+  const targetDir = (resolved && fs.existsSync(resolved)) ? resolved : os.homedir();
+  
+  const escapedTarget = targetDir.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  const script = `osascript -e 'try' -e 'set startFolder to POSIX file "${escapedTarget}"' -e 'set chosenFolder to choose folder default location startFolder' -e 'POSIX path of chosenFolder' -e 'on error' -e 'try' -e 'set chosenFolder to choose folder' -e 'POSIX path of chosenFolder' -e 'on error' -e 'return "CANCELLED"' -e 'end try' -e 'end try'`;
+
+  exec(script, (err, stdout) => {
+    if (err) {
+      console.error('Directory browse dialog cancelled or failed:', err.message);
+      res.json({ cancelled: true });
+      return;
+    }
+    const result = stdout ? stdout.trim() : '';
+    if (!result || result === 'CANCELLED') {
+      res.json({ cancelled: true });
+    } else {
+      const cleanPath = result.endsWith('/') && result.length > 1 ? result.slice(0, -1) : result;
+      res.json({ success: true, path: cleanPath });
+    }
   });
 });
 
 // Endpoint: Send a raw text message to an existing agent tmux session
 app.post('/api/send-message', (req, res) => {
-  const { changeName, message } = req.body;
-  if (!changeName || !message) {
-    res.status(400).json({ error: 'Missing changeName or message' });
+  const { changeName, sessionName: reqSession, message } = req.body;
+  const sessionName = reqSession || (changeName ? `agent-${changeName}` : '');
+
+  if (!sessionName || !message) {
+    res.status(400).json({ error: 'Missing sessionName/changeName or message' });
     return;
   }
 
-  const sessionName = `agent-${changeName}`;
   try {
     // Escape double quotes and backslashes for bash
     const escapedMessage = message.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
@@ -191,7 +259,7 @@ app.post('/api/send-message', (req, res) => {
       if (code === 0) {
         res.json({ success: true });
       } else {
-        res.status(500).json({ error: 'Failed to send message to tmux session' });
+        res.status(500).json({ error: `Failed to send message to tmux session '${sessionName}'` });
       }
     });
   } catch (err: any) {

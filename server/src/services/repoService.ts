@@ -1,5 +1,17 @@
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
+
+export function resolvePath(targetPath: string): string {
+  if (!targetPath) return targetPath;
+  if (targetPath === '~') {
+    return os.homedir();
+  }
+  if (targetPath.startsWith('~/') || targetPath.startsWith('~\\')) {
+    return path.join(os.homedir(), targetPath.slice(2));
+  }
+  return path.resolve(targetPath);
+}
 
 export interface WorktreeInfo {
   path: string;
@@ -17,7 +29,7 @@ export interface RepoStatus {
 }
 
 export async function checkRepoStatus(dirPath: string): Promise<RepoStatus> {
-  let resolvedPath = path.resolve(dirPath);
+  let resolvedPath = resolvePath(dirPath);
 
   // 1. Check if path exists
   if (!fs.existsSync(resolvedPath)) {
@@ -221,7 +233,7 @@ function findTemplateRoot(): string {
 const templateRoot = findTemplateRoot();
 
 export async function initializeOpenSpec(dirPath: string): Promise<void> {
-  const resolvedPath = path.resolve(dirPath);
+  const resolvedPath = resolvePath(dirPath);
   
   // Verify it exists and is a git repo first
   const status = await checkRepoStatus(resolvedPath);
@@ -247,8 +259,8 @@ export async function createGitWorktree(
   branchName: string,
   worktreePath: string
 ): Promise<void> {
-  const resolvedRepoPath = path.resolve(repoPath);
-  const resolvedWorktreePath = path.resolve(worktreePath);
+  const resolvedRepoPath = resolvePath(repoPath);
+  const resolvedWorktreePath = resolvePath(worktreePath);
 
   // Validate branch name
   const branchRegex = /^[a-zA-Z0-9._/-]+$/;
@@ -271,7 +283,7 @@ export async function createLocalSchema(
   schemaName: string,
   artifacts: string[]
 ): Promise<void> {
-  const resolvedRepoPath = path.resolve(repoPath);
+  const resolvedRepoPath = resolvePath(repoPath);
 
   // Validate inputs
   const nameRegex = /^[a-zA-Z0-9.-]+$/;
@@ -331,7 +343,7 @@ export async function createNewChange(
   description?: string,
   proposeEngine?: string
 ): Promise<void> {
-  const resolvedRepoPath = path.resolve(repoPath);
+  const resolvedRepoPath = resolvePath(repoPath);
 
   // Validate inputs
   const nameRegex = /^[a-zA-Z0-9.-]+$/;
@@ -415,7 +427,7 @@ export async function runProposeCommand(
   changeName: string,
   engine: string
 ): Promise<string> {
-  const resolvedRepoPath = path.resolve(repoPath);
+  const resolvedRepoPath = resolvePath(repoPath);
   const cmd = `openspec propose "${changeName}" --engine "${engine}"`;
   return await execPromise(cmd, resolvedRepoPath);
 }
@@ -424,7 +436,7 @@ export async function getChangeMetadata(
   repoPath: string,
   changeName: string
 ): Promise<ChangeMetadata> {
-  const resolvedRepoPath = path.resolve(repoPath);
+  const resolvedRepoPath = resolvePath(repoPath);
   const changeDir = path.join(resolvedRepoPath, 'openspec', 'changes', changeName);
   
   if (!fs.existsSync(changeDir)) {
@@ -476,7 +488,7 @@ export async function updateProposeEngine(
   changeName: string,
   proposeEngine: string
 ): Promise<void> {
-  const resolvedRepoPath = path.resolve(repoPath);
+  const resolvedRepoPath = resolvePath(repoPath);
   const nameRegex = /^[a-zA-Z0-9.-]+$/;
   if (!nameRegex.test(proposeEngine)) {
     throw new Error('Invalid propose engine format');
@@ -498,7 +510,7 @@ export async function updateChangeProvider(
   changeName: string,
   agentProvider: string
 ): Promise<void> {
-  const resolvedRepoPath = path.resolve(repoPath);
+  const resolvedRepoPath = resolvePath(repoPath);
   const nameRegex = /^[a-zA-Z0-9.-]+$/;
   if (!nameRegex.test(agentProvider)) {
     throw new Error('Invalid agent provider format');
@@ -519,7 +531,7 @@ export function getChangeFilesContent(
   repoPath: string,
   changeName: string
 ): string {
-  const resolvedRepoPath = path.resolve(repoPath);
+  const resolvedRepoPath = resolvePath(repoPath);
   const changeDir = path.join(resolvedRepoPath, 'openspec', 'changes', changeName);
 
   if (!fs.existsSync(changeDir)) {

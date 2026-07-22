@@ -5,7 +5,7 @@ export class ClaudeProvider implements IAgentProvider {
   
   public async executeLifecycle(command: string, args: string[], workspacePath: string): Promise<ExecutionStream> {
     const changeName = args[0] || 'default';
-    const sessionName = `agent-${Date.now()}`;
+    const sessionName = `openspec-session-${Date.now()}`;
     
     let instruction = '';
     if (command === 'opsx-continue') {
@@ -19,7 +19,7 @@ export class ClaudeProvider implements IAgentProvider {
   }
 
   public async executeTask(taskContext: string, workspacePath: string): Promise<ExecutionStream> {
-    const sessionName = `agent-${Date.now()}`;
+    const sessionName = `openspec-session-${Date.now()}`;
     const prompt = `Please complete the following task from the OpenSpec tasks.md:\n\n${taskContext}`;
     const targetCommand = `claude --permission-mode auto "${prompt}"`;
     
@@ -27,9 +27,7 @@ export class ClaudeProvider implements IAgentProvider {
   }
 
   private spawnTmux(sessionName: string, command: string, cwd: string): ExecutionStream {
-    // Escape single quotes in the command to pass to tmux safely
-    const escapedCommand = command.replace(/'/g, "'\\''");
-    const child = spawn('tmux', ['new-session', '-d', '-s', sessionName, escapedCommand], { cwd, shell: true });
+    const child = spawn('tmux', ['new-session', '-d', '-s', sessionName, command], { cwd });
 
     return {
       process: child,

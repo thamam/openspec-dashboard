@@ -21,7 +21,7 @@ export class LocalAgentWrapper {
       });
     }
 
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       const fileName = path.basename(filePath);
       
       // Prompt the agent to analyze the file and output JSON

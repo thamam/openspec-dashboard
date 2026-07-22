@@ -1,12 +1,12 @@
 import fs from 'fs';
 import path from 'path';
-import { createNewChange } from './repoService.js';
+import { createNewChange, resolvePath } from './repoService.js';
 
 /**
  * Recursively reads all markdown specs under openspec/specs/
  */
 export function getMainSpecsContent(repoPath: string): string {
-  const resolvedRepoPath = path.resolve(repoPath);
+  const resolvedRepoPath = resolvePath(repoPath);
   const specsDir = path.join(resolvedRepoPath, 'openspec', 'specs');
 
   if (!fs.existsSync(specsDir)) {
@@ -50,7 +50,7 @@ export async function commitBrainstormChange(
   changeName: string,
   files: BrainstormFiles
 ): Promise<void> {
-  const resolvedRepoPath = path.resolve(repoPath);
+  const resolvedRepoPath = resolvePath(repoPath);
 
   // 1. Create standard change structure using standard helper
   await createNewChange(resolvedRepoPath, changeName, 'spec-driven');

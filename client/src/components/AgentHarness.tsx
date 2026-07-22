@@ -90,11 +90,11 @@ export function AgentHarness({ repoPath, activeChange }: Props) {
   }, [repoPath]);
 
   useEffect(() => {
-    eventsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    eventsEndRef.current?.scrollIntoView?.({ behavior: 'smooth' });
   }, [events]);
 
   useEffect(() => {
-    outputEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    outputEndRef.current?.scrollIntoView?.({ behavior: 'smooth' });
   }, [agentOutput]);
 
   useEffect(() => {

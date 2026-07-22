@@ -1,7 +1,20 @@
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
+
+export function resolvePath(targetPath) {
+    if (!targetPath) return targetPath;
+    if (targetPath === '~') {
+        return os.homedir();
+    }
+    if (targetPath.startsWith('~/') || targetPath.startsWith('~\\')) {
+        return path.join(os.homedir(), targetPath.slice(2));
+    }
+    return path.resolve(targetPath);
+}
+
 export async function checkRepoStatus(dirPath) {
-    let resolvedPath = path.resolve(dirPath);
+    let resolvedPath = resolvePath(dirPath);
     // 1. Check if path exists
     if (!fs.existsSync(resolvedPath)) {
         return { exists: false, isGit: false, isOpenSpec: false };
@@ -194,7 +207,7 @@ function findTemplateRoot() {
 }
 const templateRoot = findTemplateRoot();
 export async function initializeOpenSpec(dirPath) {
-    const resolvedPath = path.resolve(dirPath);
+    const resolvedPath = resolvePath(dirPath);
     // Verify it exists and is a git repo first
     const status = await checkRepoStatus(resolvedPath);
     if (!status.exists || !status.isGit) {
@@ -212,8 +225,8 @@ export async function initializeOpenSpec(dirPath) {
     }
 }
 export async function createGitWorktree(repoPath, branchName, worktreePath) {
-    const resolvedRepoPath = path.resolve(repoPath);
-    const resolvedWorktreePath = path.resolve(worktreePath);
+    const resolvedRepoPath = resolvePath(repoPath);
+    const resolvedWorktreePath = resolvePath(worktreePath);
     // Validate branch name
     const branchRegex = /^[a-zA-Z0-9._/-]+$/;
     if (!branchRegex.test(branchName)) {
@@ -228,7 +241,7 @@ export async function createGitWorktree(repoPath, branchName, worktreePath) {
     await execPromise(`git worktree add -b "${branchName}" "${resolvedWorktreePath}"`, resolvedRepoPath);
 }
 export async function createLocalSchema(repoPath, schemaName, artifacts) {
-    const resolvedRepoPath = path.resolve(repoPath);
+    const resolvedRepoPath = resolvePath(repoPath);
     // Validate inputs
     const nameRegex = /^[a-zA-Z0-9.-]+$/;
     if (!nameRegex.test(schemaName)) {
@@ -275,7 +288,7 @@ export function stringifyYaml(data) {
     return content;
 }
 export async function createNewChange(repoPath, changeName, schemaName = 'spec-driven', description, proposeEngine) {
-    const resolvedRepoPath = path.resolve(repoPath);
+    const resolvedRepoPath = resolvePath(repoPath);
     // Validate inputs
     const nameRegex = /^[a-zA-Z0-9.-]+$/;
     if (!nameRegex.test(changeName)) {
@@ -338,12 +351,12 @@ export async function getChangeWorktree(repoPath, changeName) {
     return null;
 }
 export async function runProposeCommand(repoPath, changeName, engine) {
-    const resolvedRepoPath = path.resolve(repoPath);
+    const resolvedRepoPath = resolvePath(repoPath);
     const cmd = `openspec propose "${changeName}" --engine "${engine}"`;
     return await execPromise(cmd, resolvedRepoPath);
 }
 export async function getChangeMetadata(repoPath, changeName) {
-    const resolvedRepoPath = path.resolve(repoPath);
+    const resolvedRepoPath = resolvePath(repoPath);
     const changeDir = path.join(resolvedRepoPath, 'openspec', 'changes', changeName);
     if (!fs.existsSync(changeDir)) {
         throw new Error(`Change directory not found: ${changeName}`);
@@ -385,7 +398,7 @@ export async function getChangeMetadata(repoPath, changeName) {
     };
 }
 export async function updateProposeEngine(repoPath, changeName, proposeEngine) {
-    const resolvedRepoPath = path.resolve(repoPath);
+    const resolvedRepoPath = resolvePath(repoPath);
     const nameRegex = /^[a-zA-Z0-9.-]+$/;
     if (!nameRegex.test(proposeEngine)) {
         throw new Error('Invalid propose engine format');
@@ -397,6 +410,22 @@ export async function updateProposeEngine(repoPath, changeName, proposeEngine) {
     const yamlContent = fs.readFileSync(changeConfigFile, 'utf8');
     const data = parseYaml(yamlContent);
     data.proposeEngine = proposeEngine;
+    fs.writeFileSync(changeConfigFile, stringifyYaml(data), 'utf8');
+}
+
+export async function updateChangeProvider(repoPath, changeName, agentProvider) {
+    const resolvedRepoPath = resolvePath(repoPath);
+    const nameRegex = /^[a-zA-Z0-9.-]+$/;
+    if (!nameRegex.test(agentProvider)) {
+        throw new Error('Invalid agent provider format');
+    }
+    const changeConfigFile = path.join(resolvedRepoPath, 'openspec', 'changes', changeName, '.openspec.yaml');
+    if (!fs.existsSync(changeConfigFile)) {
+        throw new Error(`Change configuration file not found for change: ${changeName}`);
+    }
+    const yamlContent = fs.readFileSync(changeConfigFile, 'utf8');
+    const data = parseYaml(yamlContent);
+    data.agentProvider = agentProvider;
     fs.writeFileSync(changeConfigFile, stringifyYaml(data), 'utf8');
 }
 export function getChangeFilesContent(repoPath, changeName) {

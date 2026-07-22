@@ -2,7 +2,14 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { checkRepoStatus } from '../src/services/repoService.js';
+import { checkRepoStatus, resolvePath } from '../src/services/repoService.js';
+
+describe('repoService - resolvePath', () => {
+  it('should expand tilde (~) to user home directory', () => {
+    expect(resolvePath('~')).toBe(os.homedir());
+    expect(resolvePath('~/personal/projects')).toBe(path.join(os.homedir(), 'personal/projects'));
+  });
+});
 
 describe('repoService - checkRepoStatus', () => {
   let tempDir: string;

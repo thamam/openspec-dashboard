@@ -12,15 +12,73 @@ export class OpenSpecController {
   public async executeCommand(req: Request, res: Response): Promise<void> {
     const { command, args, changeName } = req.body;
     
-    // Whitelist allowed commands for security
-    const allowedCommands = ['opsx-new', 'opsx-continue', 'opsx-propose', 'opsx-verify', 'opsx-archive', 'opsx-sync'];
-    if (!allowedCommands.includes(command)) {
-      res.status(400).json({ error: 'Command not allowed' });
+    const lifecycleCommands = ['opsx-new', 'opsx-continue', 'opsx-propose', 'opsx-verify', 'opsx-archive', 'opsx-sync', 'opsx-apply'];
+    const shellCommands = ['agy', 'ag', 'antigravity', 'claude', 'tmux', 'git', 'openspec', 'ls', 'pwd', 'cat', 'echo', 'node', 'npm', 'which', 'clear', 'mkdir', 'touch', 'rm'];
+    
+    if (!lifecycleCommands.includes(command) && !shellCommands.includes(command)) {
+      res.status(400).json({ error: `Command '${command}' not allowed` });
       return;
     }
 
     try {
       const cwd = req.body.repoPath || process.env.REPO_PATH || process.cwd();
+
+      // Normalize command aliases
+      let execCmd = command;
+      let execArgs = args || [];
+
+      if (execCmd === 'ag' || execCmd === 'antigravity') {
+        execCmd = 'agy';
+      }
+
+      if (execCmd === 'openspec') {
+        execCmd = 'npx';
+        execArgs = ['openspec', ...(args || [])];
+      }
+
+      if (command === 'tmux') {
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.setHeader('Transfer-Encoding', 'chunked');
+
+        const sessionIndex = args ? args.indexOf('-t') : -1;
+        const sessionName = sessionIndex !== -1 && args[sessionIndex + 1] ? args[sessionIndex + 1] : '';
+
+        let tmuxArgs = args || [];
+        if (args && args.includes('attach') && sessionName) {
+          // Replace attach with capture-pane -pt for non-interactive streaming
+          tmuxArgs = ['capture-pane', '-pt', sessionName];
+        }
+
+        const child = spawn('tmux', tmuxArgs, { cwd, shell: true });
+        child.stdout.on('data', (data) => res.write(data));
+        child.stderr.on('data', (data) => res.write(data));
+        child.on('close', (code) => {
+          if (code !== 0 && sessionName) {
+            res.write(`\n[tmux session '${sessionName}' is not running or has completed]`);
+          }
+          res.end(`\n[Process exited with code ${code}]`);
+        });
+        child.on('error', (err) => {
+          res.write(`\nFailed to execute tmux: ${err.message}`);
+          res.end();
+        });
+        return;
+      }
+
+      if (shellCommands.includes(command) && !lifecycleCommands.includes(command)) {
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.setHeader('Transfer-Encoding', 'chunked');
+
+        const child = spawn(execCmd, execArgs, { cwd, shell: true });
+        child.stdout.on('data', (data) => res.write(data));
+        child.stderr.on('data', (data) => res.write(data));
+        child.on('close', (code) => res.end(`\n[Process exited with code ${code}]`));
+        child.on('error', (err) => {
+          res.write(`\nFailed to start command '${execCmd}': ${err.message}`);
+          res.end();
+        });
+        return;
+      }
 
       if (command === 'opsx-new') {
         const rawName = args?.[0] || 'default';

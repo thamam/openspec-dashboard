@@ -1,0 +1,203 @@
+.workspace-selector-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+}
+
+.workspace-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted, #85888e);
+}
+
+.workspace-input-wrapper {
+  display: flex;
+  align-items: center;
+  background: var(--bg-secondary, #1e1e24);
+  border: 1px solid var(--border-color, #2d2d39);
+  border-radius: 6px;
+  padding: 0 10px;
+  width: 360px;
+  transition: border-color 0.15s ease;
+}
+
+.workspace-input-wrapper:focus-within {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.workspace-icon {
+  color: #85888e;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.workspace-path-input {
+  background: transparent;
+  border: none;
+  color: var(--text-primary, #f3f4f6);
+  font-size: 13px;
+  font-family: inherit;
+  width: 100%;
+  padding: 6px 0;
+  outline: none;
+}
+
+.btn-load-workspace {
+  background: #3b82f6;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.btn-load-workspace:hover {
+  background: #2563eb;
+}
+
+.btn-browse-workspace {
+  background: var(--bg-secondary, #1e1e24);
+  color: var(--text-primary, #f3f4f6);
+  border: 1px solid var(--border-color, #2d2d39);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-browse-workspace:hover:not(:disabled) {
+  background: var(--bg-hover, #2a2a35);
+  border-color: #4b5563;
+}
+
+.btn-browse-workspace:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.recent-workspaces-dropdown-wrapper {
+  position: relative;
+}
+
+.btn-recent-dropdown {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-secondary, #1e1e24);
+  color: var(--text-primary, #f3f4f6);
+  border: 1px solid var(--border-color, #2d2d39);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-recent-dropdown:hover,
+.btn-recent-dropdown.active {
+  background: var(--bg-hover, #2a2a35);
+  border-color: #4b5563;
+}
+
+.recent-workspaces-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 380px;
+  background: var(--bg-primary, #121216);
+  border: 1px solid var(--border-color, #2d2d39);
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.menu-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-color, #2d2d39);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted, #85888e);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.btn-clear-history {
+  background: transparent;
+  border: none;
+  color: #ef4444;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.btn-clear-history:hover {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.menu-empty {
+  padding: 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted, #85888e);
+}
+
+.menu-list {
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  color: var(--text-primary, #f3f4f6);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.menu-item:hover {
+  background: var(--bg-hover, #2a2a35);
+}
+
+.menu-item.current {
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.menu-item-path {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.current-tag {
+  font-size: 10px;
+  background: #3b82f6;
+  color: #ffffff;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-weight: 600;
+}

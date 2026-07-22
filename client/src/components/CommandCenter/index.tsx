@@ -8,6 +8,7 @@ interface Props {
   executeCommand: (cmd: string, args?: string[]) => void;
   agentProvider: string;
   onProviderChange: (provider: string) => void;
+  onNewChangeClick?: () => void;
 }
 
 export const CommandCenter: React.FC<Props> = ({ 
@@ -16,7 +17,8 @@ export const CommandCenter: React.FC<Props> = ({
   setActiveChange, 
   executeCommand,
   agentProvider,
-  onProviderChange
+  onProviderChange,
+  onNewChangeClick
 }) => {
   return (
     <div className="left-pane">
@@ -68,8 +70,12 @@ export const CommandCenter: React.FC<Props> = ({
         className="lifecycle-btn" 
         style={{ border: '1px dashed var(--accent-color)' }}
         onClick={() => {
-          const name = window.prompt('Enter new change name (e.g. my-new-feature):');
-          if (name) executeCommand('opsx-new', [name]);
+          if (onNewChangeClick) {
+            onNewChangeClick();
+          } else {
+            const name = window.prompt('Enter new change name (e.g. my-new-feature):');
+            if (name) executeCommand('opsx-new', [name]);
+          }
         }} 
         id="btn-opsx-new"
       >

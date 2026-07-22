@@ -6,7 +6,7 @@ import { LocalAgentWrapper } from './LocalAgentWrapper.js';
 
 export class AgentService {
   private io: Server;
-  private watcher: chokidar.FSWatcher | null = null;
+  private watcher: any = null;
   private activeRepoPath: string = '';
   private agentWrapper: LocalAgentWrapper;
   // Prevent duplicate runs for the same file in quick succession
@@ -79,7 +79,7 @@ export class AgentService {
       ignoreInitial: true,
     });
 
-    this.watcher.on('all', (event, filePath) => {
+    this.watcher.on('all', (event: string, filePath: string) => {
       // Only care about markdown or json files
       if (!filePath.endsWith('.md') && !filePath.endsWith('.json')) return;
       

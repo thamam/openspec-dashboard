@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { parseTasks } from './markdownParser.js';
+import { resolvePath } from './repoService.js';
 
 export interface DagNode {
   id: string;
@@ -20,7 +21,7 @@ export interface DagEdge {
 }
 
 export async function getChanges(repoPath: string): Promise<string[]> {
-  const resolvedPath = path.resolve(repoPath);
+  const resolvedPath = resolvePath(repoPath);
   const changesDir = path.join(resolvedPath, 'openspec', 'changes');
 
   if (!fs.existsSync(changesDir)) {
@@ -55,7 +56,7 @@ export async function getChangeDag(
   repoPath: string,
   changeName: string
 ): Promise<{ nodes: DagNode[]; edges: DagEdge[]; complexity?: any }> {
-  const resolvedPath = path.resolve(repoPath);
+  const resolvedPath = resolvePath(repoPath);
   const changeDir = path.join(resolvedPath, 'openspec', 'changes', changeName);
 
   if (!fs.existsSync(changeDir)) {

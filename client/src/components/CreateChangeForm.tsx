@@ -16,7 +16,7 @@ export default function CreateChangeForm({
   const [description, setDescription] = useState('');
   const [mode, setMode] = useState<'predefined' | 'custom'>('predefined');
   const [schemaName, setSchemaName] = useState('spec-driven');
-  const [proposeEngine, setProposeEngine] = useState('gemini');
+  const [proposeEngine, setProposeEngine] = useState('antigravity');
   const [artifacts, setArtifacts] = useState({
     proposal: true,
     specs: true,
@@ -81,8 +81,14 @@ export default function CreateChangeForm({
         });
 
         if (!schemaRes.ok) {
-          const errData = await schemaRes.json();
-          throw new Error(errData.error || 'Failed to initialize local schema');
+          let msg = 'Failed to initialize local schema';
+          try {
+            const errData = await schemaRes.json();
+            if (errData?.error) msg = errData.error;
+          } catch {
+            msg = `${msg} (Status ${schemaRes.status})`;
+          }
+          throw new Error(msg);
         }
       }
 
@@ -100,8 +106,14 @@ export default function CreateChangeForm({
       });
 
       if (!changeRes.ok) {
-        const errData = await changeRes.json();
-        throw new Error(errData.error || 'Failed to create change proposal');
+        let msg = 'Failed to create change proposal';
+        try {
+          const errData = await changeRes.json();
+          if (errData?.error) msg = errData.error;
+        } catch {
+          msg = `${msg} (Status ${changeRes.status})`;
+        }
+        throw new Error(msg);
       }
 
       onCreateSuccess(cleanName);
@@ -145,15 +157,13 @@ export default function CreateChangeForm({
       <div className="form-group">
         <label htmlFor="new-change-engine-select">AI Propose Engine:</label>
         <select
-          id="new-change-engine-select"
+          id="propose-engine-select"
           value={proposeEngine}
           onChange={(e) => setProposeEngine(e.target.value)}
           disabled={submitting}
         >
-          <option value="gemini">Gemini (AGY)</option>
+          <option value="antigravity">Anti-Gravity</option>
           <option value="claude">Claude Code</option>
-          <option value="cursor">Cursor</option>
-          <option value="codex">Codex</option>
         </select>
       </div>
 

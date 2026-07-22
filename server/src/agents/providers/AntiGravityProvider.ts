@@ -4,25 +4,32 @@ import { IAgentProvider, ExecutionStream } from '../AgentProvider.js';
 export class AntiGravityProvider implements IAgentProvider {
   
   public async executeLifecycle(command: string, args: string[], workspacePath: string): Promise<ExecutionStream> {
-    const sessionName = `agent-${Date.now()}`;
-    const slashArg = args[0] || '';
-    const targetCommand = `agy -i '/${command} ${slashArg}' --dangerously-skip-permissions`;
+    const changeName = args[0] || 'default';
+    const sessionName = `openspec-session-${Date.now()}`;
     
+    let prompt = '';
+    if (command === 'opsx-continue') {
+      prompt = `Please follow the workflow instructions in .agent/workflows/opsx-continue.md to continue change ${changeName}`;
+    } else if (command.startsWith('opsx-')) {
+      prompt = `Please execute the OpenSpec workflow /${command} for change ${changeName} following the instructions in .agent/workflows/${command}.md`;
+    } else {
+      prompt = `Please run the OpenSpec command /${command} ${args.join(' ')}`;
+    }
+
+    const targetCommand = `agy --mode accept-edits --add-dir "${workspacePath}" -p "${prompt}" --dangerously-skip-permissions`;
     return this.spawnTmux(sessionName, targetCommand, workspacePath);
   }
 
   public async executeTask(taskContext: string, workspacePath: string): Promise<ExecutionStream> {
-    const sessionName = `agent-${Date.now()}`;
+    const sessionName = `openspec-session-${Date.now()}`;
     const prompt = `Please complete the following task from the OpenSpec tasks.md:\n\n${taskContext}`;
-    const targetCommand = `agy run "${prompt}"`;
+    const targetCommand = `agy --mode accept-edits --add-dir "${workspacePath}" -p "${prompt}" --dangerously-skip-permissions`;
     
     return this.spawnTmux(sessionName, targetCommand, workspacePath);
   }
 
   private spawnTmux(sessionName: string, command: string, cwd: string): ExecutionStream {
-    // Escape single quotes in the command to pass to tmux safely
-    const escapedCommand = command.replace(/'/g, "'\\''");
-    const child = spawn('tmux', ['new-session', '-d', '-s', sessionName, escapedCommand], { cwd, shell: true });
+    const child = spawn('tmux', ['new-session', '-d', '-s', sessionName, command], { cwd });
 
     return {
       process: child,
