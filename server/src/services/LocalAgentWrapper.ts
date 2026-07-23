@@ -1,6 +1,7 @@
 import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
+import { resolveProvider } from '../agents/ProviderResolver.js';
 
 export class LocalAgentWrapper {
   /**
@@ -55,19 +56,31 @@ export class LocalAgentWrapper {
           return;
         }
 
-        // Extract JSON from output
+        // Extract JSON from output with resilient fallbacks
         try {
-          const jsonMatch = fullOutput.match(/```json\s*([\s\S]*?)\s*```/);
-          if (jsonMatch && jsonMatch[1]) {
-            const parsed = JSON.parse(jsonMatch[1]);
+          let jsonString = '';
+          const jsonBlockMatch = fullOutput.match(/```json\s*([\s\S]*?)\s*```/i);
+          const genericBlockMatch = fullOutput.match(/```\s*([\s\S]*?)\s*```/);
+          const rawObjectMatch = fullOutput.match(/\{[\s\S]*?"status"[\s\S]*?\}/);
+
+          if (jsonBlockMatch && jsonBlockMatch[1]) {
+            jsonString = jsonBlockMatch[1].trim();
+          } else if (genericBlockMatch && genericBlockMatch[1] && genericBlockMatch[1].trim().startsWith('{')) {
+            jsonString = genericBlockMatch[1].trim();
+          } else if (rawObjectMatch) {
+            jsonString = rawObjectMatch[0].trim();
+          }
+
+          if (jsonString) {
+            const parsed = JSON.parse(jsonString);
             resolve(parsed);
           } else {
-            console.warn('[LocalAgentWrapper] No JSON block found in agent output');
-            resolve(null);
+            console.warn('[LocalAgentWrapper] No valid JSON status block found in output');
+            resolve({ status: 'warning', message: 'Analysis completed with unformatted output.' });
           }
         } catch (e) {
           console.error('[LocalAgentWrapper] Failed to parse agent JSON output', e);
-          resolve(null);
+          resolve({ status: 'warning', message: 'Analysis completed with non-JSON output.' });
         }
       });
     });
@@ -89,15 +102,25 @@ export class LocalAgentWrapper {
     }
 
     return new Promise((resolve) => {
-      // Inject dashboard state directly into the agent's prompt
+      // Build change artifacts context
+      let artifactSummary = 'No active change selected.';
+      if (context?.activeChange && repoPath) {
+        const changeDir = path.join(repoPath, 'openspec', 'changes', context.activeChange);
+        if (fs.existsSync(changeDir)) {
+          const files = fs.readdirSync(changeDir);
+          artifactSummary = `Artifacts present in #${context.activeChange}: [${files.join(', ')}]`;
+        }
+      }
+
       const providerInfo = context?.agentProvider ? `\n- Active Provider: ${context.agentProvider}` : '';
       const prompt = `You are the embedded native Agent Harness for the OpenSpec Dashboard. 
 Dashboard Context:
-- Active Change Directory: ${context.activeChange}${providerInfo}
+- Active Change: ${context?.activeChange || 'None'}${providerInfo}
+- ${artifactSummary}
 
 User Request: "${message}"
 
-Respond helpfully and concisely. If the user asks you to do something with the active change, use your tools or suggest what you would do.`;
+Respond helpfully and concisely. Available OpenSpec workflows include: /opsx-propose, /opsx-continue, /opsx-sync, /opsx-verify, /opsx-archive. Suggest exact workflows or actions when relevant.`;
 
       const args = ['run', '--cwd', repoPath, '--prompt', prompt];
       
@@ -158,6 +181,39 @@ Output the complete, corrected file contents inside a STRICT code block starting
         } catch (e) {
           console.error('[LocalAgentWrapper] Failed to apply autofix', e);
         }
+        resolve();
+      });
+    });
+  }
+
+  /**
+   * Executes an OpenSpec workflow via the configured AgentProvider for the workspace.
+   */
+  public async executeWorkflow(
+    repoPath: string, 
+    workflow: string, 
+    changeName: string, 
+    args: string[] = [], 
+    onChunk: (chunk: string) => void
+  ): Promise<void> {
+    if (process.env.TEST_MODE === 'true') {
+      onChunk(`[Mock Workflow] Execution started for /${workflow} on change "${changeName}"...\n`);
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          onChunk(`[Mock Workflow] Finished /${workflow} for ${changeName}.\n`);
+          resolve();
+        }, 500);
+      });
+    }
+
+    const provider = resolveProvider(repoPath, changeName);
+    const stream = await provider.executeLifecycle(workflow, [changeName, ...args], repoPath);
+
+    return new Promise((resolve) => {
+      stream.onData((data) => onChunk(data));
+      stream.onError((err) => onChunk(`⚠️ [Provider Error]: ${err}`));
+      stream.onExit((code) => {
+        onChunk(`\n[Workflow /${workflow} session completed with exit code ${code}]\n`);
         resolve();
       });
     });

@@ -89,6 +89,11 @@ export function AgentHarness({ repoPath, activeChange, agentProvider = 'codex', 
       setAnalysisResult({ status: 'success', message: 'Auto-fix applied successfully.' });
     });
 
+    socket.on('autofix_error', (data: { error: string }) => {
+      setIsFixing(false);
+      setAnalysisResult({ status: 'warning', message: `Auto-fix failed: ${data.error || 'Unknown error'}` });
+    });
+
     socket.on('chat_reply_chunk', (chunk: string) => {
       setChatHistory(prev => {
         const last = prev[prev.length - 1];
@@ -103,6 +108,30 @@ export function AgentHarness({ repoPath, activeChange, agentProvider = 'codex', 
 
     socket.on('chat_reply_complete', () => {
       setIsAgentTyping(false);
+    });
+
+    socket.on('chat_reply_error', () => {
+      setIsAgentTyping(false);
+    });
+
+    socket.on('workflow_start', (data: { workflow: string; changeName: string }) => {
+      setIsAgentTyping(true);
+      setActiveTab('analysis');
+      setAgentOutput(`[Workflow /${data.workflow} started for #${data.changeName}]\n`);
+    });
+
+    socket.on('workflow_chunk', (data: { chunk: string }) => {
+      setAgentOutput(prev => prev + data.chunk);
+    });
+
+    socket.on('workflow_complete', () => {
+      setIsAgentTyping(false);
+      setAgentOutput(prev => prev + '\n✅ [Workflow execution complete]\n');
+    });
+
+    socket.on('workflow_error', (data: { workflow: string; error: string }) => {
+      setIsAgentTyping(false);
+      setAgentOutput(prev => prev + `\n⚠️ [Workflow /${data.workflow} Error]: ${data.error}\n`);
     });
 
     socket.on('chat_history', (history: ChatMessage[]) => {
@@ -126,13 +155,37 @@ export function AgentHarness({ repoPath, activeChange, agentProvider = 'codex', 
     chatEndRef.current?.scrollIntoView?.({ behavior: 'smooth' });
   }, [chatHistory, isAgentTyping]);
 
+  const handleExecuteWorkflow = (workflow: string) => {
+    if (isAgentTyping || !socketRef.current) return;
+    const cleanWf = workflow.replace(/^\//, '');
+    socketRef.current.emit('execute_workflow', {
+      workflow: cleanWf,
+      changeName: activeChange || 'default'
+    });
+  };
+
   const handleChatSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatInput.trim() || isAgentTyping || !socketRef.current) return;
     
-    const msg = chatInput;
-    setChatHistory(prev => [...prev, { role: 'user', content: msg, timestamp: new Date().toLocaleTimeString() }]);
+    const msg = chatInput.trim();
     setChatInput('');
+
+    // Check if input is a slash command
+    if (msg.startsWith('/')) {
+      const parts = msg.split(' ');
+      const command = parts[0].replace(/^\//, '');
+      setChatHistory(prev => [...prev, { role: 'user', content: msg, timestamp: new Date().toLocaleTimeString() }]);
+      setIsAgentTyping(true);
+      socketRef.current.emit('execute_workflow', {
+        workflow: command,
+        changeName: activeChange || 'default',
+        args: parts.slice(1)
+      });
+      return;
+    }
+    
+    setChatHistory(prev => [...prev, { role: 'user', content: msg, timestamp: new Date().toLocaleTimeString() }]);
     setIsAgentTyping(true);
     
     const context = {
@@ -279,6 +332,32 @@ export function AgentHarness({ repoPath, activeChange, agentProvider = 'codex', 
           <div className="chat-view">
             <div className="chat-toolbar">
               <span className="chat-provider-info">Provider: <strong>{agentProvider.toUpperCase()}</strong></span>
+              <div className="quick-actions-bar">
+                <button 
+                  className="quick-action-btn"
+                  onClick={() => handleExecuteWorkflow('opsx-continue')}
+                  disabled={isAgentTyping}
+                  title="Run /opsx-continue workflow"
+                >
+                  ▶ Continue
+                </button>
+                <button 
+                  className="quick-action-btn"
+                  onClick={() => handleExecuteWorkflow('opsx-sync')}
+                  disabled={isAgentTyping}
+                  title="Run /opsx-sync workflow"
+                >
+                  🔄 Sync
+                </button>
+                <button 
+                  className="quick-action-btn"
+                  onClick={() => handleExecuteWorkflow('opsx-verify')}
+                  disabled={isAgentTyping}
+                  title="Run /opsx-verify workflow"
+                >
+                  ✓ Verify
+                </button>
+              </div>
               {chatHistory.length > 0 && (
                 <button className="clear-chat-btn" onClick={clearChat} title="Clear conversation history">Clear</button>
               )}

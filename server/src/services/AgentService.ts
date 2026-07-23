@@ -11,6 +11,7 @@ export class AgentService {
   private agentWrapper: LocalAgentWrapper;
   // Prevent duplicate runs for the same file in quick succession
   private activeAnalyses: Set<string> = new Set();
+  private debounceTimers: Map<string, NodeJS.Timeout> = new Map();
   private chatHistory: any[] = [];
 
   constructor(io: Server) {
@@ -39,22 +40,68 @@ export class AgentService {
         this.saveChatHistory(this.chatHistory);
 
         let agentReply = '';
-        await this.agentWrapper.chat(this.activeRepoPath, message, context, (chunk) => {
-          agentReply += chunk;
-          socket.emit('chat_reply_chunk', chunk);
-        });
-        
-        this.chatHistory.push({ role: 'agent', content: agentReply });
-        this.saveChatHistory(this.chatHistory);
-        
-        socket.emit('chat_reply_complete');
+        try {
+          // 45s timeout protection
+          const chatPromise = this.agentWrapper.chat(this.activeRepoPath, message, context, (chunk) => {
+            agentReply += chunk;
+            socket.emit('chat_reply_chunk', chunk);
+          });
+
+          const timeoutPromise = new Promise<never>((_, reject) => 
+            setTimeout(() => reject(new Error('Agent reply timed out after 45 seconds')), 45000)
+          );
+
+          await Promise.race([chatPromise, timeoutPromise]);
+          
+          this.chatHistory.push({ role: 'agent', content: agentReply });
+          this.saveChatHistory(this.chatHistory);
+          socket.emit('chat_reply_complete');
+        } catch (err: any) {
+          console.error(`[AgentService] Error handling chat message:`, err.message);
+          const errorMsg = `⚠️ Unable to complete request: ${err.message || 'Agent service error'}`;
+          socket.emit('chat_reply_chunk', errorMsg);
+          this.chatHistory.push({ role: 'agent', content: errorMsg });
+          this.saveChatHistory(this.chatHistory);
+          socket.emit('chat_reply_error', { error: err.message });
+        }
       });
 
       socket.on('trigger_autofix', async (data) => {
         const { file, message } = data;
         console.log(`[AgentService] Triggering autofix for ${file}`);
-        await this.agentWrapper.autofix(file, message);
-        socket.emit('autofix_complete');
+        try {
+          const autofixPromise = this.agentWrapper.autofix(file, message);
+          const timeoutPromise = new Promise<never>((_, reject) => 
+            setTimeout(() => reject(new Error('Autofix timed out after 45 seconds')), 45000)
+          );
+
+          await Promise.race([autofixPromise, timeoutPromise]);
+          socket.emit('autofix_complete');
+        } catch (err: any) {
+          console.error(`[AgentService] Error handling autofix:`, err.message);
+          socket.emit('autofix_error', { error: err.message });
+        }
+      });
+
+      socket.on('execute_workflow', async (data) => {
+        const { workflow, changeName, args = [] } = data;
+        console.log(`[AgentService] Executing workflow /${workflow} for change: ${changeName}`);
+        try {
+          socket.emit('workflow_start', { workflow, changeName });
+          await this.agentWrapper.executeWorkflow(
+            this.activeRepoPath,
+            workflow,
+            changeName || 'default',
+            args,
+            (chunk) => {
+              socket.emit('workflow_chunk', { chunk });
+            }
+          );
+          socket.emit('workflow_complete', { workflow, changeName });
+        } catch (err: any) {
+          console.error(`[AgentService] Error executing workflow /${workflow}:`, err.message);
+          socket.emit('workflow_error', { workflow, error: err.message });
+        }
       });
 
       socket.on('disconnect', () => {
@@ -83,37 +130,45 @@ export class AgentService {
       // Only care about markdown or json files
       if (!filePath.endsWith('.md') && !filePath.endsWith('.json')) return;
       
-      // Debounce logic or ignore unlinking
       if (event === 'unlink' || this.activeAnalyses.has(filePath)) return;
-      
-      console.log(`[AgentService] Detected ${event} on ${filePath}`);
-      this.io.emit('agent_event', {
-        type: 'file_change',
-        action: event,
-        file: filePath,
-        fileName: path.basename(filePath),
-        timestamp: new Date().toISOString()
-      });
 
-      // Launch real-time analysis!
-      this.activeAnalyses.add(filePath);
+      if (this.debounceTimers.has(filePath)) {
+        clearTimeout(this.debounceTimers.get(filePath));
+      }
       
-      this.agentWrapper.analyzeFile(this.activeRepoPath, filePath, (chunk) => {
+      const timer = setTimeout(() => {
+        this.debounceTimers.delete(filePath);
+        console.log(`[AgentService] Detected ${event} on ${filePath}`);
         this.io.emit('agent_event', {
-          type: 'analysis_chunk',
-          chunk: chunk,
+          type: 'file_change',
+          action: event,
+          file: filePath,
+          fileName: path.basename(filePath),
           timestamp: new Date().toISOString()
         });
-      }).then(result => {
-        this.activeAnalyses.delete(filePath);
-        if (result) {
+
+        // Launch real-time analysis!
+        this.activeAnalyses.add(filePath);
+        
+        this.agentWrapper.analyzeFile(this.activeRepoPath, filePath, (chunk) => {
           this.io.emit('agent_event', {
-            type: 'analysis_complete',
-            result: result,
+            type: 'analysis_chunk',
+            chunk: chunk,
             timestamp: new Date().toISOString()
           });
-        }
-      });
+        }).then(result => {
+          this.activeAnalyses.delete(filePath);
+          if (result) {
+            this.io.emit('agent_event', {
+              type: 'analysis_complete',
+              result: result,
+              timestamp: new Date().toISOString()
+            });
+          }
+        });
+      }, 300);
+
+      this.debounceTimers.set(filePath, timer);
     });
   }
 

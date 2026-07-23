@@ -4,8 +4,8 @@ import { IAgentProvider, ExecutionStream } from '../AgentProvider.js';
 export class ClaudeProvider implements IAgentProvider {
   
   public async executeLifecycle(command: string, args: string[], workspacePath: string): Promise<ExecutionStream> {
-    const changeName = args[0] || 'default';
-    const sessionName = `openspec-session-${Date.now()}`;
+    const changeName = (args[0] || 'default').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const sessionName = `agent-${changeName}`;
     
     let instruction = '';
     if (command === 'opsx-continue') {
@@ -19,7 +19,7 @@ export class ClaudeProvider implements IAgentProvider {
   }
 
   public async executeTask(taskContext: string, workspacePath: string): Promise<ExecutionStream> {
-    const sessionName = `openspec-session-${Date.now()}`;
+    const sessionName = `agent-task-${Date.now()}`;
     const prompt = `Please complete the following task from the OpenSpec tasks.md:\n\n${taskContext}`;
     const targetCommand = `claude --permission-mode auto "${prompt}"`;
     

@@ -237,6 +237,7 @@ describe('repoService - initializeOpenSpec & createGitWorktree', () => {
       created: expect.any(String),
       description: 'my standard change description',
       proposeEngine: 'claude',
+      agentProvider: 'antigravity',
       worktreeBranch: null,
     });
 

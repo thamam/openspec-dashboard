@@ -4,8 +4,8 @@ import { IAgentProvider, ExecutionStream } from '../AgentProvider.js';
 export class AntiGravityProvider implements IAgentProvider {
   
   public async executeLifecycle(command: string, args: string[], workspacePath: string): Promise<ExecutionStream> {
-    const changeName = args[0] || 'default';
-    const sessionName = `openspec-session-${Date.now()}`;
+    const changeName = (args[0] || 'default').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const sessionName = `agent-${changeName}`;
     
     let prompt = '';
     if (command === 'opsx-continue') {
@@ -21,7 +21,7 @@ export class AntiGravityProvider implements IAgentProvider {
   }
 
   public async executeTask(taskContext: string, workspacePath: string): Promise<ExecutionStream> {
-    const sessionName = `openspec-session-${Date.now()}`;
+    const sessionName = `agent-task-${Date.now()}`;
     const prompt = `Please complete the following task from the OpenSpec tasks.md:\n\n${taskContext}`;
     const targetCommand = `agy --mode accept-edits --add-dir "${workspacePath}" -p "${prompt}" --dangerously-skip-permissions`;
     
