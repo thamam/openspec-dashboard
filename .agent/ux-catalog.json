@@ -1,0 +1,13 @@
+{
+  "pillars": [
+    "Pillar A: Spatial Progressive Disclosure & Zoom Level UX",
+    "Pillar B: Cognitive Filtering & Exception-Based Monitoring",
+    "Pillar C: Active Elicitation & Micro-Interview Interfaces",
+    "Pillar D: Executable Verification & Automated Proofs (ATDD & Vericoding)",
+    "Pillar E: Living Spec-Code Synchronization & Semantic Diffs",
+    "Pillar F: Multi-Agent Pre-Review & Red Teaming",
+    "Pillar G: Visual & Live Interactive Specifications"
+  ],
+  "totalIdeas": 28,
+  "catalogPath": ".agent/knowledge/ux_innovation_ideas_catalog.md"
+}

@@ -8,7 +8,7 @@ Our comprehensive **UX Innovation Catalog (28 Ideas Across 7 Pillars)** serves a
 ## Workflow Protocol
 
 1. **User Reports Pain Point**: The user describes a specific friction, fatigue, or confusion point experienced during LLM artifact generation or review.
-2. **Consult the Idea Bank**: The agent consults the master research artifacts stored in `<appDataDir>/brain/<conversation-id>/ux_innovation_ideas_catalog.md` and `openspec_ux_transformation_blueprint.md`.
+2. **Consult the Idea Bank**: The agent consults the master research artifacts stored in `.agent/knowledge/ux_innovation_ideas_catalog.md` and `.agent/knowledge/openspec_ux_transformation_blueprint.md`.
 3. **RICE & Pain-Matching Session**:
    - Match the user's pain point directly to 1-3 targeted solution paradigms in the Idea Bank.
    - Evaluate using RICE scoring (Reach, Impact, Confidence, Effort).
@@ -18,5 +18,5 @@ Our comprehensive **UX Innovation Catalog (28 Ideas Across 7 Pillars)** serves a
 ---
 
 ## Master Idea Bank Reference
-- [28 UX Innovations Catalog](file:///Users/tomerhamam/.gemini/antigravity/brain/2fa57acb-0101-4cde-8048-5e2aa1cda934/ux_innovation_ideas_catalog.md)
-- [Master UX Transformation Blueprint](file:///Users/tomerhamam/.gemini/antigravity/brain/2fa57acb-0101-4cde-8048-5e2aa1cda934/openspec_ux_transformation_blueprint.md)
+- [28 UX Innovations Catalog](file://.agent/knowledge/ux_innovation_ideas_catalog.md)
+- [Master UX Transformation Blueprint](file://.agent/knowledge/openspec_ux_transformation_blueprint.md)

@@ -1,0 +1,12 @@
+{
+  "project": "openspec-dashboard",
+  "lastUpdated": "2026-07-23T15:40:00Z",
+  "activeChange": "None",
+  "lastSessionSummary": "Audited agent interaction & capabilities across 10 iterations. Implemented 45s socket timeout protection, 300ms watcher debouncing, resilient JSON parsing, workflow execution streaming (/opsx-continue, /opsx-sync, /opsx-verify), and Quick Action UI buttons.",
+  "topActivePainPoints": [],
+  "currentUxPriority": {
+    "ideaId": "Idea 14",
+    "title": "Real-Time Spec-Code Drift Radar & Agent Socket Harness",
+    "status": "Implemented"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "activePains": [],
+  "resolvedPains": [
+    {
+      "id": "PAIN-001",
+      "timestamp": "2026-07-23T00:00:00Z",
+      "category": "Agent Responsiveness",
+      "symptom": "Agent harness UI froze in typing state when agent process timed out or threw unhandled socket errors",
+      "rootCause": "Missing try-catch and timeout safeguards in AgentService socket events",
+      "resolution": "Added 45s timeout race condition and explicit chat_reply_error and autofix_error event emitters",
+      "status": "resolved",
+      "linkedUxIdeaId": "Idea 14"
+    }
+  ]
+}
