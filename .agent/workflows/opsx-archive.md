@@ -75,7 +75,13 @@ Archive a completed change in the experimental workflow.
    mv openspec/changes/<name> openspec/changes/archive/YYYY-MM-DD-<name>
    ```
 
-6. **Display summary**
+6. **Knowledge Vault & Journal Compaction Hook**
+
+   - Append milestone entry for change `<name>` to `.agent/JOURNAL.md`.
+   - If change was linked to a pain point in `.agent/pain-bank.json`, move it from `activePains` to `resolvedPains` with status `"resolved"`.
+   - Reset `activeChange` in `.agent/context-skyline.json` to `"None"`.
+
+7. **Display summary**
 
    Show archive completion summary including:
    - Change name
