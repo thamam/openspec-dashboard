@@ -90,9 +90,10 @@ export class LocalAgentWrapper {
 
     return new Promise((resolve) => {
       // Inject dashboard state directly into the agent's prompt
+      const providerInfo = context?.agentProvider ? `\n- Active Provider: ${context.agentProvider}` : '';
       const prompt = `You are the embedded native Agent Harness for the OpenSpec Dashboard. 
 Dashboard Context:
-- Active Change Directory: ${context.activeChange}
+- Active Change Directory: ${context.activeChange}${providerInfo}
 
 User Request: "${message}"
 
