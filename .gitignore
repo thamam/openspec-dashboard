@@ -15,6 +15,7 @@ Thumbs.db
 
 # Agent/AI temporary files
 .gemini/
+.claude/resilient-flows/
 .agent/chat_history.json
 .agent/scratch/
 .agent/tmp/
