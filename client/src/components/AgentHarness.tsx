@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { Artifacts } from '../types';
 import './AgentHarness.css';
 
 interface AgentEvent {
@@ -15,14 +16,17 @@ interface AgentEvent {
 interface Props {
   repoPath: string;
   activeChange: string | null;
+  agentProvider?: string;
+  artifacts?: Artifacts;
 }
 
 interface ChatMessage {
   role: 'user' | 'agent';
   content: string;
+  timestamp?: string;
 }
 
-export function AgentHarness({ repoPath, activeChange }: Props) {
+export function AgentHarness({ repoPath, activeChange, agentProvider = 'codex', artifacts }: Props) {
   const [activeTab, setActiveTab] = useState<'analysis' | 'chat'>('analysis');
   const [isExpanded, setIsExpanded] = useState(true);
   const [events, setEvents] = useState<AgentEvent[]>([]);
@@ -33,17 +37,38 @@ export function AgentHarness({ repoPath, activeChange }: Props) {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [isAgentTyping, setIsAgentTyping] = useState(false);
+  const [connectionState, setConnectionState] = useState<'connected' | 'connecting' | 'disconnected'>('connecting');
+  
   const eventsEndRef = useRef<HTMLDivElement>(null);
   const outputEndRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
-    const socket: Socket = io('http://localhost:3011');
+    const getSocketUrl = () => {
+      if (typeof window !== 'undefined') {
+        if (window.location.port === '5183' || window.location.port === '5173') {
+          return `${window.location.protocol}//${window.location.hostname}:3011`;
+        }
+        return window.location.origin;
+      }
+      return 'http://localhost:3011';
+    };
+
+    const socket: Socket = io(getSocketUrl());
     socketRef.current = socket;
     
     socket.on('connect', () => {
+      setConnectionState('connected');
       socket.emit('set_repo_path', repoPath);
+    });
+
+    socket.on('disconnect', () => {
+      setConnectionState('disconnected');
+    });
+
+    socket.on('connect_error', () => {
+      setConnectionState('disconnected');
     });
 
     socket.on('agent_event', (event: AgentEvent) => {
@@ -72,7 +97,7 @@ export function AgentHarness({ repoPath, activeChange }: Props) {
           updated[updated.length - 1] = { ...last, content: last.content + chunk };
           return updated;
         }
-        return [...prev, { role: 'agent', content: chunk }];
+        return [...prev, { role: 'agent', content: chunk, timestamp: new Date().toLocaleTimeString() }];
       });
     });
 
@@ -98,7 +123,7 @@ export function AgentHarness({ repoPath, activeChange }: Props) {
   }, [agentOutput]);
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    chatEndRef.current?.scrollIntoView?.({ behavior: 'smooth' });
   }, [chatHistory, isAgentTyping]);
 
   const handleChatSubmit = (e: React.FormEvent) => {
@@ -106,12 +131,13 @@ export function AgentHarness({ repoPath, activeChange }: Props) {
     if (!chatInput.trim() || isAgentTyping || !socketRef.current) return;
     
     const msg = chatInput;
-    setChatHistory(prev => [...prev, { role: 'user', content: msg }]);
+    setChatHistory(prev => [...prev, { role: 'user', content: msg, timestamp: new Date().toLocaleTimeString() }]);
     setChatInput('');
     setIsAgentTyping(true);
     
     const context = {
-      activeChange: activeChange || 'None currently selected'
+      activeChange: activeChange || 'None currently selected',
+      agentProvider: agentProvider
     };
     
     socketRef.current.emit('chat_message', { message: msg, context });
@@ -123,23 +149,35 @@ export function AgentHarness({ repoPath, activeChange }: Props) {
     socketRef.current.emit('trigger_autofix', { file: activeFile, message: analysisResult.message });
   };
 
+  const clearChat = () => {
+    setChatHistory([]);
+  };
+
   if (!isExpanded) {
     return (
-      <div className="agent-harness-collapsed" onClick={() => setIsExpanded(true)}>
+      <div className="agent-harness-collapsed" onClick={() => setIsExpanded(true)} title="Expand Agent Pane">
+        <span className={`status-dot ${connectionState}`}></span>
         <span className="agent-icon">🤖</span>
-        <span>Agent Offline</span>
+        <span>Agent ({agentProvider.toUpperCase()})</span>
       </div>
     );
   }
+
+  const linkagesCount = artifacts?.linkages?.length || 0;
 
   return (
     <div className="agent-harness">
       <div className="agent-harness-header">
         <div className="agent-harness-title">
+          <span className={`status-dot ${connectionState}`} title={`Socket: ${connectionState}`}></span>
           <span className="agent-icon">🤖</span>
-          <strong>AntiGravity Harness</strong>
+          <strong>Agent Harness</strong>
+          <span className="provider-pill">{agentProvider.toUpperCase()}</span>
+          {activeChange && activeChange !== 'main' && (
+            <span className="change-pill" title={`Scope: ${activeChange}`}>#{activeChange}</span>
+          )}
         </div>
-        <button className="collapse-btn" onClick={() => setIsExpanded(false)}>_</button>
+        <button className="collapse-btn" onClick={() => setIsExpanded(false)} title="Collapse Agent Pane">_</button>
       </div>
 
       <div className="agent-harness-tabs">
@@ -147,7 +185,7 @@ export function AgentHarness({ repoPath, activeChange }: Props) {
           className={`agent-tab ${activeTab === 'analysis' ? 'active' : ''}`}
           onClick={() => setActiveTab('analysis')}
         >
-          Live Analysis
+          Live Analysis {events.length > 0 && <span className="tab-badge">{events.length}</span>}
         </button>
         <button 
           className={`agent-tab ${activeTab === 'chat' ? 'active' : ''}`}
@@ -161,108 +199,127 @@ export function AgentHarness({ repoPath, activeChange }: Props) {
         {activeTab === 'analysis' && (
           <div className="analysis-view">
             <div className="analysis-status">
-              <span className="pulse-indicator"></span>
-              Watching {repoPath} for OpenSpec changes...
+              <span className={`pulse-indicator ${connectionState === 'connected' ? 'active' : ''}`}></span>
+              <span>Watching <code>{repoPath}</code> for OpenSpec changes...</span>
             </div>
             
-            <div className="events-list" style={{ flex: 1, overflowY: 'auto' }}>
-              {events.map((e, idx) => (
-                <div key={idx} className="mock-event">
-                  <div className="event-time">{new Date(e.timestamp).toLocaleTimeString()}</div>
-                  <div className="event-action">Detected {e.action} in <code>{e.fileName || e.file}</code></div>
+            <div className="events-list">
+              {events.length === 0 ? (
+                <div className="events-empty">
+                  <span>No file modifications detected yet. Listening for changes...</span>
                 </div>
-              ))}
+              ) : (
+                events.map((e, idx) => (
+                  <div key={idx} className="agent-event mock-event">
+                    <span className="event-time">{new Date(e.timestamp).toLocaleTimeString()}</span>
+                    <span className="event-action">
+                      Detected <strong>{e.action}</strong> in <code>{e.fileName || e.file}</code>
+                    </span>
+                  </div>
+                ))
+              )}
               <div ref={eventsEndRef} />
             </div>
 
-            <div className="mock-agent-thought">
-              <div className="thought-header">Agent is thinking...</div>
-              <div className="thought-body" style={{ maxHeight: '150px', overflowY: 'auto' }}>
+            <div className="agent-thought-container mock-agent-thought">
+              <div className="thought-header">
+                <span>Agent Analysis Output</span>
+                {agentOutput && <span className="streaming-indicator">Streaming...</span>}
+              </div>
+              <div className="thought-body">
                 <pre style={{ margin: 0, whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
-                  {agentOutput || "Waiting for file changes..."}
+                  {agentOutput || "Waiting for file events or change triggers..."}
                 </pre>
                 <div ref={outputEndRef} />
               </div>
+
               {analysisResult && (
-                <div style={{
-                  marginTop: '10px',
-                  padding: '10px',
-                  borderRadius: '6px',
-                  backgroundColor: analysisResult.status === 'warning' ? 'rgba(255, 123, 114, 0.1)' : 'rgba(86, 211, 100, 0.1)',
-                  border: `1px solid ${analysisResult.status === 'warning' ? '#ff7b72' : '#56d364'}`,
-                  color: analysisResult.status === 'warning' ? '#ff7b72' : '#56d364'
-                }}>
-                  <strong>{analysisResult.status === 'warning' ? '⚠️ WARNING' : '✅ SUCCESS'}: </strong>
-                  {analysisResult.message}
+                <div className={`analysis-result-banner ${analysisResult.status}`}>
+                  <div className="banner-title">
+                    <strong>{analysisResult.status === 'warning' ? '⚠️ WARNING' : '✅ SUCCESS'}: </strong>
+                    <span>{analysisResult.message}</span>
+                  </div>
                   {analysisResult.status === 'warning' && (
                     <button 
                       onClick={handleAutofix}
                       disabled={isFixing}
-                      style={{ 
-                        marginTop: '10px', 
-                        padding: '6px 12px', 
-                        display: 'block', 
-                        cursor: isFixing ? 'not-allowed' : 'pointer',
-                        backgroundColor: 'var(--panel-bg)',
-                        color: 'var(--text-color)',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: '4px'
-                      }}
+                      className="autofix-btn"
                     >
-                      {isFixing ? 'Fixing...' : 'Auto-Fix Issue'}
+                      {isFixing ? 'Applying Auto-Fix...' : 'Auto-Fix Issue'}
                     </button>
                   )}
                 </div>
               )}
             </div>
 
-            <div className="mock-insight-card warning">
-              <h4>⚠️ UX Philosophy Violation</h4>
-              <p>The updated spec introduces a dense technical table by default. According to <strong>ux-philosophy.md</strong>, we should use Progressive Disclosure.</p>
-              <div className="insight-actions">
-                <button className="action-btn primary">Auto-Fix Spec</button>
-                <button className="action-btn">Ignore</button>
+            {/* Dynamic Insight Cards */}
+            {analysisResult?.status === 'warning' && (
+              <div className="agent-insight-card mock-insight-card warning">
+                <h4>⚠️ Spec / UX Policy Alert</h4>
+                <p>{analysisResult.message || 'File modification contains potential UX or policy deviations.'}</p>
+                <div className="insight-actions">
+                  <button className="action-btn primary" onClick={handleAutofix} disabled={isFixing}>
+                    {isFixing ? 'Fixing...' : 'Auto-Fix Spec'}
+                  </button>
+                  <button className="action-btn" onClick={() => setAnalysisResult(null)}>Dismiss</button>
+                </div>
               </div>
-            </div>
-            
-            <div className="mock-insight-card success">
-              <h4>✅ Traceability Complete</h4>
-              <p>All newly generated tasks are properly linked back to architectural decisions.</p>
-            </div>
+            )}
+
+            {linkagesCount > 0 && (
+              <div className="agent-insight-card mock-insight-card success">
+                <h4>✅ Traceability Active</h4>
+                <p>{linkagesCount} semantic linkages verified between requirements, decisions, and tasks.</p>
+              </div>
+            )}
           </div>
         )}
 
         {activeTab === 'chat' && (
           <div className="chat-view">
-            <div className="chat-history" style={{ flex: 1, overflowY: 'auto', padding: '10px' }}>
-              {chatHistory.map((msg, idx) => (
-                <div key={idx} style={{ 
-                  marginBottom: '10px', 
-                  padding: '8px', 
-                  borderRadius: '6px', 
-                  backgroundColor: msg.role === 'user' ? 'var(--input-bg)' : 'var(--bg-color)',
-                  color: msg.role === 'user' ? 'var(--text-color)' : 'var(--accent)',
-                  alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                  whiteSpace: 'pre-wrap'
-                }}>
-                  <strong>{msg.role === 'user' ? 'You' : 'Agent'}: </strong>
-                  {msg.content}
+            <div className="chat-toolbar">
+              <span className="chat-provider-info">Provider: <strong>{agentProvider.toUpperCase()}</strong></span>
+              {chatHistory.length > 0 && (
+                <button className="clear-chat-btn" onClick={clearChat} title="Clear conversation history">Clear</button>
+              )}
+            </div>
+            
+            <div className="chat-history">
+              {chatHistory.length === 0 ? (
+                <div className="chat-empty">
+                  <span className="agent-icon-large">🤖</span>
+                  <p>Ask the agent to modify specs, analyze proposals, or automate tasks.</p>
                 </div>
-              ))}
+              ) : (
+                chatHistory.map((msg, idx) => (
+                  <div key={idx} className={`chat-bubble ${msg.role}`}>
+                    <div className="chat-bubble-header">
+                      <strong>{msg.role === 'user' ? 'You' : `Agent (${agentProvider})`}</strong>
+                      {msg.timestamp && <span className="msg-time">{msg.timestamp}</span>}
+                    </div>
+                    <div className="chat-bubble-body">{msg.content}</div>
+                  </div>
+                ))
+              )}
               {isAgentTyping && (
-                <div style={{ color: 'var(--text-muted)' }}>Agent is typing...</div>
+                <div className="typing-indicator">
+                  <span>Agent is thinking...</span>
+                  <span className="dot-flashing"></span>
+                </div>
               )}
               <div ref={chatEndRef} />
             </div>
-            <form className="chat-input" onSubmit={handleChatSubmit}>
+
+            <form className="chat-input-form" onSubmit={handleChatSubmit}>
               <input 
                 type="text" 
+                className="chat-input"
                 placeholder="Ask the agent to modify the dashboard..." 
                 value={chatInput}
                 onChange={e => setChatInput(e.target.value)}
                 disabled={isAgentTyping}
               />
-              <button type="submit" disabled={isAgentTyping || !chatInput.trim()}>
+              <button type="submit" className="chat-send-btn" disabled={isAgentTyping || !chatInput.trim()} title="Send Message">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
               </button>
             </form>

@@ -324,7 +324,12 @@ function App() {
       <div className="right-pane">
         <div className="pane-resizer" onMouseDown={startResizing} />
         <TaskHub tasks={tasks} />
-        <AgentHarness repoPath={repoPath} activeChange={activeChange} />
+        <AgentHarness 
+          repoPath={repoPath} 
+          activeChange={activeChange} 
+          agentProvider={agentProvider}
+          artifacts={artifacts}
+        />
       </div>
       <div className="terminal-resizer" onMouseDown={startResizingTerminal} title="Drag to resize terminal height" />
       <TerminalPane lines={terminalLines} onExecuteCommand={handleRunTerminalCommand} terminalHeight={terminalHeight} />
