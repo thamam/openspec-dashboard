@@ -110,6 +110,17 @@ export class AgentService {
     });
   }
 
+  public stop() {
+    if (this.watcher) {
+      this.watcher.close();
+      this.watcher = null;
+    }
+    for (const timer of this.debounceTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.debounceTimers.clear();
+  }
+
   private restartWatcher() {
     if (this.watcher) {
       this.watcher.close();

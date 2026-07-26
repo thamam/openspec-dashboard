@@ -510,17 +510,22 @@ function buildNeighborhoodClusters(artifacts: Artifacts): NeighborhoodCluster[] 
     };
 
     if (low.includes('decoder') || low.includes('frame') || low.includes('timestamp') || low.includes('manifest')) {
-      clustersMap.identity.items.push(item);
-    } else if (low.includes('session') || low.includes('spine') || low.includes('persistence') || low.includes('store')) {
-      clustersMap.spine.items.push(item);
-    } else if (low.includes('job') || low.includes('bound') || low.includes('resource') || low.includes('cancel') || low.includes('retry')) {
-      clustersMap.jobs.items.push(item);
+      if (clustersMap.identity) clustersMap.identity.items.push(item);
+      else Object.values(clustersMap)[0]?.items.push(item);
+    } else if (low.includes('session') || low.includes('spine') || low.includes('persistence') || low.includes('store') || low.includes('profile')) {
+      if (clustersMap.spine) clustersMap.spine.items.push(item);
+      else Object.values(clustersMap)[0]?.items.push(item);
+    } else if (low.includes('job') || low.includes('bound') || low.includes('resource') || low.includes('cancel') || low.includes('token') || low.includes('auth')) {
+      if (clustersMap.jobs) clustersMap.jobs.items.push(item);
+      else Object.values(clustersMap)[0]?.items.push(item);
     } else if (low.includes('qc') || low.includes('re-entry') || low.includes('timeline') || low.includes('correct') || low.includes('window')) {
-      clustersMap.reentry.items.push(item);
-    } else if (low.includes('export') || low.includes('clearml') || low.includes('provenance') || low.includes('s3') || low.includes('dataset')) {
-      clustersMap.export.items.push(item);
+      if (clustersMap.reentry) clustersMap.reentry.items.push(item);
+      else Object.values(clustersMap)[0]?.items.push(item);
+    } else if (low.includes('export') || low.includes('clearml') || low.includes('provenance') || low.includes('s3') || low.includes('dataset') || low.includes('fetch') || low.includes('api')) {
+      if (clustersMap.export) clustersMap.export.items.push(item);
+      else Object.values(clustersMap)[0]?.items.push(item);
     } else {
-      clustersMap.execution.items.push(item);
+      Object.values(clustersMap)[0]?.items.push(item);
     }
   });
 

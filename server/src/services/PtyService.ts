@@ -139,6 +139,14 @@ export class PtyService {
     }
   }
 
+  public destroy() {
+    for (const session of this.sessions.values()) {
+      session.kill();
+    }
+    this.sessions.clear();
+    this.socketSessionMap.clear();
+  }
+
   public init() {
     // Always ensure at least a default 'main' session exists
     if (this.sessions.size === 0) {

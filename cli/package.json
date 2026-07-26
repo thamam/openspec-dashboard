@@ -9,6 +9,7 @@
     "openspec-mcp": "./dist/mcp.js"
   },
   "scripts": {
+    "dev": "tsc --watch",
     "dev:cli": "tsx src/cli.ts",
     "dev:mcp": "tsx src/mcp.ts",
     "build": "tsc",

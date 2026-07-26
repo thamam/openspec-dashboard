@@ -2,3 +2,16 @@ Server is running on port 3011
 Client connected to AgentService websocket
 Client connected to AgentService websocket
 [AgentService] Watching for changes in /Users/tomerhamam/personal/projects/clawdoc-monitor/openspec/changes
+Client disconnected from AgentService
+Client disconnected from AgentService
+Client connected to AgentService websocket
+Client connected to AgentService websocket
+Client disconnected from AgentService
+Client disconnected from AgentService
+Client connected to AgentService websocket
+Client connected to AgentService websocket
+Client disconnected from AgentService
+Client disconnected from AgentService
+Client connected to AgentService websocket
+Client connected to AgentService websocket
+[AgentService] Watching for changes in /Users/tomerhamam/work/neuronbox-mlops-worktrees/sprint-4-dev/openspec/changes

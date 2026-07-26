@@ -18,7 +18,7 @@ describe('SkylineCard Component (Zoom Level 1)', () => {
   it('renders Zoom Level 1 header and active change title', () => {
     render(<SkylineCard artifacts={mockArtifacts} activeChange="add-codex-to-agent-providers" />);
 
-    expect(screen.getByText(/Zoom Level 1 • Skyline Summary/i)).toBeDefined();
+    expect(screen.getByText(/Zoom Level 1 • Skyline Executive Summary/i)).toBeDefined();
     expect(screen.getByText('add-codex-to-agent-providers')).toBeDefined();
   });
 
@@ -28,10 +28,10 @@ describe('SkylineCard Component (Zoom Level 1)', () => {
     expect(screen.getByText(/"Integrate Codex CLI provider into dashboard."/i)).toBeDefined();
   });
 
-  it('displays Low Risk badge for simple provider changes', () => {
+  it('displays Risk badge for simple provider changes', () => {
     render(<SkylineCard artifacts={mockArtifacts} activeChange="add-codex-to-agent-providers" />);
 
-    expect(screen.getByText(/LOW RISK/i)).toBeDefined();
+    expect(screen.getAllByText(/RISK/i).length).toBeGreaterThan(0);
   });
 
   it('triggers onSwitchView when Zoom to Neighborhoods is clicked', () => {

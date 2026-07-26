@@ -296,6 +296,13 @@ function synthesizeBMADLinkages(
     });
   }
 
+  if (storyMatches.length === 1) {
+    linkages.push({
+      source: 'Sprint Baseline',
+      target: storyMatches[0],
+    });
+  }
+
   for (const line of lines) {
     if (line.includes('-->') || line.includes('->')) {
       const parts = line.split(/-->|->/);
