@@ -6,11 +6,14 @@ This document defines how autonomous agents should interact with and modify the 
 
 The overarching goal of the OpenSpec project is to reduce the cognitive load required for humans to review complex AI-generated code.
 
-**CRITICAL DIRECTIVE:** All agents operating within this repository MUST adhere to the "Zoom Level" framework outlined in our core UX Philosophy. Read it before proposing or implementing any changes:
-**[-> Read `.agent/rules/ux-philosophy.md`](file://.agent/rules/ux-philosophy.md)**
+**CRITICAL DIRECTIVE:** All agents operating within this repository MUST adhere to the "Zoom Level" framework outlined in our core UX Philosophy and Plain-Language Synthesis Guide. Read them before proposing or implementing any changes:
+- **[-> Read `.agent/rules/ux-philosophy.md`](file://.agent/rules/ux-philosophy.md)**
+- **[-> Read `.agent/rules/plain-language-synthesis.md`](file://.agent/rules/plain-language-synthesis.md)**
 
-### When Designing UI/UX
+### When Designing UI/UX & Generating Specs
+- **Grandma-to-Professor Language:** Always synthesize Level 1 (Skyline) using plain, buzzword-free human language ("Grandma Standard"). Never dump raw LLM implementation trivia or run-on buzzwords.
 - **Progressive Disclosure:** Never dump dense technical markdown files on the user by default.
+- **Progressive Delta Knowledge:** Every Zoom Level must anchor to its predecessor and present ONLY the incremental delta knowledge added at that depth.
 - **Traceability:** Maintain semantic linking (using `linkages.json`) between requirements, architectural decisions, and tasks.
 - **Exception-Based Review:** The UI should highlight deviations, risk areas, and subjective choices made by the AI, while hiding standard boilerplate scaffolding.
 

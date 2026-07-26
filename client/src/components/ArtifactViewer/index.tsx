@@ -15,15 +15,38 @@ interface Props {
 
 export const ArtifactViewer: React.FC<Props> = ({ artifacts, tasks: _tasks, files, activeChange }) => {
   const [viewMode, setViewMode] = useState<'skyline' | 'raw' | 'matrix' | 'dashboard' | 'wizard'>('skyline');
+  const [selectedPillarId, setSelectedPillarId] = useState<string | null>(null);
+
+  const handleWalkPillar = (pillarId: string) => {
+    setSelectedPillarId(pillarId);
+    setViewMode('dashboard');
+  };
+
+  const handleClearPillar = () => {
+    setSelectedPillarId(null);
+  };
 
   const renderView = () => {
     switch (viewMode) {
       case 'skyline':
-        return <SkylineCard artifacts={artifacts} activeChange={activeChange} onSwitchView={v => setViewMode(v)} />;
+        return (
+          <SkylineCard
+            artifacts={artifacts}
+            activeChange={activeChange}
+            onSwitchView={(v) => setViewMode(v)}
+            onWalkPillar={handleWalkPillar}
+          />
+        );
       case 'matrix':
         return <MatrixView artifacts={artifacts} />;
       case 'dashboard':
-        return <DashboardView artifacts={artifacts} />;
+        return (
+          <DashboardView
+            artifacts={artifacts}
+            selectedPillarId={selectedPillarId}
+            onClearPillar={handleClearPillar}
+          />
+        );
       case 'wizard':
         return <WizardView artifacts={artifacts} />;
       case 'raw':
@@ -35,7 +58,14 @@ export const ArtifactViewer: React.FC<Props> = ({ artifacts, tasks: _tasks, file
   return (
     <div className="main-pane">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 20px', backgroundColor: '#0d1117', borderBottom: '1px solid #30363d' }}>
-        <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#8b949e' }}>Artifact Viewer</div>
+        <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#8b949e', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span>Artifact Viewer</span>
+          {selectedPillarId && (
+            <span style={{ fontSize: '11px', backgroundColor: '#1f6feb22', color: '#58a6ff', padding: '2px 8px', borderRadius: '12px', border: '1px solid #388bfd88' }}>
+              📍 Walking Pillar Subtree
+            </span>
+          )}
+        </div>
         <div style={{ display: 'flex', gap: '5px' }}>
           {[
             { id: 'skyline', icon: '⚡', label: 'Skyline (L1)' },
@@ -66,7 +96,7 @@ export const ArtifactViewer: React.FC<Props> = ({ artifacts, tasks: _tasks, file
           ))}
         </div>
       </div>
-      
+
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         {/* We only show the file explorer in raw view to save horizontal space in others */}
         {viewMode === 'raw' && (
@@ -80,7 +110,7 @@ export const ArtifactViewer: React.FC<Props> = ({ artifacts, tasks: _tasks, file
             ))}
           </div>
         )}
-        
+
         <div style={{ flex: 1, display: 'flex', overflow: 'hidden', backgroundColor: '#010409' }}>
           {renderView()}
         </div>
@@ -88,4 +118,3 @@ export const ArtifactViewer: React.FC<Props> = ({ artifacts, tasks: _tasks, file
     </div>
   );
 };
-

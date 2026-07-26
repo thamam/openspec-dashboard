@@ -2,6 +2,7 @@ export interface ChangeItem {
   id: string;
   title: string;
   status: string;
+  framework?: 'openspec' | 'bmad';
 }
 
 export interface TaskItem {
@@ -23,4 +24,5 @@ export interface Artifacts {
   design: string;
   tasks: string;
   linkages?: Linkage[];
+  framework?: 'openspec' | 'bmad';
 }

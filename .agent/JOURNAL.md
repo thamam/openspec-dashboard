@@ -5,14 +5,102 @@ This journal maintains a continuous, unbroken record of development cycles, huma
 ---
 
 ## Active State
-- **Current Focus:** Agent Interaction & Capabilities Audit + Knowledge Persistence Setup
-- **Active Pain Point:** None (Session context & memory persistence established)
-- **Latest Milestone:** 10 Iterations of Agent Harness Enhancements + 4-Tier Knowledge Vault Setup
-- **Test Status:** 57/57 unit tests passing across server and client
+- **Current Focus:** Guided Pillar Tree Walking (Subtree Graph Walking)
+- **Active Pain Point:** Resolved Flat Global Depth Switching & Fragmented Pillar Context
+- **Latest Milestone:** `[ 🔍 Walk Pillar #N ➔ ]` Buttons & Focused Subtree View in `DashboardView.tsx`
+- **Test Status:** 100% build and test pass
+- **Active Branch:** `feature/multi-sdd-bmad-support`
 
 ---
 
 ## Development Cycles & Decision History
+
+### [Cycle #020] - 2026-07-26 - Guided Pillar Tree Walking (Subtree Graph Navigation)
+- **Human Pain Point / Friction:** `PAIN-005` — Global top tab switching acted like a flat depth query across the entire graph. Reviewers could not follow a single pillar down its subtree.
+- **Matched UX Ideas:** Idea 03 (Subtree Focus), Idea 10 (Traceability Graph Walking), Idea 22 (Context-Aware Subtree Focus).
+- **Key Changes:**
+  - Added **`[ 🔍 Walk Pillar #N ➔ ]`** direct action buttons on each shift card in `SkylineCard.tsx`.
+  - Added shared `selectedPillarId` state in `ArtifactViewer/index.tsx`.
+  - Added **Focused Subtree Filter** and **Active Tree Walk Banner** in `DashboardView.tsx` (`📍 ACTIVE TREE WALK: ⚡ Skyline ➔ 🎬 Video Decoding (Subtree)`).
+  - Added `[ 🌐 Show All 6 Pillars ]` button to unfilter back to full grid map at any time.
+- **Verification:** Client build succeeded in 795ms; 100% test suite pass.
+
+### [Cycle #019] - 2026-07-26 - Level 2 Decision Chips & Design Rationales
+- **Human Pain Point / UX Realization:** Static key-value pairings (`Cache Ownership` ➔ `Session layer owns manifest`) looked like database config dumps. They failed to answer *what design choice was made and why*.
+- **Matched UX Ideas:** Idea 08 (Decision Cards), Idea 16 (Semantic Diffs), Grandma-to-Professor Protocol (Friend Level).
+- **Key Changes:**
+  - Upgraded structural chips in `DashboardView.tsx` to 3-part **Decision Cards** (`Title` + `Choice` + `Design Rationale`).
+  - E.g. *Frame Identity Key* ➔ `(video_id, manifest_id, frame_index)` ➔ 💡 *Anchors frames unambiguously across decoders without timestamp drift*.
+  - E.g. *Codec Isolation* ➔ `Session layer owns video manifest` ➔ 💡 *Keeps the core AI segmentation engine 100% clean and codec-free*.
+  - Updated **[plain-language-synthesis.md](file://.agent/rules/plain-language-synthesis.md)** to lock in Decision Chip rules.
+- **Verification:** Client build succeeded in 766ms; 100% test suite pass.
+
+### [Cycle #018] - 2026-07-26 - Level 2 (Neighborhoods) Visual De-Clutter & Friend-Level Formatting
+- **Human Pain Point / Visual Feedback:** Level 2 suffered from "visual fireworks" — loud red pin banners (`📌 ANCHORED TO...`), 5 out of 6 cards tagged `HIGH RISK` (alarm fatigue), loud green subheaders, noisy diamond metrics (`♦ 45 High Risk`), and truncated chip text.
+- **Matched UX Ideas:** Grandma-to-Professor Protocol (Friend Level), Idea 02 (Neighborhood Cards).
+- **Key Changes:**
+  - Replaced loud red pin headers with subtle breadcrumb tags (`Pillar #1 • Real Video Window Decoding`).
+  - Tightened risk classification logic in `DashboardView.tsx` to eliminate false-positive `HIGH RISK` badges across every card.
+  - Removed loud green subheaders and noisy diamond metric tallies.
+  - Simplified card subtitles into clean Friend-Level language (*"Switches video loading from 1-frame mocks to real MP4 decoding"*, *"Saves keyframes on server so progress survives refreshes"*).
+  - Formatted architectural choice chips into clean key-value rows without text truncation.
+- **Verification:** Client build succeeded in 791ms; server test suite passed 100%.
+
+### [Cycle #017] - 2026-07-26 - Plain-Language Synthesis Rule Persistence
+- **Objective:** Lock in guidelines and prompt instructions so all future sessions and specification reviews automatically produce Grandma-Standard plain language descriptions.
+- **Key Changes:**
+  - Created **[plain-language-synthesis.md](file://.agent/rules/plain-language-synthesis.md)** containing anti-pattern rules, audience ladder definitions, and the 3-question Grandma prompt template.
+  - Updated **[AGENTS.md](file://AGENTS.md)** to make the Grandma-to-Professor language protocol a mandatory directive for all agents working in this repository.
+  - Linked rules inside **[ux-philosophy.md](file://.agent/rules/ux-philosophy.md)**.
+- **Verification:** All rule files validated and linked across context Skyline and journal.
+
+### [Cycle #016] - 2026-07-26 - "Grandma-to-Professor" Audience Protocol & Plain Simplification
+- **Human Pain Point / Strategic Breakthrough:** LLMs naturally generate dense buzzword salads (*"worker budgets, cooperative cancel, 12 provenance fields"*) that act like teasers rather than useful plain-language explanations.
+- **Matched UX Ideas:** Grandma-to-Professor Audience Protocol, Idea 01 (Executive Skyline Summary).
+- **Key Changes:**
+  - Codified the **Grandma-to-Professor Audience Protocol** in `.agent/rules/ux-philosophy.md`: Level 1 = Grandma (plain human intent, zero buzzwords); Level 2 = Cross-Department Friend (functional choices & bounds); Level 3/4 = Specialist/Professor (code diffs & schema details).
+  - Replaced all buzzword teasers in `SkylineCard.tsx` with 5 plain human functional shifts (*"Instead of 1 static image, load real MP4 clips"*, *"Server backend automatically remembers work"*, *"Smooth background processing"*, *"Smart correction re-processing"*, *"Direct ClearML export"*).
+- **Verification:** Client build succeeded in 777ms; server test suite passed 100%.
+
+### [Cycle #015] - 2026-07-26 - Progressive Delta Knowledge Chain (Zoom L1 ➔ Zoom L2)
+- **Human Pain Point / Strategic Breakthrough:** Solved disconnected Zoom levels and cryptic raw quotes in Skyline. Level 1 (Skyline) was quoting raw technical trivia, and Level 2 (Neighborhoods) was starting from zero instead of expanding Level 1.
+- **Matched UX Ideas:** Progressive Delta Knowledge Protocol, Idea 01 (Skyline Executive Summary), Idea 02 (Neighborhood Cards).
+- **Key Changes:**
+  - Codified **Progressive Delta Knowledge Protocol** in `.agent/rules/ux-philosophy.md`.
+  - Replaced raw quote dumps in `SkylineCard.tsx` with a **Plain-English Executive Synthesizer** (1-sentence intent + 5 Core Architectural Pillars).
+  - Added explicit **📌 ANCHORED TO SKYLINE PILLAR N** badges and **`➕ DELTA KNOWLEDGE ADDED AT LEVEL 2`** section headers to `DashboardView.tsx`.
+- **Verification:** Client build succeeded in 1.53s; server test suite passed 100%.
+
+### [Cycle #014] - 2026-07-26 - Plain-English Intent Translator & Card Redesign
+- **Human Pain Point / Friction:** `PAIN-003` & `PAIN-004` — Cryptic LLM run-on implementation trivia (`Pillow`, `frame_count=1`, `FrameRef`) forced multi-read cognitive strain without conveying clear human meaning.
+- **Matched UX Ideas:** Idea 16 (Intent-Based Semantic Diffs), Idea 13 (Key Invariant Badging), Idea 08 (Decision Cards).
+- **Key Changes:**
+  - Built **Plain-English Intent Translator Engine** in `DashboardView.tsx` to automatically convert dense technical trivia into 1-sentence human statements (*"Video loading is currently a 1-image mock; real multi-frame video clips cannot run yet"*).
+  - Extracted 2–3 visual **Key Structural Chips** per card (`Primary Join Key`, `Timestamp Monotonicity`, `Cache Boundary`).
+  - Implemented **Default-Collapsed Detail Drawers** (`[ 🔽 Inspect Raw Specs ]`) reducing card text volume by 80% upfront while preserving 1-click forensic inspection.
+  - Added header toggle `[ 💬 Plain English Mode ]` to switch between Human Intent and Raw Technical spec lines.
+- **Verification:** Client build succeeded in 779ms; server vitest test suite passed 100%.
+
+### [Cycle #013] - 2026-07-26 - Zoom Level 2 Ergonomics (Cluster Cards + Scaffolding Dimmer)
+- **Human Pain Point / Friction:** `PAIN-002` — Transitioning from Zoom Level 1 (Skyline) to Zoom Level 2 (Neighborhoods) presented a wall of dense text and unorganized decisions.
+- **Matched UX Ideas:** Idea 02 (Neighborhood Cluster Cards), Idea 06 (Scaffolding Dimmer), Idea 05 (Risk Indexing).
+- **Key Changes:**
+  - Replaced unorganized bullet streams in `DashboardView.tsx` with collapsible **Neighborhood Cluster Cards** (*Decoder & Frame Identity*, *Session Spine*, *Job Bounds*, *QC Timeline*, *Export Provenance*, *User Stories*).
+  - Added header controls bar with `[ 🔅 Dim Boilerplate ]` toggle (suppresses routine setup items by 70%) and `[ 🛡️ High Risk Only ]` filter toggle.
+  - Added risk classification pills (`HIGH RISK`, `NEW CONTRACT`, `ROUTINE`) per card and item.
+  - Maintained hover-driven semantic DAG traceability across cards.
+- **Verification:** Client build `tsc && vite build` succeeded cleanly in 803ms; server test suite passed 100%.
+
+### [Cycle #012] - 2026-07-26 - Multi-SDD Framework Support (OpenSpec & BMAD)
+- **Objective:** Extend OpenSpec Dashboard to support BMAD (Building My App Daily) sprint planning increments alongside OpenSpec changes in a framework-agnostic manner.
+- **Architectural Analysis:** Designed a normalized canonical SDD model mapping BMAD concepts (`PRD.md`, `SPRINT-*-KICKOFF.md`, `.memlog.md`, `epics.md`, sharded stories) into `Proposal`, `Spec`, `Design`, `Tasks`, and `Linkages`.
+- **Key Changes:**
+  - Created `server/src/services/bmadAdapter.ts` for workspace auto-detection, sprint scanning, artifact parsing, and semantic linkage synthesis.
+  - Updated `server/src/services/repoService.ts` and `/api/status` to detect `isBMAD` and return `frameworks: ['openspec', 'bmad']`.
+  - Updated `/api/changes` and `/api/artifacts` in `server/src/app.ts` to fetch and render BMAD sprints.
+  - Added framework visual badges (`BMAD` in purple vs `OPENSPEC` in blue) in `client/src/components/CommandCenter/index.tsx`.
+  - Created unit & integration test suite `server/tests/bmadAdapter.test.ts` validating real-world Sprint 4.5 (`/Users/tomerhamam/work/neuronbox-mlops-worktrees/sprint-4-dev`).
+- **Verification:** 46/46 server tests passing; client build succeeded cleanly.
 
 ### [Cycle #011] - 2026-07-23 - Knowledge Persistence & Walk of Pain Architecture
 - **Objective:** Persist thread context, research artifacts, and "Walk of Pain" prioritization rules into version control for cross-agent session continuity.

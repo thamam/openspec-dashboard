@@ -43,6 +43,8 @@ app.post('/api/init', async (req, res) => {
   }
 });
 
+import { getBMADSprints, getBMADArtifacts } from './services/bmadAdapter.js';
+
 app.get('/api/changes', async (req, res) => {
   const repoPath = req.query.path as string;
   if (!repoPath) {
@@ -51,18 +53,34 @@ app.get('/api/changes', async (req, res) => {
   }
   try {
     const resolvedPath = resolvePath(repoPath);
+    const allChanges: Array<{ id: string; title: string; status: string; framework?: 'openspec' | 'bmad' }> = [];
+
+    // 1. OpenSpec changes
     const changesDir = path.join(resolvedPath, 'openspec', 'changes');
-    if (!fs.existsSync(changesDir)) {
-      res.json([]);
-      return;
+    if (fs.existsSync(changesDir)) {
+      const dirs = fs.readdirSync(changesDir, { withFileTypes: true });
+      dirs.filter(d => d.isDirectory()).forEach(d => {
+        allChanges.push({
+          id: d.name,
+          title: d.name,
+          status: 'In Progress',
+          framework: 'openspec'
+        });
+      });
     }
-    const dirs = fs.readdirSync(changesDir, { withFileTypes: true });
-    const changes = dirs.filter(d => d.isDirectory()).map(d => ({
-      id: d.name,
-      title: d.name,
-      status: 'In Progress'
-    }));
-    res.json(changes);
+
+    // 2. BMAD Sprints
+    const bmadSprints = getBMADSprints(resolvedPath);
+    bmadSprints.forEach(s => {
+      allChanges.push({
+        id: s.id,
+        title: s.title,
+        status: s.status,
+        framework: 'bmad'
+      });
+    });
+
+    res.json(allChanges);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -102,6 +120,7 @@ app.post('/api/schema', async (req, res) => {
 app.get('/api/artifacts', async (req, res) => {
   const repoPath = req.query.path as string;
   const changeName = req.query.change as string;
+  const frameworkReq = req.query.framework as string | undefined;
   
   if (!repoPath || !changeName) {
     res.status(400).json({ error: 'Missing path or change' });
@@ -110,13 +129,25 @@ app.get('/api/artifacts', async (req, res) => {
 
   try {
     const resolvedPath = resolvePath(repoPath);
+
+    // If explicit framework=bmad or if requested change is a BMAD sprint
+    const bmadSprints = getBMADSprints(resolvedPath);
+    const isBmadSprint = frameworkReq === 'bmad' || bmadSprints.some(s => s.id === changeName);
+
+    if (isBmadSprint) {
+      const bmadResult = getBMADArtifacts(resolvedPath, changeName);
+      res.json(bmadResult);
+      return;
+    }
+
+    // Default to OpenSpec change parsing
     const changeDir = path.join(resolvedPath, 'openspec', 'changes', changeName);
     if (!fs.existsSync(changeDir)) {
       res.status(404).json({ error: 'Change not found' });
       return;
     }
 
-    const artifacts: Record<string, string> = { proposal: '', spec: '', design: '', tasks: '' };
+    const artifacts: Record<string, any> = { proposal: '', spec: '', design: '', tasks: '', framework: 'openspec' };
     let files: string[] = [];
     let parsedTasks: any[] = [];
     let linkages: any[] = [];

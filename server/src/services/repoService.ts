@@ -13,6 +13,8 @@ export function resolvePath(targetPath: string): string {
   return path.resolve(targetPath);
 }
 
+import { isBMADWorkspace } from './bmadAdapter.js';
+
 export interface WorktreeInfo {
   path: string;
   branch: string | null;
@@ -23,6 +25,8 @@ export interface RepoStatus {
   exists: boolean;
   isGit: boolean;
   isOpenSpec: boolean;
+  isBMAD: boolean;
+  frameworks: string[];
   repoRoot?: string;
   isTraceReady?: boolean;
   worktrees?: WorktreeInfo[];
@@ -33,7 +37,7 @@ export async function checkRepoStatus(dirPath: string): Promise<RepoStatus> {
 
   // 1. Check if path exists
   if (!fs.existsSync(resolvedPath)) {
-    return { exists: false, isGit: false, isOpenSpec: false };
+    return { exists: false, isGit: false, isOpenSpec: false, isBMAD: false, frameworks: [] };
   }
 
   // If path is a file, use its parent directory
@@ -43,7 +47,7 @@ export async function checkRepoStatus(dirPath: string): Promise<RepoStatus> {
       resolvedPath = path.dirname(resolvedPath);
     }
   } catch {
-    return { exists: false, isGit: false, isOpenSpec: false };
+    return { exists: false, isGit: false, isOpenSpec: false, isBMAD: false, frameworks: [] };
   }
 
   // Traverse upwards to find .git
@@ -76,21 +80,26 @@ export async function checkRepoStatus(dirPath: string): Promise<RepoStatus> {
 
   // Check if OpenSpec is initialized at the repository root
   let isOpenSpec = false;
-  if (isGit) {
-    const openspecDir = path.join(targetPath, 'openspec');
-    try {
-      const openspecStat = fs.statSync(openspecDir);
-      isOpenSpec = openspecStat.isDirectory();
-    } catch {
-      isOpenSpec = false;
-    }
+  const openspecDir = path.join(targetPath, 'openspec');
+  try {
+    const openspecStat = fs.statSync(openspecDir);
+    isOpenSpec = openspecStat.isDirectory();
+  } catch {
+    isOpenSpec = false;
   }
+
+  // Check if BMAD workspace is present
+  const isBMAD = isBMADWorkspace(targetPath);
+
+  const frameworks: string[] = [];
+  if (isOpenSpec) frameworks.push('openspec');
+  if (isBMAD) frameworks.push('bmad');
 
   // Check if target has the updated openspec flow (traceability rules/linkages configured)
   let isTraceReady = false;
+  let worktrees: WorktreeInfo[] | undefined;
   if (isGit) {
     const proposeWorkflowPath = path.join(targetPath, '.agent', 'workflows', 'opsx-propose.md');
-    let worktrees: WorktreeInfo[] | undefined;
     if (fs.existsSync(proposeWorkflowPath)) {
       try {
         const content = fs.readFileSync(proposeWorkflowPath, 'utf8');
@@ -100,22 +109,17 @@ export async function checkRepoStatus(dirPath: string): Promise<RepoStatus> {
       }
     }
     worktrees = await getConnectedWorktrees(targetPath);
-    return {
-      exists: true,
-      isGit,
-      isOpenSpec,
-      repoRoot: targetPath,
-      isTraceReady,
-      worktrees,
-    };
   }
 
   return {
     exists: true,
     isGit,
     isOpenSpec,
+    isBMAD,
+    frameworks,
     repoRoot: targetPath,
-    isTraceReady: false,
+    isTraceReady,
+    worktrees,
   };
 }
 

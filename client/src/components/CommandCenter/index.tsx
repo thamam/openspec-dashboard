@@ -34,9 +34,24 @@ export const CommandCenter: React.FC<Props> = ({
             className={`nav-item ${activeChange === change.id ? 'active' : ''}`} 
             onClick={() => setActiveChange(change.id)}
             id={`nav-item-${change.id}`}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-            {change.title} {activeChange === change.id ? '(Active)' : ''}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{change.title} {activeChange === change.id ? '(Active)' : ''}</span>
+            </div>
+            <span style={{
+              fontSize: '9px',
+              fontWeight: 'bold',
+              padding: '1px 5px',
+              borderRadius: '3px',
+              flexShrink: 0,
+              background: change.framework === 'bmad' ? 'rgba(168, 85, 247, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+              color: change.framework === 'bmad' ? '#a855f7' : '#3b82f6',
+              border: `1px solid ${change.framework === 'bmad' ? 'rgba(168, 85, 247, 0.3)' : 'rgba(59, 130, 246, 0.3)'}`
+            }}>
+              {change.framework === 'bmad' ? 'BMAD' : 'OPENSPEC'}
+            </span>
           </div>
         ))}
       </div>

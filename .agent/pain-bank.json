@@ -1,6 +1,46 @@
 {
-  "activePains": [],
+  "activePains": [
+    {
+      "id": "PAIN-005",
+      "timestamp": "2026-07-26T22:00:00Z",
+      "category": "Navigation & Subtree Focus",
+      "symptom": "Transitioning across levels via global top tabs dumps all cards/tasks at that depth rather than allowing the user to walk down a specific pillar's subtree",
+      "rootCause": "Lack of pillar-focused tree navigation that filters Level 2 and Level 3 views to a selected pillar path",
+      "status": "in_analysis",
+      "linkedUxIdeaIds": ["Idea 03", "Idea 10", "Idea 22"]
+    }
+  ],
   "resolvedPains": [
+    {
+      "id": "PAIN-004",
+      "timestamp": "2026-07-26T21:00:00Z",
+      "category": "Spec Readability & Cognitive Jargon Burden",
+      "symptom": "Raw spec lines mix dense technical trivia (Pillow, frame_count=1, FrameRef) forcing reviewers to re-read multiple times without understanding the human meaning",
+      "rootCause": "Lack of an automated Plain-English Intent Translator layer that separates 'What it means for the product' from 'Technical implementation trivia'",
+      "resolution": "Implemented Plain-English Intent Translator Engine in DashboardView.tsx with 💬 Plain English Mode toggle",
+      "status": "resolved",
+      "linkedUxIdeaIds": ["Idea 16", "Idea 01", "Idea 08"]
+    },
+    {
+      "id": "PAIN-003",
+      "timestamp": "2026-07-26T20:58:00Z",
+      "category": "Zoom Level 2 Ergonomics & Information Architecture",
+      "symptom": "Cards feel like packaged text dumps; descriptions contain cryptic jargon and cards still display full lists of raw markdown bullet lines",
+      "rootCause": "Cards lack plain-English intent summaries and key invariant extraction; raw spec lines are displayed upfront instead of collapsed into detail drawers",
+      "resolution": "Redesigned cards with 1-sentence Plain-English Goals, 2-3 Key Structural Chips, and default-collapsed detail drawers in DashboardView.tsx",
+      "status": "resolved",
+      "linkedUxIdeaIds": ["Idea 16", "Idea 13", "Idea 08"]
+    },
+    {
+      "id": "PAIN-002",
+      "timestamp": "2026-07-26T19:53:00Z",
+      "category": "Zoom Level Ergonomics & Cognitive Fatigue",
+      "symptom": "Transitioning from Zoom Level 1 (Skyline) to Zoom Level 2 (Neighborhoods) presents a wall of dense text and decisions that is hard to scan",
+      "rootCause": "Lack of visual spatial clustering and risk-based noise filtering at Zoom Level 2",
+      "resolution": "Implemented Neighborhood Cluster Cards (Idea 02), Scaffolding Dimmer (Idea 06), and Risk Indexing (Idea 05) in DashboardView.tsx",
+      "status": "resolved",
+      "linkedUxIdeaIds": ["Idea 02", "Idea 05", "Idea 06"]
+    },
     {
       "id": "PAIN-001",
       "timestamp": "2026-07-23T00:00:00Z",

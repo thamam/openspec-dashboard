@@ -33,6 +33,8 @@ describe('repoService - checkRepoStatus', () => {
       exists: false,
       isGit: false,
       isOpenSpec: false,
+      isBMAD: false,
+      frameworks: [],
     });
   });
 
@@ -45,8 +47,11 @@ describe('repoService - checkRepoStatus', () => {
       exists: true,
       isGit: false,
       isOpenSpec: false,
+      isBMAD: false,
+      frameworks: [],
       repoRoot: path.resolve(normalDir),
       isTraceReady: false,
+      worktrees: undefined,
     });
   });
 
@@ -60,6 +65,8 @@ describe('repoService - checkRepoStatus', () => {
       exists: true,
       isGit: true,
       isOpenSpec: false,
+      isBMAD: false,
+      frameworks: [],
       repoRoot: path.resolve(gitDir),
       isTraceReady: false,
       worktrees: [],
@@ -78,6 +85,8 @@ describe('repoService - checkRepoStatus', () => {
       exists: true,
       isGit: true,
       isOpenSpec: true,
+      isBMAD: false,
+      frameworks: ['openspec'],
       repoRoot: path.resolve(openspecDir),
       isTraceReady: false,
       worktrees: [],
@@ -94,6 +103,8 @@ describe('repoService - checkRepoStatus', () => {
       exists: true,
       isGit: true,
       isOpenSpec: false,
+      isBMAD: false,
+      frameworks: [],
       repoRoot: path.resolve(worktreeDir),
       isTraceReady: false,
       worktrees: [],
@@ -115,6 +126,8 @@ describe('repoService - checkRepoStatus', () => {
       exists: true,
       isGit: true,
       isOpenSpec: true,
+      isBMAD: false,
+      frameworks: ['openspec'],
       repoRoot: path.resolve(gitDir),
       isTraceReady: false,
       worktrees: [],

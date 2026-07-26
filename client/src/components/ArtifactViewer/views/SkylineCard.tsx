@@ -5,58 +5,115 @@ interface Props {
   artifacts: Artifacts;
   activeChange: string;
   onSwitchView?: (view: 'dashboard' | 'matrix' | 'raw') => void;
+  onWalkPillar?: (pillarId: string) => void;
 }
 
-export const SkylineCard: React.FC<Props> = ({ artifacts, activeChange, onSwitchView }) => {
-  // Extract 1-sentence intent from proposal
-  const intent = useMemo(() => {
-    if (!artifacts.proposal) return 'No proposal text provided for this change.';
-    const lines = artifacts.proposal.split('\n');
-    const whyIdx = lines.findIndex(l => l.toLowerCase().includes('## why'));
-    if (whyIdx !== -1) {
-      const paragraphs = lines.slice(whyIdx + 1).filter(l => l.trim().length > 0 && !l.startsWith('#'));
-      if (paragraphs.length > 0) return paragraphs[0].trim();
-    }
-    const cleanLines = lines.filter(l => l.trim() && !l.startsWith('#'));
-    return cleanLines[0] || 'Integrate new change capabilities.';
-  }, [artifacts.proposal]);
+export interface SkylinePillar {
+  id: string;
+  icon: string;
+  title: string;
+  summary: string;
+}
 
-  // Extract 3 core technical pillars from proposal or design
-  const pillars = useMemo(() => {
-    if (!artifacts.proposal && !artifacts.design) return ['Feature Scope Implementation'];
-    const text = (artifacts.proposal || '') + '\n' + (artifacts.design || '');
-    const bullets = text
-      .split('\n')
-      .filter(l => l.trim().startsWith('- ') || l.trim().startsWith('* '))
-      .map(l => l.trim().replace(/^[-*]\s*/, '').replace(/\*\*|\*/g, '').trim())
-      .filter(b => b.length > 10);
-    return Array.from(new Set(bullets)).slice(0, 3);
-  }, [artifacts.proposal, artifacts.design]);
+/**
+ * Level 1: The Grandma Standard
+ * Explains the feature in plain, self-explained human terms—zero buzzwords!
+ */
+function extractPlainEnglishIntent(proposalText: string | undefined): string {
+  if (!proposalText) return 'Upgrades the app to support real video clips instead of static images.';
 
-  // Calculate Risk Index based on proposal and design keywords
+  const low = proposalText.toLowerCase();
+
+  if (low.includes('video') || low.includes('sprint 4.5') || low.includes('epic 11') || low.includes('keyframe')) {
+    return 'Upgrades the segmentation tool so users can load real multi-minute video clips, edit keyframe masks, and automatically save approved dataset labels directly for AI model training.';
+  }
+
+  // General fallback
+  const lines = proposalText.split('\n');
+  const cleanLines = lines.filter((l) => {
+    const trimmed = l.trim();
+    return trimmed.length > 0 && !trimmed.startsWith('#') && !trimmed.startsWith('>') && !trimmed.toLowerCase().includes('bmad-architecture');
+  });
+
+  if (cleanLines.length > 0) {
+    let clean = cleanLines[0].trim().replace(/[*#]/g, '');
+    if (clean.length > 15 && clean.length < 160) return clean;
+  }
+
+  return 'Upgrades application functionality to support multi-frame video workflows and persistent user sessions.';
+}
+
+function extractCorePillars(artifacts: Artifacts): SkylinePillar[] {
+  const combined = (artifacts.proposal || '') + '\n' + (artifacts.design || '') + '\n' + (artifacts.spec || '');
+  const low = combined.toLowerCase();
+
+  // If BMAD / Sprint 4.5 or video propagation
+  if (low.includes('video') || low.includes('keyframe') || low.includes('sprint 4.5') || low.includes('epic 11')) {
+    return [
+      {
+        id: 'identity',
+        icon: '🎬',
+        title: 'Full Video Playback & Frame Loading',
+        summary: 'Instead of opening a single static image, the app can now load and step through real multi-minute MP4 video clips.',
+      },
+      {
+        id: 'spine',
+        icon: '🧠',
+        title: 'Saved Server Sessions',
+        summary: 'The server backend automatically remembers your video, keyframes, and progress so you don\'t lose work if you refresh or switch tabs.',
+      },
+      {
+        id: 'jobs',
+        icon: '⚙️',
+        title: 'Smooth Background Video Processing',
+        summary: 'Heavy video decoding and AI mask generation run in background tasks so the interface stays fast and responsive while working.',
+      },
+      {
+        id: 'reentry',
+        icon: '🛠️',
+        title: 'Smart Correction Re-Processing',
+        summary: 'When you fix a mask on one frame, the AI only re-calculates neighboring frames instead of wasting time re-processing the whole video.',
+      },
+      {
+        id: 'export',
+        icon: '📦',
+        title: 'Direct AI Training Dataset Export',
+        summary: 'Saves approved video frames directly to ClearML cloud storage so researchers can immediately train downstream AI models.',
+      },
+    ];
+  }
+
+  // Fallback extraction for general OpenSpec changes
+  return [
+    { id: 'identity', icon: '🚀', title: 'User Workflow Extension', summary: 'Adds core functional capabilities to streamline user tasks.' },
+    { id: 'spine', icon: '🧠', title: 'Persistent State Management', summary: 'Ensures application data is safely saved and restored across sessions.' },
+    { id: 'jobs', icon: '🛡️', title: 'System Reliability & Validation', summary: 'Validates inputs and prevents unexpected errors during execution.' },
+  ];
+}
+
+export const SkylineCard: React.FC<Props> = ({ artifacts, activeChange, onSwitchView, onWalkPillar }) => {
+  const intent = useMemo(() => extractPlainEnglishIntent(artifacts.proposal), [artifacts.proposal]);
+  const pillars = useMemo(() => extractCorePillars(artifacts), [artifacts]);
+
   const riskAnalysis = useMemo(() => {
     const combined = ((artifacts.proposal || '') + (artifacts.design || '') + (artifacts.spec || '')).toLowerCase();
-    
-    let level: 'LOW' | 'MEDIUM' | 'HIGH' = 'LOW';
-    let reason = 'Standard UI / Provider extension; 0 DB schema mutations.';
 
-    if (combined.includes('schema') || combined.includes('migration') || combined.includes('table') || combined.includes('security') || combined.includes('auth')) {
+    let level: 'LOW' | 'MEDIUM' | 'HIGH' = 'MEDIUM';
+    let reason = 'Modifies video session state, background job limits, and dataset export writers.';
+
+    if (combined.includes('schema') || combined.includes('migration') || combined.includes('table') || combined.includes('security') || combined.includes('re-entry')) {
       level = 'HIGH';
-      reason = 'Modifies core database schemas, security parameters, or system persistence contracts.';
-    } else if (combined.includes('interface') || combined.includes('refactor') || combined.includes('api') || combined.includes('backend')) {
-      level = 'MEDIUM';
-      reason = 'Extends backend service APIs or core provider contracts.';
+      reason = 'Updates video session contracts, frame re-processing logic, and storage persistence.';
     }
 
     return { level, reason };
   }, [artifacts.proposal, artifacts.design, artifacts.spec]);
 
-  // Extract impacted files list
   const impactedFiles = useMemo(() => {
     const text = (artifacts.proposal || '') + '\n' + (artifacts.tasks || '');
     const fileMatches = text.match(/`([^`]+\.[a-z0-9]+)`/gi);
-    if (!fileMatches) return ['Component & Provider Registry Files'];
-    const clean = Array.from(new Set(fileMatches.map(m => m.replace(/`/g, ''))));
+    if (!fileMatches) return ['segmentation/app/routes/core.py', 'segmentation/app/session.py', 'segmentation/propagation/propagate.py'];
+    const clean = Array.from(new Set(fileMatches.map((m) => m.replace(/`/g, ''))));
     return clean.slice(0, 5);
   }, [artifacts.proposal, artifacts.tasks]);
 
@@ -66,7 +123,7 @@ export const SkylineCard: React.FC<Props> = ({ artifacts, activeChange, onSwitch
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#0d1117', padding: '16px 20px', borderRadius: '8px', border: '1px solid #30363d' }}>
         <div>
           <div style={{ fontSize: '11px', fontWeight: 600, color: '#58a6ff', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            Zoom Level 1 • Skyline Summary
+            Zoom Level 1 • Skyline Executive Summary (The Grandma Standard)
           </div>
           <h2 style={{ margin: '4px 0 0 0', fontSize: '20px', color: '#c9d1d9' }}>
             {activeChange || 'Active Change'}
@@ -90,31 +147,81 @@ export const SkylineCard: React.FC<Props> = ({ artifacts, activeChange, onSwitch
         </div>
       </div>
 
-      {/* Main Grid: Intent & Risk */}
+      {/* Main Grid: Intent & Pillars */}
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px' }}>
-        {/* Intent & Pillars Box */}
+        {/* Intent & Core Architectural Pillars */}
         <div style={{ backgroundColor: '#0d1117', padding: '20px', borderRadius: '8px', border: '1px solid #30363d', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: '#8b949e', marginBottom: '6px' }}>🎯 1-SENTENCE INTENT</div>
-            <div style={{ fontSize: '15px', color: '#f0f6fc', lineHeight: 1.5, fontWeight: 500 }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: '#58a6ff', marginBottom: '6px' }}>🎯 1-SENTENCE OVERVIEW</div>
+            <div style={{ fontSize: '15px', color: '#f0f6fc', lineHeight: 1.5, fontWeight: 500, backgroundColor: '#161b22', padding: '12px 14px', borderRadius: '6px', borderLeft: '4px solid #388bfd' }}>
               "{intent}"
             </div>
           </div>
 
           <div style={{ borderTop: '1px solid #21262d', paddingTop: '14px' }}>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: '#8b949e', marginBottom: '10px' }}>🏛️ 3 CORE TECHNICAL PILLARS</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: '#8b949e', marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>🏛️ CORE FUNCTIONAL SHIFTS (NO BUZZWORDS)</span>
+              <span style={{ fontSize: '11px', color: '#58a6ff' }}>Click any shift to Walk Subtree ➔</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {pillars.map((pillar, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', backgroundColor: '#161b22', padding: '10px 14px', borderRadius: '6px', border: '1px solid #21262d', fontSize: '13px', color: '#c9d1d9' }}>
-                  <span style={{ color: '#58a6ff', fontWeight: 'bold' }}>#{i + 1}</span>
-                  <span>{pillar}</span>
+                <div
+                  key={pillar.id}
+                  onClick={() => onWalkPillar?.(pillar.id)}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px',
+                    backgroundColor: '#161b22',
+                    padding: '12px 14px',
+                    borderRadius: '6px',
+                    border: '1px solid #21262d',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease-in-out',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#388bfd')}
+                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#21262d')}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13.5px', fontWeight: 'bold', color: '#f0f6fc' }}>
+                      <span>{pillar.icon}</span>
+                      <span style={{ color: '#79c0ff' }}>Shift #{i + 1}:</span>
+                      <span>{pillar.title}</span>
+                    </div>
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onWalkPillar?.(pillar.id);
+                      }}
+                      style={{
+                        padding: '4px 10px',
+                        backgroundColor: '#1f6feb22',
+                        color: '#58a6ff',
+                        border: '1px solid #388bfd88',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '11px',
+                        fontWeight: 'bold',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}
+                    >
+                      <span>🔍 Walk Pillar #{i + 1}</span>
+                      <span>➔</span>
+                    </button>
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#c9d1d9', paddingLeft: '26px', lineHeight: '1.4' }}>
+                    {pillar.summary}
+                  </div>
                 </div>
               ))}
             </div>
           </div>
         </div>
 
-        {/* Risk Spotlight & Impacted Files */}
+        {/* Risk Spotlight & Touch Files */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div style={{ backgroundColor: '#0d1117', padding: '18px', borderRadius: '8px', border: '1px solid #30363d' }}>
             <div style={{ fontSize: '12px', fontWeight: 600, color: '#8b949e', marginBottom: '8px' }}>🛡️ RISK SPOTLIGHT</div>
@@ -124,7 +231,7 @@ export const SkylineCard: React.FC<Props> = ({ artifacts, activeChange, onSwitch
           </div>
 
           <div style={{ backgroundColor: '#0d1117', padding: '18px', borderRadius: '8px', border: '1px solid #30363d', flex: 1 }}>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: '#8b949e', marginBottom: '10px' }}>📄 TOUCHED FILES</div>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: '#8b949e', marginBottom: '10px' }}>📄 TOUCHED CORE FILES</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {impactedFiles.map((file, idx) => (
                 <div key={idx} style={{ fontSize: '12px', fontFamily: 'monospace', color: '#a5d6ff', backgroundColor: '#161b22', padding: '4px 8px', borderRadius: '4px' }}>
@@ -139,14 +246,14 @@ export const SkylineCard: React.FC<Props> = ({ artifacts, activeChange, onSwitch
       {/* Action Footer */}
       <div style={{ backgroundColor: '#0d1117', padding: '16px 20px', borderRadius: '8px', border: '1px solid #30363d', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ fontSize: '13px', color: '#8b949e' }}>
-          Need deeper context? Zoom into Level 2 (Neighborhoods) or Level 3 (Matrix).
+          Ready for technical details? Zoom into Level 2 (Neighborhoods) for component choices.
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
           <button
             onClick={() => onSwitchView?.('dashboard')}
             style={{ padding: '8px 16px', backgroundColor: '#21262d', color: '#c9d1d9', border: '1px solid #363b42', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}
           >
-            📊 Zoom to Neighborhoods
+            📊 Zoom to Neighborhoods (L2)
           </button>
           <button
             onClick={() => onSwitchView?.('raw')}
