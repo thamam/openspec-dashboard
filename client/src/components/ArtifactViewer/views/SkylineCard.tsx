@@ -20,34 +20,78 @@ export interface SkylinePillar {
  * Explains the feature in plain, self-explained human terms—zero buzzwords!
  */
 function extractPlainEnglishIntent(proposalText: string | undefined): string {
-  if (!proposalText) return 'Upgrades the app to support real video clips instead of static images.';
+  if (!proposalText) return 'Upgrades application architecture and state management for active change.';
 
   const low = proposalText.toLowerCase();
 
-  if (low.includes('video') || low.includes('sprint 4.5') || low.includes('epic 11') || low.includes('keyframe')) {
+  // Profile / ClawDoc / Epic 4
+  if (low.includes('profile') || low.includes('clawdoc') || low.includes('epic 4') || low.includes('4-1-profile')) {
+    return 'Adds a secure, single-file profile system to ClawDoc Monitor so user settings are safely saved locally, automatically restored across app restarts, and protected against file corruption or unauthorized browser writes.';
+  }
+
+  // Multi-frame Video propagation (Sprint 4.5)
+  if (low.includes('video') || low.includes('keyframe') || low.includes('sprint 4.5') || low.includes('epic 11')) {
     return 'Upgrades the segmentation tool so users can load real multi-minute video clips, edit keyframe masks, and automatically save approved dataset labels directly for AI model training.';
   }
 
-  // General fallback
+  // General dynamic extraction from proposal text
   const lines = proposalText.split('\n');
   const cleanLines = lines.filter((l) => {
     const trimmed = l.trim();
-    return trimmed.length > 0 && !trimmed.startsWith('#') && !trimmed.startsWith('>') && !trimmed.toLowerCase().includes('bmad-architecture');
+    return (
+      trimmed.length > 0 &&
+      !trimmed.startsWith('#') &&
+      !trimmed.startsWith('>') &&
+      !trimmed.startsWith('|') &&
+      !trimmed.toLowerCase().includes('bmad-architecture')
+    );
   });
 
-  if (cleanLines.length > 0) {
-    let clean = cleanLines[0].trim().replace(/[*#]/g, '');
-    if (clean.length > 15 && clean.length < 160) return clean;
+  for (const l of cleanLines) {
+    let clean = l.trim().replace(/[*#`]/g, '');
+    if (clean.length > 20 && clean.length < 200 && !clean.includes('http')) {
+      return clean;
+    }
   }
 
-  return 'Upgrades application functionality to support multi-frame video workflows and persistent user sessions.';
+  return 'Upgrades application state persistence, architecture, and task workflow management.';
 }
 
 function extractCorePillars(artifacts: Artifacts): SkylinePillar[] {
   const combined = (artifacts.proposal || '') + '\n' + (artifacts.design || '') + '\n' + (artifacts.spec || '');
   const low = combined.toLowerCase();
 
-  // If BMAD / Sprint 4.5 or video propagation
+  // Profile / ClawDoc / Epic 4
+  if (low.includes('profile') || low.includes('clawdoc') || low.includes('epic 4') || low.includes('4-1-profile')) {
+    return [
+      {
+        id: 'identity',
+        icon: '👤',
+        title: 'Saved User Profiles & Persistence',
+        summary: 'Saves user profile configuration locally in a single JSON file (.clawdocprofile.json) that automatically loads on startup.',
+      },
+      {
+        id: 'spine',
+        icon: '🛡️',
+        title: 'Automatic Corruption Recovery & Backups',
+        summary: 'Quarantines corrupted profile files and safely falls back to a clean default seed without crashing or losing data.',
+      },
+      {
+        id: 'jobs',
+        icon: '🔒',
+        title: 'Single-Session Security Tokens',
+        summary: 'Injects a 256-bit single-launch token via meta tag to prevent unauthorized web scripts from changing active profiles.',
+      },
+      {
+        id: 'export',
+        icon: '⚡',
+        title: 'Centralized Web Communications',
+        summary: 'Consolidates renderer network requests into a single apiGet chokepoint to enforce strict security limits.',
+      },
+    ];
+  }
+
+  // Multi-frame Video propagation (Sprint 4.5)
   if (low.includes('video') || low.includes('keyframe') || low.includes('sprint 4.5') || low.includes('epic 11')) {
     return [
       {
@@ -81,6 +125,22 @@ function extractCorePillars(artifacts: Artifacts): SkylinePillar[] {
         summary: 'Saves approved video frames directly to ClearML cloud storage so researchers can immediately train downstream AI models.',
       },
     ];
+  }
+
+  // Dynamic extraction from Markdown Headings for general SDD projects
+  const headers = combined
+    .split('\n')
+    .filter((l) => l.trim().startsWith('## ') || l.trim().startsWith('### '))
+    .map((l) => l.replace(/^#+\s+/, '').trim())
+    .filter((h) => h.length > 5 && !h.toLowerCase().includes('open question') && !h.toLowerCase().includes('verification'));
+
+  if (headers.length >= 3) {
+    return headers.slice(0, 5).map((h, idx) => ({
+      id: `shift-${idx + 1}`,
+      icon: idx === 0 ? '🚀' : idx === 1 ? '🧠' : idx === 2 ? '🛡️' : idx === 3 ? '🔒' : '📦',
+      title: h,
+      summary: `Functional capability defined in SDD section: ${h}`,
+    }));
   }
 
   // Fallback extraction for general OpenSpec changes

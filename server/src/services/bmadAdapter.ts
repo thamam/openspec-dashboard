@@ -45,12 +45,64 @@ export function isBMADWorkspace(repoPath: string): boolean {
 }
 
 /**
- * Scans a BMAD workspace and returns detected sprint/planning increments as changes.
+ * Scans a BMAD workspace and returns detected sprint/planning/implementation increments as changes.
  */
 export function getBMADSprints(repoPath: string): BMADChangeItem[] {
   const resolved = resolvePath(repoPath);
   const sprintList: BMADChangeItem[] = [];
 
+  // 1. Single-story implementation artifacts (e.g. 4-1-profile-persistence-spine.md)
+  const implDirs = [
+    path.join(resolved, '_bmad-output', 'implementation-artifacts'),
+    path.join(resolved, 'bmad-output', 'implementation-artifacts'),
+  ];
+
+  for (const implDir of implDirs) {
+    if (!fs.existsSync(implDir)) continue;
+    try {
+      const files = fs.readdirSync(implDir);
+      for (const f of files) {
+        if (f.endsWith('.md') && f !== 'deferred-work.md') {
+          const id = f.replace(/\.md$/, '');
+          const cleanName = f.replace(/\.md$/, '').replace(/-/g, ' ');
+          const title = cleanName.replace(/\b\w/g, (l) => l.toUpperCase());
+
+          sprintList.push({
+            id,
+            title: `Story ${title}`,
+            status: 'In Progress',
+            framework: 'bmad',
+            sprintPath: path.join(implDir, f),
+          });
+        }
+      }
+    } catch (e) {
+      // Ignore
+    }
+  }
+
+  // 2. Epic directories (e.g. _bmad-output/epic-4-2026-07-26)
+  const bmadBase = path.join(resolved, '_bmad-output');
+  if (fs.existsSync(bmadBase)) {
+    try {
+      const baseEntries = fs.readdirSync(bmadBase, { withFileTypes: true });
+      for (const entry of baseEntries) {
+        if (entry.isDirectory() && entry.name.startsWith('epic-')) {
+          sprintList.push({
+            id: entry.name,
+            title: entry.name.replace(/-/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
+            status: 'In Progress',
+            framework: 'bmad',
+            sprintPath: path.join(bmadBase, entry.name),
+          });
+        }
+      }
+    } catch (e) {
+      // Ignore
+    }
+  }
+
+  // 3. Traditional planning artifact sprint folders
   const planningDirs = [
     path.join(resolved, '_bmad-output', 'planning-artifacts'),
     path.join(resolved, 'bmad-output', 'planning-artifacts'),
@@ -110,7 +162,6 @@ function deriveSprintTitle(sprintFolder: string, defaultId: string): string {
     // Ignore and fallback
   }
 
-  // Formatting defaultId like "sprint-4.5" -> "Sprint 4.5"
   return defaultId
     .replace(/^sprint-/, 'Sprint ')
     .replace(/-/g, ' ')
@@ -125,14 +176,6 @@ export function getBMADArtifacts(repoPath: string, sprintId: string): BMADArtifa
   const sprints = getBMADSprints(resolved);
   const sprint = sprints.find((s) => s.id === sprintId);
 
-  const sprintPath = sprint
-    ? sprint.sprintPath
-    : path.join(resolved, '_bmad-output', 'planning-artifacts', sprintId);
-
-  if (!fs.existsSync(sprintPath)) {
-    throw new Error(`BMAD sprint planning directory not found: ${sprintId}`);
-  }
-
   let proposal = '';
   let design = '';
   let tasks = '';
@@ -140,35 +183,74 @@ export function getBMADArtifacts(repoPath: string, sprintId: string): BMADArtifa
   const files: string[] = [];
   const linkages: Array<{ source: string; target: string }> = [];
 
-  const sprintFiles = fs.readdirSync(sprintPath);
-  for (const file of sprintFiles) {
-    files.push(file);
-    const fullPath = path.join(sprintPath, file);
-    const lowerName = file.toLowerCase();
+  const sprintPath = sprint
+    ? sprint.sprintPath
+    : path.join(resolved, '_bmad-output', 'implementation-artifacts', `${sprintId}.md`);
 
-    if (lowerName.endsWith('-kickoff.md') || lowerName === 'kickoff.md') {
-      proposal = fs.readFileSync(fullPath, 'utf8');
-    } else if (lowerName === '.memlog.md' || lowerName === 'memlog.md') {
-      design += (design ? '\n\n---\n\n' : '') + fs.readFileSync(fullPath, 'utf8');
-    } else if (lowerName === 'architecture.md' || lowerName.includes('architecture')) {
-      design += (design ? '\n\n---\n\n' : '') + fs.readFileSync(fullPath, 'utf8');
-    } else if (lowerName === 'epics.md' || lowerName.includes('epic')) {
-      const epicsContent = fs.readFileSync(fullPath, 'utf8');
-      tasks += epicsContent;
-      spec += (spec ? '\n\n---\n\n' : '') + epicsContent;
-    } else if (lowerName.endsWith('.md')) {
-      const content = fs.readFileSync(fullPath, 'utf8');
-      if (!proposal) proposal = content;
-      else spec += '\n\n---\n\n' + content;
-    }
+  if (!fs.existsSync(sprintPath)) {
+    throw new Error(`BMAD artifact path not found: ${sprintId}`);
   }
 
-  // If no separate architecture file in sprint folder, check root planning artifacts
-  if (!design) {
-    const rootArchPath = path.join(resolved, '_bmad-output', 'planning-artifacts', 'architecture.md');
-    if (fs.existsSync(rootArchPath)) {
-      design = fs.readFileSync(rootArchPath, 'utf8');
+  const isFile = fs.statSync(sprintPath).isFile();
+
+  if (isFile) {
+    // Single-story implementation artifact
+    const content = fs.readFileSync(sprintPath, 'utf8');
+    files.push(path.basename(sprintPath));
+    proposal = content;
+    spec = content;
+    tasks = content;
+
+    // Look for parent architecture file in epic folder
+    const bmadBase = path.join(resolved, '_bmad-output');
+    if (fs.existsSync(bmadBase)) {
+      try {
+        const entries = fs.readdirSync(bmadBase);
+        const epicDir = entries.find((e) => e.startsWith('epic-'));
+        if (epicDir) {
+          const archDir = path.join(bmadBase, epicDir, 'architecture');
+          if (fs.existsSync(archDir)) {
+            const archFiles = fs.readdirSync(archDir);
+            for (const af of archFiles) {
+              if (af.endsWith('.md')) {
+                design += (design ? '\n\n---\n\n' : '') + fs.readFileSync(path.join(archDir, af), 'utf8');
+              }
+            }
+          }
+        }
+      } catch (e) {
+        // Ignore
+      }
     }
+  } else {
+    // Directory artifact (sprint or epic directory)
+    const readDirRecursive = (dir: string) => {
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          readDirRecursive(fullPath);
+        } else if (entry.isFile() && entry.name.endsWith('.md')) {
+          files.push(entry.name);
+          const lowerName = entry.name.toLowerCase();
+          const content = fs.readFileSync(fullPath, 'utf8');
+
+          if (lowerName.endsWith('-kickoff.md') || lowerName === 'kickoff.md') {
+            proposal = content;
+          } else if (lowerName === '.memlog.md' || lowerName.includes('architecture') || lowerName.includes('spine')) {
+            design += (design ? '\n\n---\n\n' : '') + content;
+          } else if (lowerName.includes('epic') || lowerName.includes('story')) {
+            tasks += (tasks ? '\n\n---\n\n' : '') + content;
+            spec += (spec ? '\n\n---\n\n' : '') + content;
+          } else {
+            if (!proposal) proposal = content;
+            else spec += '\n\n---\n\n' + content;
+          }
+        }
+      }
+    };
+
+    readDirRecursive(sprintPath);
   }
 
   // Synthesize semantic linkages from BMAD Stories and Architecture Decisions
@@ -189,12 +271,12 @@ export function getBMADArtifacts(repoPath: string, sprintId: string): BMADArtifa
     parsedTasks,
     files,
     linkages,
-    agentProvider: 'antigravity',
+    agentProvider: 'claude-code',
   };
 }
 
 /**
- * Extracts story IDs and architecture decision topics from text to build the linkages graph.
+ * Synthesizes traceability graph linkages between Stories, Design Decisions, and Tasks.
  */
 function synthesizeBMADLinkages(
   tasksText: string,
@@ -202,34 +284,28 @@ function synthesizeBMADLinkages(
   designText: string,
   linkages: Array<{ source: string; target: string }>
 ) {
-  // Extract Story headers (e.g. ### Story 11.1: Video decoder manifest...)
-  const storyMatches = Array.from(tasksText.matchAll(/###\s+(Story\s+[\w.]+[:\s]*[^\n]+)/gi));
-  const decisionsMatches = Array.from(designText.matchAll(/(?:type:\s*decision\s*\|\s*text:\s*|##\s*Architecture Decisions|^\s*-\s*\*\*|\d+\.\s+\*\*)([^\n\.\:\*]+)/gmi));
+  const combined = tasksText + '\n' + proposalText + '\n' + designText;
+  const lines = combined.split('\n');
 
-  const decisions: string[] = [];
-  for (const m of decisionsMatches) {
-    const clean = m[1].trim();
-    if (clean.length > 5 && !decisions.includes(clean)) {
-      decisions.push(clean);
-    }
+  const storyMatches = Array.from(new Set(combined.match(/Story\s+\d+\.\d+|FR-\d+|ADR-\d+|AD-\d+/gi) || []));
+
+  for (let i = 0; i < storyMatches.length - 1; i++) {
+    linkages.push({
+      source: storyMatches[i],
+      target: storyMatches[i + 1],
+    });
   }
 
-  if (storyMatches.length > 0 && decisions.length > 0) {
-    storyMatches.forEach((match, idx) => {
-      const storyTitle = match[1].split(':')[0].trim();
-      const targetDecision = decisions[idx % decisions.length];
-      linkages.push({
-        source: storyTitle,
-        target: targetDecision,
-      });
-    });
-  } else if (storyMatches.length > 0) {
-    storyMatches.forEach((match) => {
-      const storyTitle = match[1].trim();
-      linkages.push({
-        source: storyTitle,
-        target: 'Sprint Mission & Architecture Contract',
-      });
-    });
+  for (const line of lines) {
+    if (line.includes('-->') || line.includes('->')) {
+      const parts = line.split(/-->|->/);
+      if (parts.length === 2) {
+        const src = parts[0].trim().replace(/^[-*#\d\s]+/, '');
+        const tgt = parts[1].trim();
+        if (src.length > 3 && tgt.length > 3) {
+          linkages.push({ source: src, target: tgt });
+        }
+      }
+    }
   }
 }

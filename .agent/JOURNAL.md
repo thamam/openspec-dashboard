@@ -5,15 +5,26 @@ This journal maintains a continuous, unbroken record of development cycles, huma
 ---
 
 ## Active State
-- **Current Focus:** Guided Pillar Tree Walking (Subtree Graph Walking)
-- **Active Pain Point:** Resolved Flat Global Depth Switching & Fragmented Pillar Context
-- **Latest Milestone:** `[ 🔍 Walk Pillar #N ➔ ]` Buttons & Focused Subtree View in `DashboardView.tsx`
-- **Test Status:** 100% build and test pass
+- **Current Focus:** Visual UX Scaffolding & Ambiguity Radar (Story 4.1 Review)
+- **Target Repo:** `clawhub-dev/clawdoc-monitor` (`story/4.1-foundation`)
+- **Latest Milestone:** Approved `visual_ux_scaffolding_review.md` artifact & UI Mockup
+- **Test Status:** 413 passing tests in target repo; 100% dashboard build pass
 - **Active Branch:** `feature/multi-sdd-bmad-support`
 
 ---
 
 ## Development Cycles & Decision History
+
+### [Cycle #021] - 2026-07-27 - Visual UX Scaffolding & Ambiguity Audit (ClawDoc Monitor Story 4.1)
+- **Human Pain Point / Need:** Code reviews of UX-oriented changes are tedious when reading text. Reviewers need visual UI mockups of baseline vs proposed state and explicit highlighting of subjective LLM decisions/ambiguities.
+- **Matched UX Ideas:** Idea 14 (Visual UX Scaffolding), Idea 08 (Decision Cards), Exception-Based Review Pattern.
+- **Key Accomplishments:**
+  - Cloned `clawhub-dev/clawdoc-monitor` and checked out `story/4.1-foundation`.
+  - Upgraded `bmadAdapter.ts` to parse single-story BMAD implementation artifacts (`4-1-profile-persistence-spine.md`) and epic folders (`epic-4-2026-07-26`).
+  - Fixed hardcoded fallback string leakage in `SkylineCard.tsx`.
+  - Generated high-fidelity visual UI mockup (`clawdoc_profile_mockup`) demonstrating the active profile selector and session token security badge.
+  - Authored `visual_ux_scaffolding_review.md` artifact featuring baseline UX comparison, 3 subjective LLM decision radars (Storage Engine, Corruption UX, Token Injection), and RICE Greedy Metric Audit (8.5/10).
+- **User Outcome:** User reviewed and approved the artifact.
 
 ### [Cycle #020] - 2026-07-26 - Guided Pillar Tree Walking (Subtree Graph Navigation)
 - **Human Pain Point / Friction:** `PAIN-005` — Global top tab switching acted like a flat depth query across the entire graph. Reviewers could not follow a single pillar down its subtree.

@@ -1,12 +1,13 @@
 {
   "project": "openspec-dashboard",
-  "lastUpdated": "2026-07-26T22:05:00Z",
-  "activeChange": "feature/multi-sdd-bmad-support",
-  "lastSessionSummary": "Implemented Guided Pillar Tree Walking across SkylineCard.tsx, ArtifactViewer/index.tsx, and DashboardView.tsx. Added [ 🔍 Walk Pillar #N ➔ ] buttons to Skyline shift cards and a focused subtree view and active path breadcrumb bar to Level 2. Verified with 100% build & test pass.",
+  "lastUpdated": "2026-07-27T00:01:00Z",
+  "activeChange": "story/4.1-foundation",
+  "targetRepository": "clawhub-dev/clawdoc-monitor",
+  "lastSessionSummary": "Reviewed clawhub-dev/clawdoc-monitor PR #3 (Story 4.1 Profile Persistence Spine). Added single-story implementation artifact adapter support, eliminated hardcoded fallback leakage, generated visual UI mockup, and produced approved Visual UX Scaffolding & Ambiguity Audit artifact with RICE score 8.5/10.",
   "topActivePainPoints": [],
   "currentUxPriority": {
-    "ideaId": "Guided Pillar Tree Walking",
-    "title": "Subtree Graph Walking Across Zoom Levels",
-    "status": "Implemented"
+    "ideaId": "Visual UX Scaffolding & Ambiguity Radar",
+    "title": "Visual Baseline Comparison & LLM Subjective Decision Radar",
+    "status": "Approved"
   }
 }
