@@ -1,13 +1,13 @@
 {
   "project": "openspec-dashboard",
-  "lastUpdated": "2026-07-28T00:53:10Z",
+  "lastUpdated": "2026-07-28T01:16:42Z",
   "activeChange": "planning-stage-latest",
   "targetRepository": "/Users/tomerhamam/work/projects/neuronbox-ml/gad-sam21-multi-area-planning",
-  "lastSessionSummary": "Updated bmadAdapter.ts to recursively auto-discover BMAD planning stage increments (PRDs, Architectures, Epics) for gad-sam21-multi-area-planning. Registered new Architecture Topology View (Idea 17) rendering multi-layer swimlanes, node detail inspector, and Mermaid diagram source.",
+  "lastSessionSummary": "Redesigned CommandCenter sidebar into a Searchable, Categorized, and Epic-Grouped Story Navigator. Added real-time filter input, category pills ([All], [Planning], [Epics], [Stories]), collapsible epic accordions, and formatted story titles (e.g. Story 1.1: Assemble Controlled WS0 Set).",
   "topActivePainPoints": [],
   "currentUxPriority": {
-    "ideaId": "Idea 17",
-    "title": "Interactive Architecture Diagram Builder",
-    "status": "Verified & Active"
+    "ideaId": "Sidebar UX & Story Navigator",
+    "title": "Searchable & Epic-Grouped Story Navigator",
+    "status": "Implemented & Verified"
   }
 }

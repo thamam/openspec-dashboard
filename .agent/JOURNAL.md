@@ -15,6 +15,16 @@ This journal maintains a continuous, unbroken record of development cycles, huma
 
 ## Development Cycles & Decision History
 
+### [Cycle #024] - 2026-07-28 - Searchable & Epic-Grouped Story Navigator
+- **Human Pain Point / Friction:** The left sidebar displayed a flat, unorganized list of 75+ stories (`Story 1 1 Assemble Th...`, `Story 1 2 Build...`), making it very truncated and difficult to navigate.
+- **Matched UX Ideas:** Idea 02 (Neighborhood Topology), Idea 06 (Noise Suppression & Categorization).
+- **Key Accomplishments:**
+  - Redesigned `CommandCenter/index.tsx` into a **Searchable, Categorized, and Epic-Grouped Story Navigator**.
+  - Built a real-time search input bar (`🔍 Filter stories & epics...`) and category filter pills (`[All]`, `[📌 Plan]`, `[📦 Epics]`, `[📄 Stories]`).
+  - Implemented collapsible **Epic Folder Accordions** (e.g. `📁 Epic 1 (6)`, `📁 Epic 2 (9)`...) that expand on click or search match.
+  - Enhanced `bmadAdapter.ts` to parse single-story filenames into clean titles (e.g. `Story 1.1: Assemble Controlled Ws0 Eval Set`) with full hover tooltips.
+- **Verification:** 46/46 server Vitest tests passing; client build succeeded cleanly in 816ms.
+
 ### [Cycle #023] - 2026-07-28 - BMAD Planning Stage Increments & Topology Sync
 - **Objective:** Sync OpenSpec Dashboard to ingest newly completed BMAD planning stage artifacts (PRDs, Architectures, Epics) from `/Users/tomerhamam/work/projects/neuronbox-ml/gad-sam21-multi-area-planning`.
 - **Key Accomplishments:**
