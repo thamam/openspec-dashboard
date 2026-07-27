@@ -1,0 +1,293 @@
+.diagram-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  background-color: #010409;
+  color: #c9d1d9;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.diagram-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  background-color: #0d1117;
+  border-bottom: 1px solid #30363d;
+}
+
+.diagram-title-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.diagram-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #f0f6fc;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.diagram-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background-color: #23863622;
+  color: #3fb950;
+  border: 1px solid #23863666;
+}
+
+.diagram-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.diagram-btn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid #30363d;
+  background-color: #21262d;
+  color: #c9d1d9;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.diagram-btn:hover {
+  background-color: #30363d;
+  border-color: #8b949e;
+  color: #f0f6fc;
+}
+
+.diagram-btn.active {
+  background-color: #1f6feb;
+  border-color: #388bfd;
+  color: #ffffff;
+}
+
+.diagram-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.diagram-canvas {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.diagram-layer {
+  background-color: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  transition: border-color 0.2s;
+}
+
+.diagram-layer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #21262d;
+  padding-bottom: 8px;
+}
+
+.diagram-layer-title {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #8b949e;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.diagram-nodes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.diagram-node-card {
+  background-color: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+}
+
+.diagram-node-card:hover {
+  transform: translateY(-2px);
+  border-color: #58a6ff;
+  box-shadow: 0 4px 16px rgba(88, 166, 255, 0.15);
+}
+
+.diagram-node-card.selected {
+  border-color: #388bfd;
+  background-color: #1c2128;
+  box-shadow: 0 0 0 2px rgba(56, 139, 253, 0.4);
+}
+
+.diagram-node-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.diagram-node-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #f0f6fc;
+}
+
+.diagram-node-type-pill {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background-color: #1f6feb22;
+  color: #58a6ff;
+  border: 1px solid #388bfd44;
+  white-space: nowrap;
+}
+
+.diagram-node-desc {
+  font-size: 12px;
+  color: #8b949e;
+  line-height: 1.4;
+}
+
+.diagram-node-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #8b949e;
+  border-top: 1px dashed #21262d;
+  padding-top: 8px;
+}
+
+.diagram-node-links-count {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #58a6ff;
+  font-weight: 600;
+}
+
+.diagram-inspector-drawer {
+  width: 380px;
+  background-color: #0d1117;
+  border-left: 1px solid #30363d;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 20px;
+  gap: 16px;
+  box-shadow: -4px 0 16px rgba(0,0,0,0.3);
+}
+
+.diagram-inspector-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #21262d;
+  padding-bottom: 12px;
+}
+
+.diagram-inspector-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #f0f6fc;
+}
+
+.diagram-close-btn {
+  background: transparent;
+  border: none;
+  color: #8b949e;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.diagram-close-btn:hover {
+  color: #f0f6fc;
+  background-color: #21262d;
+}
+
+.diagram-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.diagram-section-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #8b949e;
+  letter-spacing: 0.5px;
+}
+
+.diagram-spec-item {
+  background-color: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #c9d1d9;
+}
+
+.diagram-mermaid-drawer {
+  flex: 1;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background-color: #010409;
+}
+
+.diagram-code-box {
+  flex: 1;
+  background-color: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 16px;
+  font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+  font-size: 13px;
+  color: #e6edf3;
+  overflow: auto;
+  white-space: pre;
+  line-height: 1.5;
+}

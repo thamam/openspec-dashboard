@@ -15,6 +15,17 @@ This journal maintains a continuous, unbroken record of development cycles, huma
 
 ## Development Cycles & Decision History
 
+### [Cycle #022] - 2026-07-27 - Idea 17: Interactive Architecture Diagram Builder
+- **Human Pain Point / Need:** Code reviewers lacked a top-level architectural diagram view to understand complex proposed system changes, layer boundaries, and component interactions before inspecting raw diffs.
+- **Matched UX Ideas:** Idea 17 (Interactive Architecture Diagram Builder), Idea 28 (Interactive C4 Topology), Idea 02 (Neighborhood Topology).
+- **Key Accomplishments:**
+  - Designed and created `DiagramView.tsx` and `DiagramView.css` for interactive visual component diagram rendering.
+  - Implemented dynamic component parsing from SDD artifacts (`proposal.md`, `design.md`, `specs.md`, `linkages.json`) categorizing nodes into 4 system layers (*Presentation & UI*, *Orchestration & API*, *Core Engine*, *Data & Storage*).
+  - Built an interactive **Node Detail Inspector** drawer displaying node overviews, design rationales, linked specifications, and execution tasks.
+  - Added a **Mermaid Source View** toggle with 1-click clipboard copying for bidirectional spec/diagram sync.
+  - Registered `📐 Architecture (Idea 17)` view routing in `ArtifactViewer/index.tsx` and added action button in `SkylineCard.tsx`.
+- **Verification:** Client build `npm run build` completed cleanly in 867ms with 0 errors.
+
 ### [Cycle #021] - 2026-07-27 - Visual UX Scaffolding & Ambiguity Audit (ClawDoc Monitor Story 4.1)
 - **Human Pain Point / Need:** Code reviews of UX-oriented changes are tedious when reading text. Reviewers need visual UI mockups of baseline vs proposed state and explicit highlighting of subjective LLM decisions/ambiguities.
 - **Matched UX Ideas:** Idea 14 (Visual UX Scaffolding), Idea 08 (Decision Cards), Exception-Based Review Pattern.

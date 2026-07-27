@@ -4,7 +4,7 @@ import { Artifacts } from '../../../types';
 interface Props {
   artifacts: Artifacts;
   activeChange: string;
-  onSwitchView?: (view: 'dashboard' | 'matrix' | 'raw') => void;
+  onSwitchView?: (view: 'dashboard' | 'matrix' | 'raw' | 'diagram') => void;
   onWalkPillar?: (pillarId: string) => void;
 }
 
@@ -309,6 +309,12 @@ export const SkylineCard: React.FC<Props> = ({ artifacts, activeChange, onSwitch
           Ready for technical details? Zoom into Level 2 (Neighborhoods) for component choices.
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
+          <button
+            onClick={() => onSwitchView?.('diagram')}
+            style={{ padding: '8px 16px', backgroundColor: '#1f6feb', color: '#ffffff', border: '1px solid #388bfd', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            📐 Architecture Diagram (Idea 17)
+          </button>
           <button
             onClick={() => onSwitchView?.('dashboard')}
             style={{ padding: '8px 16px', backgroundColor: '#21262d', color: '#c9d1d9', border: '1px solid #363b42', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}

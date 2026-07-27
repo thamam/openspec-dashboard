@@ -5,6 +5,7 @@ import { RawView } from './views/RawView';
 import { MatrixView } from './views/MatrixView';
 import { DashboardView } from './views/DashboardView';
 import { WizardView } from './views/WizardView';
+import { DiagramView } from './views/DiagramView';
 
 interface Props {
   artifacts: Artifacts;
@@ -14,7 +15,7 @@ interface Props {
 }
 
 export const ArtifactViewer: React.FC<Props> = ({ artifacts, tasks: _tasks, files, activeChange }) => {
-  const [viewMode, setViewMode] = useState<'skyline' | 'raw' | 'matrix' | 'dashboard' | 'wizard'>('skyline');
+  const [viewMode, setViewMode] = useState<'skyline' | 'raw' | 'matrix' | 'dashboard' | 'wizard' | 'diagram'>('skyline');
   const [selectedPillarId, setSelectedPillarId] = useState<string | null>(null);
 
   const handleWalkPillar = (pillarId: string) => {
@@ -37,6 +38,8 @@ export const ArtifactViewer: React.FC<Props> = ({ artifacts, tasks: _tasks, file
             onWalkPillar={handleWalkPillar}
           />
         );
+      case 'diagram':
+        return <DiagramView artifacts={artifacts} />;
       case 'matrix':
         return <MatrixView artifacts={artifacts} />;
       case 'dashboard':
@@ -69,6 +72,7 @@ export const ArtifactViewer: React.FC<Props> = ({ artifacts, tasks: _tasks, file
         <div style={{ display: 'flex', gap: '5px' }}>
           {[
             { id: 'skyline', icon: '⚡', label: 'Skyline (L1)' },
+            { id: 'diagram', icon: '📐', label: 'Architecture (Idea 17)' },
             { id: 'dashboard', icon: '📊', label: 'Neighborhoods (L2)' },
             { id: 'matrix', icon: '🌳', label: 'Matrix (L3)' },
             { id: 'raw', icon: '📝', label: 'Raw Diffs (L4)' },
