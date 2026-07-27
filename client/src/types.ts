@@ -3,6 +3,8 @@ export interface ChangeItem {
   title: string;
   status: string;
   framework?: 'openspec' | 'bmad';
+  category?: 'planning' | 'epic' | 'story' | 'openspec';
+  epicNumber?: number;
 }
 
 export interface TaskItem {

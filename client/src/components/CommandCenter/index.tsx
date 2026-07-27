@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { ChangeItem } from '../../types';
 
 interface Props {
@@ -20,42 +20,292 @@ export const CommandCenter: React.FC<Props> = ({
   onProviderChange,
   onNewChangeClick
 }) => {
-  return (
-    <div className="left-pane">
-      <div className="pane-header">Changes</div>
-      <div className="nav-group">
-        <div className={`nav-item ${activeChange === 'main' ? 'active' : ''}`} onClick={() => setActiveChange('main')} id="nav-item-main">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-          main
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeCategoryFilter, setActiveCategoryFilter] = useState<'all' | 'planning' | 'epic' | 'story'>('all');
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    planning: true,
+    epics: true,
+    stories: true,
+  });
+  const [expandedEpics, setExpandedEpics] = useState<Record<number, boolean>>({});
+
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  const toggleEpicFolder = (epicNum: number) => {
+    setExpandedEpics(prev => ({ ...prev, [epicNum]: !prev[epicNum] }));
+  };
+
+  // Filter & categorize items
+  const filteredChanges = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return changes.filter(c => {
+      const matchesSearch = !query || c.title.toLowerCase().includes(query) || c.id.toLowerCase().includes(query);
+      const matchesCategory = activeCategoryFilter === 'all' || 
+        (activeCategoryFilter === 'planning' && (c.category === 'planning' || c.id === 'main')) ||
+        (activeCategoryFilter === 'epic' && c.category === 'epic') ||
+        (activeCategoryFilter === 'story' && c.category === 'story');
+      return matchesSearch && matchesCategory;
+    });
+  }, [changes, searchQuery, activeCategoryFilter]);
+
+  // Group items by category
+  const planningItems = useMemo(() => filteredChanges.filter(c => c.category === 'planning' || c.id === 'main'), [filteredChanges]);
+  const epicItems = useMemo(() => filteredChanges.filter(c => c.category === 'epic'), [filteredChanges]);
+  const storyItems = useMemo(() => filteredChanges.filter(c => c.category === 'story'), [filteredChanges]);
+
+  // Group stories by Epic Number
+  const storiesByEpic = useMemo(() => {
+    const map = new Map<number, ChangeItem[]>();
+    const ungrouped: ChangeItem[] = [];
+
+    storyItems.forEach(item => {
+      if (item.epicNumber !== undefined) {
+        if (!map.has(item.epicNumber)) map.set(item.epicNumber, []);
+        map.get(item.epicNumber)!.push(item);
+      } else {
+        ungrouped.push(item);
+      }
+    });
+
+    const sortedEpics = Array.from(map.keys()).sort((a, b) => a - b);
+    return { map, sortedEpics, ungrouped };
+  }, [storyItems]);
+
+  const renderItemCard = (change: ChangeItem) => {
+    const isActive = activeChange === change.id;
+    return (
+      <div 
+        key={change.id} 
+        className={`nav-item ${isActive ? 'active' : ''}`} 
+        onClick={() => setActiveChange(change.id)}
+        id={`nav-item-${change.id}`}
+        title={change.title}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '6px 10px',
+          fontSize: '12.5px',
+          borderRadius: '5px',
+          marginBottom: '3px',
+          cursor: 'pointer',
+          transition: 'all 0.15s ease',
+          borderLeft: isActive ? '3px solid #388bfd' : '3px solid transparent',
+          backgroundColor: isActive ? 'rgba(56, 139, 253, 0.15)' : 'transparent'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', minWidth: 0 }}>
+          <span style={{ fontSize: '11px', flexShrink: 0 }}>
+            {change.category === 'planning' ? '📌' : change.category === 'epic' ? '📦' : '📄'}
+          </span>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: isActive ? 600 : 400 }}>
+            {change.title}
+          </span>
         </div>
-        {changes.map(change => (
-          <div 
-            key={change.id} 
-            className={`nav-item ${activeChange === change.id ? 'active' : ''}`} 
-            onClick={() => setActiveChange(change.id)}
-            id={`nav-item-${change.id}`}
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+        <span style={{
+          fontSize: '9px',
+          fontWeight: 'bold',
+          padding: '1px 5px',
+          borderRadius: '3px',
+          flexShrink: 0,
+          background: change.framework === 'bmad' ? 'rgba(168, 85, 247, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+          color: change.framework === 'bmad' ? '#c084fc' : '#60a5fa',
+          border: `1px solid ${change.framework === 'bmad' ? 'rgba(168, 85, 247, 0.3)' : 'rgba(59, 130, 246, 0.3)'}`
+        }}>
+          {change.framework === 'bmad' ? 'BMAD' : 'SPEC'}
+        </span>
+      </div>
+    );
+  };
+
+  return (
+    <div className="left-pane" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+      <div className="pane-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span>Changes Navigator</span>
+        <span style={{ fontSize: '11px', color: '#8b949e', fontWeight: 'bold' }}>{changes.length} Items</span>
+      </div>
+
+      {/* Search Input */}
+      <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--border-color)', backgroundColor: '#0d1117' }}>
+        <input
+          type="text"
+          placeholder="🔍 Filter stories & epics..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          style={{
+            width: '100%',
+            boxSizing: 'border-box',
+            backgroundColor: '#161b22',
+            border: '1px solid #30363d',
+            color: '#c9d1d9',
+            padding: '5px 8px',
+            borderRadius: '4px',
+            fontSize: '12px',
+            outline: 'none'
+          }}
+        />
+      </div>
+
+      {/* Category Pills */}
+      <div style={{ display: 'flex', gap: '4px', padding: '6px 10px', borderBottom: '1px solid var(--border-color)', backgroundColor: '#0d1117', overflowX: 'auto' }}>
+        {[
+          { id: 'all', label: `All (${changes.length})` },
+          { id: 'planning', label: `📌 Plan (${planningItems.length})` },
+          { id: 'epic', label: `📦 Epics (${epicItems.length})` },
+          { id: 'story', label: `📄 Stories (${storyItems.length})` },
+        ].map(cat => (
+          <button
+            key={cat.id}
+            onClick={() => setActiveCategoryFilter(cat.id as any)}
+            style={{
+              padding: '2px 7px',
+              fontSize: '10.5px',
+              fontWeight: 600,
+              borderRadius: '10px',
+              border: '1px solid',
+              borderColor: activeCategoryFilter === cat.id ? '#388bfd' : '#30363d',
+              backgroundColor: activeCategoryFilter === cat.id ? '#1f6feb22' : '#161b22',
+              color: activeCategoryFilter === cat.id ? '#58a6ff' : '#8b949e',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap'
+            }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{change.title} {activeChange === change.id ? '(Active)' : ''}</span>
-            </div>
-            <span style={{
-              fontSize: '9px',
-              fontWeight: 'bold',
-              padding: '1px 5px',
-              borderRadius: '3px',
-              flexShrink: 0,
-              background: change.framework === 'bmad' ? 'rgba(168, 85, 247, 0.15)' : 'rgba(59, 130, 246, 0.15)',
-              color: change.framework === 'bmad' ? '#a855f7' : '#3b82f6',
-              border: `1px solid ${change.framework === 'bmad' ? 'rgba(168, 85, 247, 0.3)' : 'rgba(59, 130, 246, 0.3)'}`
-            }}>
-              {change.framework === 'bmad' ? 'BMAD' : 'OPENSPEC'}
-            </span>
-          </div>
+            {cat.label}
+          </button>
         ))}
       </div>
 
+      {/* Scrollable Nav List */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
+        {/* Section 1: Planning & Architecture */}
+        {planningItems.length > 0 && (
+          <div style={{ marginBottom: '12px' }}>
+            <div 
+              onClick={() => toggleSection('planning')}
+              style={{
+                fontSize: '11px',
+                fontWeight: 'bold',
+                color: '#8b949e',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                padding: '4px 6px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                userSelect: 'none'
+              }}
+            >
+              <span>{expandedSections.planning ? '▼' : '▶'} 📌 Planning Stage ({planningItems.length})</span>
+            </div>
+            {expandedSections.planning && (
+              <div style={{ marginTop: '4px' }}>
+                {planningItems.map(renderItemCard)}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Section 2: Epics */}
+        {epicItems.length > 0 && (
+          <div style={{ marginBottom: '12px' }}>
+            <div 
+              onClick={() => toggleSection('epics')}
+              style={{
+                fontSize: '11px',
+                fontWeight: 'bold',
+                color: '#8b949e',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                padding: '4px 6px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                userSelect: 'none'
+              }}
+            >
+              <span>{expandedSections.epics ? '▼' : '▶'} 📦 Epics & Sprints ({epicItems.length})</span>
+            </div>
+            {expandedSections.epics && (
+              <div style={{ marginTop: '4px' }}>
+                {epicItems.map(renderItemCard)}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Section 3: Stories Grouped by Epic */}
+        {storyItems.length > 0 && (
+          <div style={{ marginBottom: '12px' }}>
+            <div 
+              onClick={() => toggleSection('stories')}
+              style={{
+                fontSize: '11px',
+                fontWeight: 'bold',
+                color: '#8b949e',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                padding: '4px 6px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                userSelect: 'none'
+              }}
+            >
+              <span>{expandedSections.stories ? '▼' : '▶'} 📄 Stories ({storyItems.length})</span>
+            </div>
+
+            {expandedSections.stories && (
+              <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {storiesByEpic.sortedEpics.map(epicNum => {
+                  const epicStories = storiesByEpic.map.get(epicNum)!;
+                  const isEpicOpen = expandedEpics[epicNum] ?? (searchQuery.length > 0 || epicStories.some(s => s.id === activeChange));
+
+                  return (
+                    <div key={epicNum} style={{ backgroundColor: '#0d1117', border: '1px solid #21262d', borderRadius: '6px', overflow: 'hidden' }}>
+                      <div 
+                        onClick={() => toggleEpicFolder(epicNum)}
+                        style={{
+                          padding: '5px 8px',
+                          fontSize: '11.5px',
+                          fontWeight: 600,
+                          color: '#c9d1d9',
+                          backgroundColor: '#161b22',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          userSelect: 'none'
+                        }}
+                      >
+                        <span>{isEpicOpen ? '📂' : '📁'} Epic {epicNum} ({epicStories.length})</span>
+                        <span style={{ fontSize: '10px', color: '#8b949e' }}>{isEpicOpen ? '▲' : '▼'}</span>
+                      </div>
+                      {isEpicOpen && (
+                        <div style={{ padding: '4px 6px' }}>
+                          {epicStories.map(renderItemCard)}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {storiesByEpic.ungrouped.length > 0 && (
+                  <div style={{ padding: '4px 6px' }}>
+                    {storiesByEpic.ungrouped.map(renderItemCard)}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Agent Configuration Footer */}
       <div className="pane-header" style={{ marginTop: 'auto', borderTop: '1px solid var(--border-color)', borderBottom: 'none' }}>Agent Configuration</div>
       <div style={{ padding: '0 12px 12px 12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
         <label style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 'bold' }}>AGENT PROVIDER</label>
@@ -84,7 +334,7 @@ export const CommandCenter: React.FC<Props> = ({
       <div className="pane-header" style={{ borderTop: '1px solid var(--border-color)', borderBottom: 'none' }}>Lifecycle Actions</div>
       <button 
         className="lifecycle-btn" 
-        style={{ border: '1px dashed var(--accent-color)' }}
+        style={{ border: '1px dashed var(--accent-color)', margin: '8px 12px' }}
         onClick={() => {
           if (onNewChangeClick) {
             onNewChangeClick();
@@ -97,9 +347,6 @@ export const CommandCenter: React.FC<Props> = ({
       >
         + New Change (opsx-new)
       </button>
-      <button className="lifecycle-btn primary" onClick={() => executeCommand('opsx-continue')} id="btn-opsx-continue">▶ Continue (opsx-continue)</button>
-      <button className="lifecycle-btn" onClick={() => executeCommand('opsx-verify')} id="btn-opsx-verify">Verify Specs (opsx-verify)</button>
-      <button className="lifecycle-btn" onClick={() => executeCommand('opsx-sync')} id="btn-opsx-sync">Sync Specs (opsx-sync)</button>
     </div>
   );
 };

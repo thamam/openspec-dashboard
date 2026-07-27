@@ -64,14 +64,15 @@ export function getBMADSprints(repoPath: string): BMADChangeItem[] {
       for (const f of files) {
         if (f.endsWith('.md') && f !== 'deferred-work.md') {
           const id = f.replace(/\.md$/, '');
-          const cleanName = f.replace(/\.md$/, '').replace(/-/g, ' ');
-          const title = cleanName.replace(/\b\w/g, (l) => l.toUpperCase());
+          const { title, epicNumber } = parseStoryMetadata(f);
 
           sprintList.push({
             id,
-            title: `Story ${title}`,
+            title,
             status: 'In Progress',
             framework: 'bmad',
+            category: 'story',
+            epicNumber,
             sprintPath: path.join(implDir, f),
           });
         }
@@ -88,11 +89,15 @@ export function getBMADSprints(repoPath: string): BMADChangeItem[] {
       const baseEntries = fs.readdirSync(bmadBase, { withFileTypes: true });
       for (const entry of baseEntries) {
         if (entry.isDirectory() && entry.name.startsWith('epic-')) {
+          const epicMatch = entry.name.match(/epic-(\d+)/i);
+          const epicNum = epicMatch ? parseInt(epicMatch[1], 10) : undefined;
           sprintList.push({
             id: entry.name,
             title: entry.name.replace(/-/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
             status: 'In Progress',
             framework: 'bmad',
+            category: 'epic',
+            epicNumber: epicNum,
             sprintPath: path.join(bmadBase, entry.name),
           });
         }
@@ -124,6 +129,7 @@ export function getBMADSprints(repoPath: string): BMADChangeItem[] {
           title: 'Planning Stage (PRD + Architecture + Epics)',
           status: 'In Progress',
           framework: 'bmad',
+          category: 'planning',
           sprintPath: pDir,
         });
       }
@@ -144,17 +150,20 @@ export function getBMADSprints(repoPath: string): BMADChangeItem[] {
                   title: `${entry.name.toUpperCase().slice(0, -1)}: ${title}`,
                   status: 'In Progress',
                   framework: 'bmad',
+                  category: 'planning',
                   sprintPath: subPath,
                 });
               }
             }
           } else {
             const title = deriveSprintTitle(entryPath, entry.name);
+            const isEpicOrSprint = entry.name.toLowerCase().includes('epic') || entry.name.toLowerCase().includes('sprint');
             sprintList.push({
               id: entry.name,
               title,
               status: 'In Progress',
               framework: 'bmad',
+              category: isEpicOrSprint ? 'epic' : 'planning',
               sprintPath: entryPath,
             });
           }
