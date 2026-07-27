@@ -102,7 +102,7 @@ export function getBMADSprints(repoPath: string): BMADChangeItem[] {
     }
   }
 
-  // 3. Traditional planning artifact sprint folders
+  // 3. Traditional planning artifact sprint folders and nested planning increments (prds, architectures, briefs)
   const planningDirs = [
     path.join(resolved, '_bmad-output', 'planning-artifacts'),
     path.join(resolved, 'bmad-output', 'planning-artifacts'),
@@ -116,18 +116,48 @@ export function getBMADSprints(repoPath: string): BMADChangeItem[] {
     try {
       const entries = fs.readdirSync(pDir, { withFileTypes: true });
 
+      // Add a root planning stage item if root epics/architecture exist
+      const hasRootPlanning = entries.some(e => e.isFile() && (e.name === 'epics.md' || e.name === 'architecture.md'));
+      if (hasRootPlanning) {
+        sprintList.push({
+          id: 'planning-stage-latest',
+          title: 'Planning Stage (PRD + Architecture + Epics)',
+          status: 'In Progress',
+          framework: 'bmad',
+          sprintPath: pDir,
+        });
+      }
+
       for (const entry of entries) {
         if (entry.isDirectory()) {
-          const sprintPath = path.join(pDir, entry.name);
-          const title = deriveSprintTitle(sprintPath, entry.name);
+          const entryPath = path.join(pDir, entry.name);
 
-          sprintList.push({
-            id: entry.name,
-            title,
-            status: 'In Progress',
-            framework: 'bmad',
-            sprintPath,
-          });
+          // If entry is a category folder like prds, architectures, briefs, scan children
+          if (['prds', 'architectures', 'briefs', 'ux-designs'].includes(entry.name.toLowerCase())) {
+            const subEntries = fs.readdirSync(entryPath, { withFileTypes: true });
+            for (const sub of subEntries) {
+              if (sub.isDirectory()) {
+                const subPath = path.join(entryPath, sub.name);
+                const title = deriveSprintTitle(subPath, sub.name);
+                sprintList.push({
+                  id: sub.name,
+                  title: `${entry.name.toUpperCase().slice(0, -1)}: ${title}`,
+                  status: 'In Progress',
+                  framework: 'bmad',
+                  sprintPath: subPath,
+                });
+              }
+            }
+          } else {
+            const title = deriveSprintTitle(entryPath, entry.name);
+            sprintList.push({
+              id: entry.name,
+              title,
+              status: 'In Progress',
+              framework: 'bmad',
+              sprintPath: entryPath,
+            });
+          }
         }
       }
     } catch (err) {
@@ -144,19 +174,21 @@ export function getBMADSprints(repoPath: string): BMADChangeItem[] {
 function deriveSprintTitle(sprintFolder: string, defaultId: string): string {
   try {
     const files = fs.readdirSync(sprintFolder);
-    const kickoffFile = files.find((f) => f.toUpperCase().endsWith('-KICKOFF.MD') || f.toUpperCase() === 'KICKOFF.MD');
 
-    if (kickoffFile) {
-      const content = fs.readFileSync(path.join(sprintFolder, kickoffFile), 'utf8');
-      const h1Match = content.match(/^#\s+(.+)$/m);
-      if (h1Match) return h1Match[1].trim();
-    }
+    const preferredFiles = [
+      files.find((f) => f.toUpperCase().endsWith('-KICKOFF.MD') || f.toUpperCase() === 'KICKOFF.MD'),
+      files.find((f) => f.toLowerCase() === 'prd.md' || f.toLowerCase().endsWith('-prd.md')),
+      files.find((f) => f.toLowerCase() === 'architecture.md' || f.toLowerCase().endsWith('-architecture.md')),
+      files.find((f) => f.toLowerCase() === 'brief.md' || f.toLowerCase().endsWith('-brief.md')),
+      files.find((f) => f.toLowerCase() === 'epics.md'),
+    ];
 
-    const epicsFile = files.find((f) => f.toLowerCase() === 'epics.md');
-    if (epicsFile) {
-      const content = fs.readFileSync(path.join(sprintFolder, epicsFile), 'utf8');
-      const h1Match = content.match(/^#\s+(.+)$/m);
-      if (h1Match) return h1Match[1].trim();
+    for (const file of preferredFiles) {
+      if (file) {
+        const content = fs.readFileSync(path.join(sprintFolder, file), 'utf8');
+        const h1Match = content.match(/^#\s+(.+)$/m);
+        if (h1Match) return h1Match[1].trim();
+      }
     }
   } catch (e) {
     // Ignore and fallback
@@ -235,8 +267,8 @@ export function getBMADArtifacts(repoPath: string, sprintId: string): BMADArtifa
           const lowerName = entry.name.toLowerCase();
           const content = fs.readFileSync(fullPath, 'utf8');
 
-          if (lowerName.endsWith('-kickoff.md') || lowerName === 'kickoff.md') {
-            proposal = content;
+          if (lowerName.endsWith('-kickoff.md') || lowerName === 'kickoff.md' || lowerName.includes('prd') || lowerName.includes('brief')) {
+            proposal += (proposal ? '\n\n---\n\n' : '') + content;
           } else if (lowerName === '.memlog.md' || lowerName.includes('architecture') || lowerName.includes('spine')) {
             design += (design ? '\n\n---\n\n' : '') + content;
           } else if (lowerName.includes('epic') || lowerName.includes('story')) {
@@ -251,6 +283,23 @@ export function getBMADArtifacts(repoPath: string, sprintId: string): BMADArtifa
     };
 
     readDirRecursive(sprintPath);
+  }
+
+  // Supplement missing proposal/design/tasks from root planning artifacts if needed
+  const planningBase = path.join(resolved, '_bmad-output', 'planning-artifacts');
+  if (fs.existsSync(planningBase)) {
+    if (!proposal) {
+      const rootPrd = path.join(planningBase, 'prd.md');
+      if (fs.existsSync(rootPrd)) proposal = fs.readFileSync(rootPrd, 'utf8');
+    }
+    if (!design) {
+      const rootArch = path.join(planningBase, 'architecture.md');
+      if (fs.existsSync(rootArch)) design = fs.readFileSync(rootArch, 'utf8');
+    }
+    if (!tasks) {
+      const rootEpics = path.join(planningBase, 'epics.md');
+      if (fs.existsSync(rootEpics)) tasks = fs.readFileSync(rootEpics, 'utf8');
+    }
   }
 
   // Synthesize semantic linkages from BMAD Stories and Architecture Decisions
