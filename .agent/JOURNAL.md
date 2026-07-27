@@ -15,6 +15,14 @@ This journal maintains a continuous, unbroken record of development cycles, huma
 
 ## Development Cycles & Decision History
 
+### [Cycle #023] - 2026-07-28 - BMAD Planning Stage Increments & Topology Sync
+- **Objective:** Sync OpenSpec Dashboard to ingest newly completed BMAD planning stage artifacts (PRDs, Architectures, Epics) from `/Users/tomerhamam/work/projects/neuronbox-ml/gad-sam21-multi-area-planning`.
+- **Key Accomplishments:**
+  - Upgraded `bmadAdapter.ts` to recursively scan nested category folders (`prds/`, `architectures/`, `briefs/`, `ux-designs/`) and detect root planning stage increments (`planning-stage-latest`).
+  - Added automatic cross-linking: if a specific PRD or Architecture increment is selected, `bmadAdapter` automatically supplements missing sibling sections from `architecture.md` and `epics.md`.
+  - Wired the new **Idea 17 Interactive Architecture Diagram Builder** to render layer swimlanes (*QC Presentation UI*, *FastAPI Orchestration*, *SAM 2.1/3.1 Core*, *ClearML/Storage*) and generate Mermaid diagram source.
+- **Verification:** 46/46 server Vitest tests passing; client build succeeded cleanly in 835ms.
+
 ### [Cycle #022] - 2026-07-27 - Idea 17: Interactive Architecture Diagram Builder
 - **Human Pain Point / Need:** Code reviewers lacked a top-level architectural diagram view to understand complex proposed system changes, layer boundaries, and component interactions before inspecting raw diffs.
 - **Matched UX Ideas:** Idea 17 (Interactive Architecture Diagram Builder), Idea 28 (Interactive C4 Topology), Idea 02 (Neighborhood Topology).

@@ -1,13 +1,13 @@
 {
   "project": "openspec-dashboard",
-  "lastUpdated": "2026-07-27T14:56:00Z",
-  "activeChange": "story/4.1-foundation",
-  "targetRepository": "clawhub-dev/clawdoc-monitor",
-  "lastSessionSummary": "Implemented Idea 17 (Interactive Architecture Diagram Builder) in OpenSpec Dashboard. Added DiagramView.tsx, DiagramView.css, and view routing in ArtifactViewer with visual canvas layers, interactive node inspector, and Mermaid diagram source sync.",
+  "lastUpdated": "2026-07-28T00:53:10Z",
+  "activeChange": "planning-stage-latest",
+  "targetRepository": "/Users/tomerhamam/work/projects/neuronbox-ml/gad-sam21-multi-area-planning",
+  "lastSessionSummary": "Updated bmadAdapter.ts to recursively auto-discover BMAD planning stage increments (PRDs, Architectures, Epics) for gad-sam21-multi-area-planning. Registered new Architecture Topology View (Idea 17) rendering multi-layer swimlanes, node detail inspector, and Mermaid diagram source.",
   "topActivePainPoints": [],
   "currentUxPriority": {
     "ideaId": "Idea 17",
     "title": "Interactive Architecture Diagram Builder",
-    "status": "Implemented"
+    "status": "Verified & Active"
   }
 }
