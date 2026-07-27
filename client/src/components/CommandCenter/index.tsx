@@ -57,7 +57,7 @@ export const CommandCenter: React.FC<Props> = ({
     openspec: true,
     planning: true,
     epics: true,
-    stories: true,
+    stories: false, // Default collapsed to prevent clutter
   });
   const [expandedEpics, setExpandedEpics] = useState<Record<number, boolean>>({});
 
@@ -93,6 +93,13 @@ export const CommandCenter: React.FC<Props> = ({
   const planningItems = useMemo(() => filteredChanges.filter(c => c.category === 'planning'), [filteredChanges]);
   const epicItems = useMemo(() => filteredChanges.filter(c => c.category === 'epic'), [filteredChanges]);
   const storyItems = useMemo(() => filteredChanges.filter(c => c.category === 'story'), [filteredChanges]);
+
+  // Find top recommended entry item for user's current phase
+  const recommendedItem = useMemo(() => {
+    return planningItems.find(p => p.id === 'planning-stage-latest' || p.id.includes('gad-sam21') || p.id.includes('architecture')) ||
+           planningItems[0] ||
+           epicItems[0];
+  }, [planningItems, epicItems]);
 
   // Group stories by Epic Number
   const storiesByEpic = useMemo(() => {
@@ -165,6 +172,36 @@ export const CommandCenter: React.FC<Props> = ({
         <span>Changes Navigator</span>
         <span style={{ fontSize: '11px', color: '#8b949e', fontWeight: 'bold' }}>{changes.length} Items</span>
       </div>
+
+      {/* Featured Recommended Starting Point Card */}
+      {recommendedItem && (
+        <div style={{ padding: '10px', backgroundColor: '#0d1117', borderBottom: '1px solid #30363d' }}>
+          <div style={{ fontSize: '10px', fontWeight: 700, color: '#3fb950', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <span>⭐ RECOMMENDED FOR YOUR PHASE</span>
+          </div>
+          <div 
+            onClick={() => setActiveChange(recommendedItem.id)}
+            style={{
+              padding: '8px 10px',
+              backgroundColor: activeChange === recommendedItem.id ? 'rgba(56, 139, 253, 0.2)' : 'rgba(31, 111, 235, 0.12)',
+              border: '1px solid #388bfd88',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '4px',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <div style={{ fontSize: '12.5px', fontWeight: 700, color: '#58a6ff', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span>📌</span> {recommendedItem.title}
+            </div>
+            <div style={{ fontSize: '11px', color: '#8b949e', lineHeight: 1.3 }}>
+              View full architecture, PRD, & Idea 17 Diagram.
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Search Input */}
       <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--border-color)', backgroundColor: '#0d1117' }}>
