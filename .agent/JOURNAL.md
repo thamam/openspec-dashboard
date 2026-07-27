@@ -15,6 +15,14 @@ This journal maintains a continuous, unbroken record of development cycles, huma
 
 ## Development Cycles & Decision History
 
+### [Cycle #025] - 2026-07-28 - /api/changes Category Serialization & Client Fallback Categorizer
+- **Human Pain Point / Root Cause Analysis:** Items in the sidebar collapsed into 0 counts (`Plan (0)`, `Epics (0)`, `Stories (0)`) because `server/src/app.ts` (`/api/changes`) was stripping the `category` and `epicNumber` properties from `getBMADSprints()` before JSON serialization.
+- **Key Accomplishments:**
+  - Updated `server/src/app.ts` to include `category: s.category` and `epicNumber: s.epicNumber` in the `/api/changes` response array.
+  - Implemented robust client-side `getItemCategory()` and `getItemEpicNumber()` fallback regex resolvers in `CommandCenter/index.tsx` so all items (e.g. `Story 1 1`, `1-1-assemble...`, `epic-4`) are 100% categorized even if metadata is missing.
+  - Added an `⚡ Active Changes` fallback section to ensure zero items are lost.
+- **Verification:** 46/46 server Vitest tests passing; client build succeeded in 723ms.
+
 ### [Cycle #024] - 2026-07-28 - Searchable & Epic-Grouped Story Navigator
 - **Human Pain Point / Friction:** The left sidebar displayed a flat, unorganized list of 75+ stories (`Story 1 1 Assemble Th...`, `Story 1 2 Build...`), making it very truncated and difficult to navigate.
 - **Matched UX Ideas:** Idea 02 (Neighborhood Topology), Idea 06 (Noise Suppression & Categorization).

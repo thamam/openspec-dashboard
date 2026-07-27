@@ -1,13 +1,13 @@
 {
   "project": "openspec-dashboard",
-  "lastUpdated": "2026-07-28T01:16:42Z",
+  "lastUpdated": "2026-07-28T01:23:50Z",
   "activeChange": "planning-stage-latest",
   "targetRepository": "/Users/tomerhamam/work/projects/neuronbox-ml/gad-sam21-multi-area-planning",
-  "lastSessionSummary": "Redesigned CommandCenter sidebar into a Searchable, Categorized, and Epic-Grouped Story Navigator. Added real-time filter input, category pills ([All], [Planning], [Epics], [Stories]), collapsible epic accordions, and formatted story titles (e.g. Story 1.1: Assemble Controlled WS0 Set).",
+  "lastSessionSummary": "Fixed missing category and epicNumber serialization in server /api/changes endpoint and added robust client-side fallback categorization in CommandCenter/index.tsx. Verified all items now correctly populate Planning, Epics, and Stories accordions.",
   "topActivePainPoints": [],
   "currentUxPriority": {
     "ideaId": "Sidebar UX & Story Navigator",
     "title": "Searchable & Epic-Grouped Story Navigator",
-    "status": "Implemented & Verified"
+    "status": "Fixed & Verified"
   }
 }
