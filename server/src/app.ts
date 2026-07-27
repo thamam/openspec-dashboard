@@ -53,7 +53,7 @@ app.get('/api/changes', async (req, res) => {
   }
   try {
     const resolvedPath = resolvePath(repoPath);
-    const allChanges: Array<{ id: string; title: string; status: string; framework?: 'openspec' | 'bmad' }> = [];
+    const allChanges: Array<{ id: string; title: string; status: string; framework?: 'openspec' | 'bmad'; category?: string; epicNumber?: number }> = [];
 
     // 1. OpenSpec changes
     const changesDir = path.join(resolvedPath, 'openspec', 'changes');
@@ -64,7 +64,8 @@ app.get('/api/changes', async (req, res) => {
           id: d.name,
           title: d.name,
           status: 'In Progress',
-          framework: 'openspec'
+          framework: 'openspec',
+          category: 'openspec'
         });
       });
     }
@@ -76,7 +77,9 @@ app.get('/api/changes', async (req, res) => {
         id: s.id,
         title: s.title,
         status: s.status,
-        framework: 'bmad'
+        framework: 'bmad',
+        category: s.category,
+        epicNumber: s.epicNumber
       });
     });
 
