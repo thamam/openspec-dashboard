@@ -130,204 +130,30 @@ function classifyItem(text: string): { risk: RiskLevel; isBoilerplate: boolean }
 /**
  * Generates rich Decision Chips (Title + Choice + Rationale) for Level 2 (Friend Level).
  */
-function extractDecisionChips(clusterId: string, artifacts?: Artifacts): DecisionChip[] {
-  const combined = ((artifacts?.proposal || '') + '\n' + (artifacts?.design || '') + '\n' + (artifacts?.spec || '')).toLowerCase();
+function extractDecisionChips(_clusterId: string, artifacts?: Artifacts): DecisionChip[] {
+  const combined = ((artifacts?.proposal || '') + '\n' + (artifacts?.design || '') + '\n' + (artifacts?.spec || ''));
+  const lines = combined.split('\n');
+  const chips: DecisionChip[] = [];
 
-  // Profile / ClawDoc / Epic 4
-  if (combined.includes('profile') || combined.includes('clawdoc') || combined.includes('epic 4') || combined.includes('4-1-profile')) {
-    switch (clusterId) {
-      case 'identity':
-        return [
-          {
-            title: 'Storage Engine',
-            choice: 'Single JSON document (.clawdocprofile.json)',
-            rationale: 'Atomic temp + os.replace write protection prevents partial writes during power loss.',
-          },
-          {
-            title: 'Profile Pointer',
-            choice: '.activeprofile.json pointer file',
-            rationale: 'Remembers active profile across restarts with automatic default seed fallback.',
-          },
-          {
-            title: 'Key Material Rule',
-            choice: 'Reject credentials in profile JSON',
-            rationale: 'Prevents security tokens or passwords from leaking into persistent profile files.',
-          },
-        ];
-      case 'spine':
-        return [
-          {
-            title: 'Quarantine Strategy',
-            choice: 'Auto-rename to .corrupt.<timestamp>',
-            rationale: 'Preserves corrupted file bytes for developer inspection without crashing app launch.',
-          },
-          {
-            title: 'Schema Migration',
-            choice: 'Forward-only schema migration',
-            rationale: 'Upgrades older profile versions safely while backing up original files.',
-          },
-          {
-            title: 'Seed Fallback',
-            choice: 'Bundled default profile seed',
-            rationale: 'Guarantees a usable desktop launch state even if user profile is missing or invalid.',
-          },
-        ];
-      case 'jobs':
-        return [
-          {
-            title: 'Token Minting',
-            choice: '256-bit urandom session token',
-            rationale: 'Generated fresh per desktop launch using os.urandom(32) and never logged.',
-          },
-          {
-            title: 'HTML Injection',
-            choice: '<meta name="clawdoc-token"> header',
-            rationale: 'Injected at SPA read-time into index.html without extra script blocks.',
-          },
-          {
-            title: 'Token Gate',
-            choice: 'POST /api/profile/active authorization',
-            rationale: 'Uses hmac.compare_digest to block unauthorized web renderer writes.',
-          },
-        ];
-      case 'export':
-      default:
-        return [
-          {
-            title: 'Fetch Gateway',
-            choice: 'Single apiGet helper function',
-            rationale: 'Centralizes renderer network calls to exactly 1 fetch() site in index.html.',
-          },
-          {
-            title: 'Layer Disjointness',
-            choice: 'Agent-root disjointness assertions',
-            rationale: 'Prevents profile write targets from overlapping configured agent roots.',
-          },
-          {
-            title: 'Ratification Guard',
-            choice: 'Desktop build & packaging gates',
-            rationale: 'Asserts zero runtime dependencies and verifies macOS build scripts.',
-          },
-        ];
+  // Parse lines matching ### Decision: <Title> or **Choice**: <Text> or - **<Title>**: <Choice>
+  for (const line of lines) {
+    const decMatch = line.match(/^###\s+Decision\s*\d*\s*[:—–-]\s*(.+)$/i) ||
+                     line.match(/^[-*]\s+\*\*([^*]+)\*\*\s*[:—–-]\s*(.+)$/);
+
+    if (decMatch && chips.length < 3) {
+      const title = decMatch[1].trim();
+      const choice = decMatch[2] ? decMatch[2].trim() : 'Design contract specified in SDD.';
+      chips.push({
+        title,
+        choice,
+        rationale: `Architectural decision defined in ${artifacts?.framework === 'bmad' ? 'BMAD architecture' : 'OpenSpec design'}.`
+      });
     }
   }
 
-  // Video MLOps Pipeline (Sprint 4.5)
-  if (combined.includes('video') || combined.includes('keyframe') || combined.includes('sprint 4.5')) {
-    switch (clusterId) {
-      case 'identity':
-        return [
-          {
-            title: 'Frame Identity Key',
-            choice: '(video_id, manifest_id, frame_index)',
-            rationale: 'Anchors frames unambiguously across decoders without timestamp drift.',
-          },
-          {
-            title: 'Codec Isolation',
-            choice: 'Session layer owns video manifest',
-            rationale: 'Keeps the core AI segmentation engine 100% clean and codec-free.',
-          },
-          {
-            title: 'Timestamp Order',
-            choice: 'Monotonic integer milliseconds',
-            rationale: 'Enforces strict integer frame ordering starting at 0 for frame 0.',
-          },
-        ];
-      case 'spine':
-        return [
-          {
-            title: 'Single Source of Truth',
-            choice: 'Server owns video session state',
-            rationale: 'Prevents client-side state loss when refreshing or switching tabs.',
-          },
-          {
-            title: 'Conflict Guard',
-            choice: 'Versioned session write checks',
-            rationale: 'Rejects stale write attempts if a parallel background job updated session state.',
-          },
-          {
-            title: 'Storage Boundary',
-            choice: 'Working session cache vs durable export',
-            rationale: 'Isolates fast temporary session writes from durable ClearML dataset exports.',
-          },
-        ];
-      case 'jobs':
-        return [
-          {
-            title: 'Async Route Boundary',
-            choice: 'Immediate HTTP 202 response',
-            rationale: 'Offloads heavy MP4 decoding to background tasks so UI never freezes.',
-          },
-          {
-            title: 'Worker RAM Cap',
-            choice: 'Max 4 GB RAM per worker job',
-            rationale: 'Prevents video decoding jobs from breaching worker memory limits.',
-          },
-          {
-            title: 'Job Lifecycle',
-            choice: 'Stable job_id with attempt tracking',
-            rationale: 'Ensures failed decoding attempts can be safely retried or inspected.',
-          },
-        ];
-      case 'reentry':
-        return [
-          {
-            title: 'Bounded Window Re-Entry',
-            choice: 'Recomputes ONLY [c - 5, c + 5]',
-            rationale: 'Saves 90% compute time when a user corrects a mask on frame c.',
-          },
-          {
-            title: 'Outside Mask Preservation',
-            choice: 'Preserves approved masks 100%',
-            rationale: 'Ensures manual user approvals outside the active window are never overwritten.',
-          },
-          {
-            title: 'Halt Boundary Persistence',
-            choice: 'Persists cut & reseed points in session',
-            rationale: 'Remembers user-defined propagation boundaries across job restarts.',
-          },
-        ];
-      case 'export':
-        return [
-          {
-            title: 'Dataset Export Rule',
-            choice: 'Approved or Corrected frames only',
-            rationale: 'Filters out un-reviewed or failing candidate frames from training datasets.',
-          },
-          {
-            title: 'Sole Exporter Writer',
-            choice: 'segmentation/export module',
-            rationale: 'Guarantees single-writer consistency when publishing to ClearML storage.',
-          },
-          {
-            title: 'Dataset Lineage',
-            choice: 'Full frame provenance metadata',
-            rationale: 'Logs raw video ID, manifest ID, and model version for every exported label.',
-          },
-        ];
-      case 'execution':
-      default:
-        return [
-          {
-            title: 'Execution Scope',
-            choice: 'Stories 11.1 through 11.7',
-            rationale: 'Covers end-to-end video loading, propagation, QC, and dataset export.',
-          },
-          {
-            title: 'Acceptance Bar',
-            choice: 'Live production video per facility',
-            rationale: 'Requires real facility MP4 video validation before closing the epic.',
-          },
-          {
-            title: 'Model Constraint',
-            choice: 'Memoryless prior-mask baseline',
-            rationale: 'Defers complex stateful SAM predictors until empirical evidence demands it.',
-          },
-        ];
-    }
-  }
+  if (chips.length > 0) return chips;
 
-  // Dynamic fallback for general SDD projects
+  // Pure generic dynamic fallback with ZERO hardcoded project names
   return [
     {
       title: 'Architectural Choice',

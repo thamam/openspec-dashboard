@@ -22,18 +22,6 @@ export interface SkylinePillar {
 function extractPlainEnglishIntent(proposalText: string | undefined): string {
   if (!proposalText) return 'Upgrades application architecture and state management for active change.';
 
-  const low = proposalText.toLowerCase();
-
-  // Profile / ClawDoc / Epic 4
-  if (low.includes('profile') || low.includes('clawdoc') || low.includes('epic 4') || low.includes('4-1-profile')) {
-    return 'Adds a secure, single-file profile system to ClawDoc Monitor so user settings are safely saved locally, automatically restored across app restarts, and protected against file corruption or unauthorized browser writes.';
-  }
-
-  // Multi-frame Video propagation (Sprint 4.5)
-  if (low.includes('video') || low.includes('keyframe') || low.includes('sprint 4.5') || low.includes('epic 11')) {
-    return 'Upgrades the segmentation tool so users can load real multi-minute video clips, edit keyframe masks, and automatically save approved dataset labels directly for AI model training.';
-  }
-
   // General dynamic extraction from proposal text
   const lines = proposalText.split('\n');
   const cleanLines = lines.filter((l) => {
@@ -49,7 +37,7 @@ function extractPlainEnglishIntent(proposalText: string | undefined): string {
 
   for (const l of cleanLines) {
     let clean = l.trim().replace(/[*#`]/g, '');
-    if (clean.length > 20 && clean.length < 200 && !clean.includes('http')) {
+    if (clean.length > 20 && clean.length < 250 && !clean.includes('http')) {
       return clean;
     }
   }
@@ -59,82 +47,15 @@ function extractPlainEnglishIntent(proposalText: string | undefined): string {
 
 function extractCorePillars(artifacts: Artifacts): SkylinePillar[] {
   const combined = (artifacts.proposal || '') + '\n' + (artifacts.design || '') + '\n' + (artifacts.spec || '');
-  const low = combined.toLowerCase();
-
-  // Profile / ClawDoc / Epic 4
-  if (low.includes('profile') || low.includes('clawdoc') || low.includes('epic 4') || low.includes('4-1-profile')) {
-    return [
-      {
-        id: 'identity',
-        icon: '👤',
-        title: 'Saved User Profiles & Persistence',
-        summary: 'Saves user profile configuration locally in a single JSON file (.clawdocprofile.json) that automatically loads on startup.',
-      },
-      {
-        id: 'spine',
-        icon: '🛡️',
-        title: 'Automatic Corruption Recovery & Backups',
-        summary: 'Quarantines corrupted profile files and safely falls back to a clean default seed without crashing or losing data.',
-      },
-      {
-        id: 'jobs',
-        icon: '🔒',
-        title: 'Single-Session Security Tokens',
-        summary: 'Injects a 256-bit single-launch token via meta tag to prevent unauthorized web scripts from changing active profiles.',
-      },
-      {
-        id: 'export',
-        icon: '⚡',
-        title: 'Centralized Web Communications',
-        summary: 'Consolidates renderer network requests into a single apiGet chokepoint to enforce strict security limits.',
-      },
-    ];
-  }
-
-  // Multi-frame Video propagation (Sprint 4.5)
-  if (low.includes('video') || low.includes('keyframe') || low.includes('sprint 4.5') || low.includes('epic 11')) {
-    return [
-      {
-        id: 'identity',
-        icon: '🎬',
-        title: 'Full Video Playback & Frame Loading',
-        summary: 'Instead of opening a single static image, the app can now load and step through real multi-minute MP4 video clips.',
-      },
-      {
-        id: 'spine',
-        icon: '🧠',
-        title: 'Saved Server Sessions',
-        summary: 'The server backend automatically remembers your video, keyframes, and progress so you don\'t lose work if you refresh or switch tabs.',
-      },
-      {
-        id: 'jobs',
-        icon: '⚙️',
-        title: 'Smooth Background Video Processing',
-        summary: 'Heavy video decoding and AI mask generation run in background tasks so the interface stays fast and responsive while working.',
-      },
-      {
-        id: 'reentry',
-        icon: '🛠️',
-        title: 'Smart Correction Re-Processing',
-        summary: 'When you fix a mask on one frame, the AI only re-calculates neighboring frames instead of wasting time re-processing the whole video.',
-      },
-      {
-        id: 'export',
-        icon: '📦',
-        title: 'Direct AI Training Dataset Export',
-        summary: 'Saves approved video frames directly to ClearML cloud storage so researchers can immediately train downstream AI models.',
-      },
-    ];
-  }
 
   // Dynamic extraction from Markdown Headings for general SDD projects
   const headers = combined
     .split('\n')
     .filter((l) => l.trim().startsWith('## ') || l.trim().startsWith('### '))
     .map((l) => l.replace(/^#+\s+/, '').trim())
-    .filter((h) => h.length > 5 && !h.toLowerCase().includes('open question') && !h.toLowerCase().includes('verification'));
+    .filter((h) => h.length > 3 && !h.toLowerCase().includes('open question') && !h.toLowerCase().includes('verification') && !h.toLowerCase().includes('table of contents'));
 
-  if (headers.length >= 3) {
+  if (headers.length >= 1) {
     return headers.slice(0, 5).map((h, idx) => ({
       id: `shift-${idx + 1}`,
       icon: idx === 0 ? '🚀' : idx === 1 ? '🧠' : idx === 2 ? '🛡️' : idx === 3 ? '🔒' : '📦',
@@ -159,23 +80,23 @@ export const SkylineCard: React.FC<Props> = ({ artifacts, activeChange, onSwitch
     const combined = ((artifacts.proposal || '') + (artifacts.design || '') + (artifacts.spec || '')).toLowerCase();
 
     let level: 'LOW' | 'MEDIUM' | 'HIGH' = 'MEDIUM';
-    let reason = 'Modifies video session state, background job limits, and dataset export writers.';
+    let reason = 'Modifies system architectural contracts, state handlers, and task execution boundaries.';
 
-    if (combined.includes('schema') || combined.includes('migration') || combined.includes('table') || combined.includes('security') || combined.includes('re-entry')) {
+    if (combined.includes('schema') || combined.includes('migration') || combined.includes('table') || combined.includes('security') || combined.includes('auth')) {
       level = 'HIGH';
-      reason = 'Updates video session contracts, frame re-processing logic, and storage persistence.';
+      reason = 'Updates security policies, persistent storage schemas, or critical authentication contracts.';
     }
 
     return { level, reason };
   }, [artifacts.proposal, artifacts.design, artifacts.spec]);
 
   const impactedFiles = useMemo(() => {
-    const text = (artifacts.proposal || '') + '\n' + (artifacts.tasks || '');
+    const text = (artifacts.proposal || '') + '\n' + (artifacts.tasks || '') + '\n' + (artifacts.design || '');
     const fileMatches = text.match(/`([^`]+\.[a-z0-9]+)`/gi);
-    if (!fileMatches) return ['segmentation/app/routes/core.py', 'segmentation/app/session.py', 'segmentation/propagation/propagate.py'];
+    if (!fileMatches) return ['Target repository source files'];
     const clean = Array.from(new Set(fileMatches.map((m) => m.replace(/`/g, ''))));
     return clean.slice(0, 5);
-  }, [artifacts.proposal, artifacts.tasks]);
+  }, [artifacts.proposal, artifacts.tasks, artifacts.design]);
 
   return (
     <div style={{ padding: '24px', flex: 1, display: 'flex', flexDirection: 'column', gap: '20px', backgroundColor: '#010409', overflowY: 'auto' }}>
