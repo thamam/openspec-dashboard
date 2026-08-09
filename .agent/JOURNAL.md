@@ -15,6 +15,15 @@ This journal maintains a continuous, unbroken record of development cycles, huma
 
 ## Development Cycles & Decision History
 
+### [Cycle #026] - 2026-08-09 - Pure Dynamic Markdown Extraction (ClawDoc Purge Fix)
+- **Human Pain Point / Root Cause Analysis:** Users saw persistent ClawDoc Monitor profile system strings in unrelated projects because `SkylineCard.tsx` and `DashboardView.tsx` executed keyword guards like `includes('profile')` or `includes('epic 4')`, which triggered on generic words (like "HSV color profile" or "Epic 4") and hijacked the display with static ClawDoc text.
+- **Key Accomplishments:**
+  - Completely purged all hardcoded project strings (*ClawDoc Monitor*, *Sprint 4.5 Video*) and static `if` keyword guards from `SkylineCard.tsx` and `DashboardView.tsx`.
+  - Implemented 100% dynamic Markdown paragraph extraction for `extractPlainEnglishIntent()` reading active project `proposal.md`/`prd.md` text.
+  - Implemented 100% dynamic section header parsing for `extractCorePillars()` and `extractDecisionChips()`.
+  - Added framework-agnostic generic fallbacks with zero hardcoded project names.
+- **Verification:** 46/46 server Vitest tests passing; client build succeeded cleanly in 1.06s.
+
 ### [Cycle #025] - 2026-07-28 - /api/changes Category Serialization & Client Fallback Categorizer
 - **Human Pain Point / Root Cause Analysis:** Items in the sidebar collapsed into 0 counts (`Plan (0)`, `Epics (0)`, `Stories (0)`) because `server/src/app.ts` (`/api/changes`) was stripping the `category` and `epicNumber` properties from `getBMADSprints()` before JSON serialization.
 - **Key Accomplishments:**

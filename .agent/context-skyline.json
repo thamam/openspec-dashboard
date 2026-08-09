@@ -1,13 +1,13 @@
 {
   "project": "openspec-dashboard",
-  "lastUpdated": "2026-07-28T01:23:50Z",
+  "lastUpdated": "2026-08-09T14:40:30Z",
   "activeChange": "planning-stage-latest",
   "targetRepository": "/Users/tomerhamam/work/projects/neuronbox-ml/gad-sam21-multi-area-planning",
-  "lastSessionSummary": "Fixed missing category and epicNumber serialization in server /api/changes endpoint and added robust client-side fallback categorization in CommandCenter/index.tsx. Verified all items now correctly populate Planning, Epics, and Stories accordions.",
+  "lastSessionSummary": "Executed approved fix purging all hardcoded ClawDoc Monitor string leakage from SkylineCard.tsx and DashboardView.tsx. Replaced static project keyword guards with 100% dynamic Markdown paragraph and decision chip extractors.",
   "topActivePainPoints": [],
   "currentUxPriority": {
-    "ideaId": "Sidebar UX & Story Navigator",
-    "title": "Searchable & Epic-Grouped Story Navigator",
-    "status": "Fixed & Verified"
+    "ideaId": "Dynamic Extraction Engine",
+    "title": "Pure Dynamic Markdown Extractor (Zero Project Hardcoding)",
+    "status": "Implemented & Verified"
   }
 }
