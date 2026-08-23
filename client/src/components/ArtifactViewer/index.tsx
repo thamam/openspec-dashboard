@@ -6,16 +6,18 @@ import { MatrixView } from './views/MatrixView';
 import { DashboardView } from './views/DashboardView';
 import { WizardView } from './views/WizardView';
 import { DiagramView } from './views/DiagramView';
+import { KeystoneView } from './views/KeystoneView';
 
 interface Props {
   artifacts: Artifacts;
   tasks: TaskItem[];
   files: string[];
   activeChange: string;
+  repoPath: string;
 }
 
-export const ArtifactViewer: React.FC<Props> = ({ artifacts, tasks: _tasks, files, activeChange }) => {
-  const [viewMode, setViewMode] = useState<'skyline' | 'raw' | 'matrix' | 'dashboard' | 'wizard' | 'diagram'>('skyline');
+export const ArtifactViewer: React.FC<Props> = ({ artifacts, tasks: _tasks, files, activeChange, repoPath }) => {
+  const [viewMode, setViewMode] = useState<'skyline' | 'raw' | 'matrix' | 'dashboard' | 'wizard' | 'diagram' | 'keystone'>('skyline');
   const [selectedPillarId, setSelectedPillarId] = useState<string | null>(null);
 
   const handleWalkPillar = (pillarId: string) => {
@@ -52,6 +54,8 @@ export const ArtifactViewer: React.FC<Props> = ({ artifacts, tasks: _tasks, file
         );
       case 'wizard':
         return <WizardView artifacts={artifacts} />;
+      case 'keystone':
+        return <KeystoneView repoPath={repoPath} />;
       case 'raw':
       default:
         return <RawView artifacts={artifacts} activeChange={activeChange} />;
@@ -76,7 +80,8 @@ export const ArtifactViewer: React.FC<Props> = ({ artifacts, tasks: _tasks, file
             { id: 'dashboard', icon: '📊', label: 'Neighborhoods (L2)' },
             { id: 'matrix', icon: '🌳', label: 'Matrix (L3)' },
             { id: 'raw', icon: '📝', label: 'Raw Diffs (L4)' },
-            { id: 'wizard', icon: '🧙‍♂️', label: 'Wizard' }
+            { id: 'wizard', icon: '🧙‍♂️', label: 'Wizard' },
+            { id: 'keystone', icon: '🧩', label: 'Artifacts (Keystone)' }
           ].map(v => (
             <button
               key={v.id}

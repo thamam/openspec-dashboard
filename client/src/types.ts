@@ -28,3 +28,47 @@ export interface Artifacts {
   linkages?: Linkage[];
   framework?: 'openspec' | 'bmad';
 }
+
+// Keystone handshake v0.1 (.aidev/manifest.yaml) — see thamam/keystone SPEC.md
+
+export interface KeystoneFinding {
+  id: string;
+  file: string;
+  line: number;
+  side?: 'old' | 'new';
+  severity: 'blocker' | 'major' | 'minor' | 'info';
+  title: string;
+  detail?: string;
+  status: 'open' | 'resolved' | 'dismissed';
+  trace?: string[];
+}
+
+export interface KeystoneReviewEnvelope {
+  format: string;
+  format_version: string;
+  project_id: string;
+  source_sha: string;
+  generated_by: string;
+  generated_at: string;
+  payload: { findings: KeystoneFinding[] };
+}
+
+export interface KeystoneArtifact {
+  kind: string;
+  path: string;
+  format: string;
+  producer?: string;
+  source_sha: string;
+  updated?: string;
+  fresh: boolean;
+  headSha: string | null;
+  review?: KeystoneReviewEnvelope | null;
+}
+
+export interface KeystoneManifest {
+  enabled: boolean;
+  handshake?: string;
+  project?: { id: string; repo?: string; repo_id?: string };
+  headSha?: string | null;
+  artifacts?: KeystoneArtifact[];
+}

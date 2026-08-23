@@ -320,7 +320,7 @@ function App() {
         onProviderChange={handleProviderChange}
         onNewChangeClick={() => setShowCreateChange(true)}
       />
-      <ArtifactViewer artifacts={artifacts} tasks={tasks} files={files} activeChange={activeChange} />
+      <ArtifactViewer artifacts={artifacts} tasks={tasks} files={files} activeChange={activeChange} repoPath={repoPath} />
       <div className="right-pane">
         <div className="pane-resizer" onMouseDown={startResizing} />
         <TaskHub tasks={tasks} />
