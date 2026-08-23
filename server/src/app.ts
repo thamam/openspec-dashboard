@@ -7,6 +7,7 @@ import { spawn, exec } from 'child_process';
 import { checkRepoStatus, initializeOpenSpec, updateChangeProvider, getChangeMetadata, createLocalSchema, createNewChange, resolvePath } from './services/repoService.js';
 import { OpenSpecController } from './controllers/openspecController.js';
 import { parseTasks } from './services/markdownParser.js';
+import { getKeystoneManifest } from './services/keystoneService.js';
 
 const app = express();
 const openspecController = new OpenSpecController();
@@ -166,6 +167,21 @@ app.get('/api/artifacts', async (req, res) => {
     }
 
     res.json({ artifacts, parsedTasks, files, linkages, agentProvider });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Endpoint: Keystone handshake v0.1 manifest (.aidev/manifest.yaml) with fresh/stale per artifact
+app.get('/api/keystone/manifest', async (req, res) => {
+  const repoPath = (req.query.path || req.query.repo) as string;
+  if (!repoPath) {
+    res.status(400).json({ error: 'Missing query parameter "path"' });
+    return;
+  }
+  try {
+    const result = await getKeystoneManifest(repoPath);
+    res.json(result);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
