@@ -129,6 +129,48 @@ describe('keystoneService - getKeystoneManifest', () => {
     });
   });
 
+  it('should stay fresh after an .aidev-only commit and go stale on a code commit (R2 rule v0.2)', async () => {
+    const wrinkleDir = path.join(tempDir, 'wrinkle-repo');
+    fs.mkdirSync(wrinkleDir);
+    const g = (cmd: string) =>
+      execSync(`git -c user.name=test -c user.email=test@example.com ${cmd}`, { cwd: wrinkleDir })
+        .toString()
+        .trim();
+    g('init -b main');
+    fs.writeFileSync(path.join(wrinkleDir, 'code.txt'), 'v1\n');
+    g('add code.txt');
+    g('commit -m code --no-gpg-sign');
+    const pinned = g('rev-parse HEAD');
+
+    fs.mkdirSync(path.join(wrinkleDir, '.aidev'), { recursive: true });
+    fs.writeFileSync(
+      path.join(wrinkleDir, '.aidev', 'manifest.yaml'),
+      [
+        'handshake: "0.1"',
+        'project:',
+        '  id: wrinkle-fixture',
+        'artifacts:',
+        '  - kind: review',
+        '    path: .aidev/artifacts/review.json',
+        '    format: review-findings/0.1',
+        `    source_sha: ${pinned}`,
+        ''
+      ].join('\n')
+    );
+    g('add .aidev');
+    g('commit -m "pin artifact" --no-gpg-sign');
+
+    // manifest commit advanced HEAD, but no non-.aidev change → still fresh
+    let result = await getKeystoneManifest(wrinkleDir);
+    expect(result.artifacts![0].fresh).toBe(true);
+
+    fs.writeFileSync(path.join(wrinkleDir, 'code.txt'), 'v2\n');
+    g('add code.txt');
+    g('commit -m "more code" --no-gpg-sign');
+    result = await getKeystoneManifest(wrinkleDir);
+    expect(result.artifacts![0].fresh).toBe(false);
+  });
+
   it('should mark artifacts stale when the repo has no git HEAD', async () => {
     const nonGitDir = path.join(tempDir, 'non-git');
     fs.mkdirSync(path.join(nonGitDir, '.aidev'), { recursive: true });

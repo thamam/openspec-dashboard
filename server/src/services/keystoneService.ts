@@ -37,7 +37,8 @@ export interface KeystoneArtifact {
   producer?: string;
   source_sha: string;
   updated?: string;
-  // SPEC.md R2 (freshness): fresh iff source_sha equals the currently pinned commit (HEAD)
+  // SPEC.md R2 (freshness, rule v0.2): fresh iff the effective commits (last commit
+  // touching paths outside .aidev/) of source_sha and HEAD match
   fresh: boolean;
   headSha: string | null;
   // Parsed envelope for review-findings/0.1 artifacts so the client can render findings
@@ -52,9 +53,9 @@ export interface KeystoneManifestResult {
   artifacts?: KeystoneArtifact[];
 }
 
-function gitHeadSha(cwd: string): Promise<string | null> {
+function git(cwd: string, args: string[]): Promise<string | null> {
   return new Promise((resolve) => {
-    execFile('git', ['rev-parse', 'HEAD'], { cwd }, (error, stdout) => {
+    execFile('git', args, { cwd }, (error, stdout) => {
       if (error) {
         resolve(null);
       } else {
@@ -62,6 +63,17 @@ function gitHeadSha(cwd: string): Promise<string | null> {
       }
     });
   });
+}
+
+function gitHeadSha(cwd: string): Promise<string | null> {
+  return git(cwd, ['rev-parse', 'HEAD']);
+}
+
+// R2 rule v0.2: the effective commit of a ref is the last commit reachable from it
+// touching any path outside .aidev/ — so committing the manifest itself never ages
+// its own artifacts. Null when the ref is unknown or history is .aidev-only.
+function effectiveCommit(cwd: string, ref: string): Promise<string | null> {
+  return git(cwd, ['rev-list', '-1', ref, '--', ':(exclude).aidev']).then((out) => out || null);
 }
 
 function readReviewEnvelope(filePath: string): KeystoneReviewEnvelope | null {
@@ -85,11 +97,19 @@ export async function getKeystoneManifest(repoPath: string): Promise<KeystoneMan
   const manifest = parseYamlDocument(fs.readFileSync(manifestPath, 'utf-8'));
   const headSha = await gitHeadSha(resolved);
 
+  const effectiveHead = headSha ? await effectiveCommit(resolved, 'HEAD') : null;
+
   const rows: any[] = Array.isArray(manifest?.artifacts) ? manifest.artifacts : [];
+  const effectiveBySha = new Map<string, string | null>();
+  for (const row of rows) {
+    if (row.source_sha && !effectiveBySha.has(row.source_sha)) {
+      effectiveBySha.set(row.source_sha, headSha ? await effectiveCommit(resolved, row.source_sha) : null);
+    }
+  }
   const artifacts: KeystoneArtifact[] = rows.map((row) => {
     const artifact: KeystoneArtifact = {
       ...row,
-      fresh: headSha !== null && row.source_sha === headSha,
+      fresh: headSha !== null && (effectiveBySha.get(row.source_sha) ?? null) === effectiveHead,
       headSha
     };
     if (row.format === 'review-findings/0.1' && row.path) {
