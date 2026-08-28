@@ -8,6 +8,7 @@ import { AgentHarness } from './components/AgentHarness';
 import CreateChangeForm from './components/CreateChangeForm';
 import { WorkspaceSelector } from './components/WorkspaceSelector';
 import { ChangeItem, TaskItem, Artifacts } from './types';
+import { isDrifted, readPinnedContext } from './keystone/pinnedContext';
 
 // For E2E testing, we allow passing the repo path via query param
 const urlParams = new URLSearchParams(window.location.search);
@@ -26,6 +27,25 @@ function App() {
   const [rightPaneWidth, setRightPaneWidth] = useState(320);
   const [terminalHeight, setTerminalHeight] = useState(220);
   const [showCreateChange, setShowCreateChange] = useState(false);
+  // Keystone CHROME.md v0.2 §1: pin the Deck context this tab was opened with, and
+  // flag it the moment the in-tool workspace selection departs from that pin.
+  const [keystonePin] = useState(() => readPinnedContext(window.location.search));
+  const [keystoneHeadSha, setKeystoneHeadSha] = useState<string | null>(null);
+
+  // HEAD of the selected workspace, read from the manifest endpoint we already serve.
+  // Best-effort: without it we still flag project drift, just not commit drift.
+  useEffect(() => {
+    if (!keystonePin?.sha) return;
+    let cancelled = false;
+    fetch(`/api/keystone/manifest?path=${encodeURIComponent(repoPath)}`)
+      .then(res => (res && res.ok ? res.json() : null))
+      .then(data => { if (!cancelled) setKeystoneHeadSha(data?.headSha ?? null); })
+      .catch(() => { if (!cancelled) setKeystoneHeadSha(null); });
+    return () => { cancelled = true; };
+  }, [repoPath, keystonePin]);
+
+  const keystoneDrifted = keystonePin !== null
+    && isDrifted(keystonePin, { repo: repoPath, headSha: keystoneHeadSha });
 
   const startResizing = useCallback((mouseDownEvent: React.MouseEvent) => {
     const startX = mouseDownEvent.clientX;
@@ -298,6 +318,21 @@ function App() {
           OpenSpec
           <span className="badge">v2.0 (Deterministic)</span>
         </div>
+        {keystonePin && (
+          <div className="keystone-context" title="Pinned Deck context (CHROME.md §1)">
+            <span className="keystone-pin">
+              {keystonePin.project}{keystonePin.sha ? ` @ ${keystonePin.sha.slice(0, 7)}` : ''}
+            </span>
+            {keystoneDrifted && (
+              <span
+                className="keystone-drift"
+                title="The selected workspace departs from the project/commit this tab was opened with"
+              >
+                drifted from Deck context
+              </span>
+            )}
+          </div>
+        )}
         <div id="workspace-header">
           <WorkspaceSelector
             currentPath={repoPath}

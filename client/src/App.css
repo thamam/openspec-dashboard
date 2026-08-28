@@ -367,3 +367,34 @@ header {
 .term-success { color: #3fb950; }
 .term-info { color: #58a6ff; }
 .term-cmd { color: #c9d1d9; }
+
+
+/* Keystone CHROME.md v0.2 §1 — pinned Deck context + drift flag */
+.keystone-context {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 12px;
+}
+
+.keystone-pin {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 10px;
+  color: #8b949e;
+  background: #161b22;
+  border: 1px solid #30363d;
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.keystone-drift {
+  font-size: 10px;
+  font-weight: 600;
+  color: #d29922;
+  background: rgba(210, 153, 34, 0.15);
+  border: 1px solid #9e6a03;
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
