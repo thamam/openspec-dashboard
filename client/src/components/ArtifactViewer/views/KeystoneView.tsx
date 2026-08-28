@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { KeystoneManifest, KeystoneArtifact, KeystoneFinding } from '../../../types';
+import { KeystoneManifest, KeystoneArtifact, KeystoneFinding, KeystoneWikiEnvelope } from '../../../types';
 
 interface Props {
   repoPath: string;
@@ -68,6 +68,43 @@ const FindingRow: React.FC<{ finding: KeystoneFinding }> = ({ finding }) => (
   </div>
 );
 
+// wiki/1 is codex-wiki's CodexResponse (SPEC.md §3): an analysis, wiki pages, diagrams.
+// The dashboard produces none of it — that is the point of the round-one exit test.
+const WikiBody: React.FC<{ wiki: KeystoneWikiEnvelope }> = ({ wiki }) => {
+  const { analysis, wikiPages, diagrams } = wiki.payload;
+  const sections = analysis?.sections || [];
+  return (
+    <div style={{ borderTop: '1px solid #21262d' }}>
+      <div style={{ padding: '8px 12px', fontSize: '12px', color: '#c9d1d9' }}>
+        <span style={{ fontWeight: 'bold' }}>{analysis?.title || 'Untitled analysis'}</span>
+        <span style={{ color: '#8b949e', marginLeft: '8px' }}>
+          {sections.length} section{sections.length === 1 ? '' : 's'} · {wikiPages.length} page
+          {wikiPages.length === 1 ? '' : 's'} · {diagrams.length} diagram{diagrams.length === 1 ? '' : 's'}
+        </span>
+      </div>
+      {wikiPages.map((page, idx) => (
+        <div
+          key={`${page.title}-${idx}`}
+          style={{ display: 'flex', alignItems: 'baseline', gap: '10px', padding: '6px 12px', borderTop: '1px solid #21262d', fontSize: '12px' }}
+        >
+          <span style={{ color: '#3fb950', fontSize: '11px', minWidth: '96px', textTransform: 'uppercase' }}>
+            {page.category}
+          </span>
+          <span style={{ color: '#c9d1d9', fontWeight: 'bold', minWidth: '140px' }}>{page.title}</span>
+          <span style={{ color: '#8b949e', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {page.summary}
+          </span>
+        </div>
+      ))}
+      {diagrams.length > 0 && (
+        <div style={{ padding: '6px 12px', borderTop: '1px solid #21262d', fontSize: '11px', color: '#d29922' }}>
+          diagrams: {diagrams.map(d => `${d.title} (${d.type})`).join(' · ')}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const ArtifactCard: React.FC<{ artifact: KeystoneArtifact }> = ({ artifact }) => {
   const findings = artifact.review?.payload?.findings || [];
   return (
@@ -102,6 +139,15 @@ const ArtifactCard: React.FC<{ artifact: KeystoneArtifact }> = ({ artifact }) =>
         ) : (
           <div style={{ padding: '6px 12px', borderTop: '1px solid #21262d', color: '#8b949e', fontSize: '12px' }}>
             {artifact.review ? 'No findings.' : 'Could not read review-findings file.'}
+          </div>
+        )
+      )}
+      {artifact.format === 'wiki/1' && (
+        artifact.wiki ? (
+          <WikiBody wiki={artifact.wiki} />
+        ) : (
+          <div style={{ padding: '6px 12px', borderTop: '1px solid #21262d', color: '#8b949e', fontSize: '12px' }}>
+            Could not read wiki file.
           </div>
         )
       )}

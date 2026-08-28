@@ -49,6 +49,34 @@ export interface KeystoneReviewEnvelope {
   payload: { findings: KeystoneFinding[] };
 }
 
+export interface KeystoneWikiPage {
+  title: string;
+  summary: string;
+  category: string;
+  content: string;
+}
+
+export interface KeystoneDiagram {
+  title: string;
+  type: 'architecture' | 'dependency' | 'dataflow' | 'relations';
+  mermaid: string;
+}
+
+export interface KeystoneWikiEnvelope {
+  format: string;
+  format_version: string;
+  project_id: string;
+  source_sha: string;
+  generated_by: string;
+  generated_at: string;
+  payload: {
+    analysis: { title: string; sections: Array<{ heading: string; content: string; diagram: string | null }> };
+    wikiPages: KeystoneWikiPage[];
+    diagrams: KeystoneDiagram[];
+    suggestedQuestions: string[];
+  };
+}
+
 export interface KeystoneArtifact {
   kind: string;
   path: string;
@@ -59,6 +87,7 @@ export interface KeystoneArtifact {
   fresh: boolean;
   headSha: string | null;
   review?: KeystoneReviewEnvelope | null;
+  wiki?: KeystoneWikiEnvelope | null;
 }
 
 export interface KeystoneManifest {

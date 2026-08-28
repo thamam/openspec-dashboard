@@ -28,6 +28,26 @@ const reviewEnvelope = (sourceSha: string) => ({
   }
 });
 
+const wikiEnvelope = (sourceSha: string) => ({
+  format: 'wiki',
+  format_version: '1',
+  project_id: 'keystone-fixture',
+  source_sha: sourceSha,
+  generated_by: 'codex-wiki',
+  generated_at: '2026-08-28T06:00:00Z',
+  payload: {
+    analysis: {
+      title: 'keystone-fixture',
+      sections: [{ heading: 'Overview', content: 'What the fixture does.', diagram: null }]
+    },
+    wikiPages: [
+      { title: 'Protocol', summary: 'The artifact envelope', category: 'Architecture', content: '...' }
+    ],
+    diagrams: [{ title: 'Pipeline', type: 'dataflow', mermaid: 'graph LR; a-->b;' }],
+    suggestedQuestions: ['How is provenance recorded?']
+  }
+});
+
 describe('keystoneService - getKeystoneManifest', () => {
   let tempDir: string;
   let repoDir: string;
@@ -52,6 +72,10 @@ describe('keystoneService - getKeystoneManifest', () => {
       JSON.stringify(reviewEnvelope(headSha), null, 2)
     );
     fs.writeFileSync(
+      path.join(aidevDir, 'wiki-fresh.json'),
+      JSON.stringify(wikiEnvelope(headSha), null, 2)
+    );
+    fs.writeFileSync(
       path.join(repoDir, '.aidev', 'manifest.yaml'),
       [
         'handshake: "0.1"',
@@ -67,6 +91,13 @@ describe('keystoneService - getKeystoneManifest', () => {
         '    producer: theia',
         `    source_sha: ${headSha}`,
         '    updated: "2026-08-23"',
+        '',
+        '  - kind: wiki',
+        '    path: .aidev/artifacts/wiki-fresh.json',
+        '    format: wiki/1',
+        '    producer: codex-wiki',
+        `    source_sha: ${headSha}`,
+        '    updated: "2026-08-28"',
         '',
         '  - kind: blueprint',
         '    path: main.spec.yaml',
@@ -99,7 +130,7 @@ describe('keystoneService - getKeystoneManifest', () => {
     expect(result.handshake).toBe('0.1');
     expect(result.project).toEqual({ id: 'keystone-fixture', repo: 'thamam/keystone-fixture' });
     expect(result.headSha).toBe(headSha);
-    expect(result.artifacts).toHaveLength(2);
+    expect(result.artifacts).toHaveLength(3);
 
     const review = result.artifacts!.find(a => a.kind === 'review')!;
     expect(review.fresh).toBe(true);
@@ -127,6 +158,22 @@ describe('keystoneService - getKeystoneManifest', () => {
       severity: 'major',
       status: 'open'
     });
+  });
+
+  it('should include the parsed envelope payload for wiki/1 artifacts (second producer)', async () => {
+    const result = await getKeystoneManifest(repoDir);
+    const wiki = result.artifacts!.find(a => a.format === 'wiki/1')!;
+
+    expect(wiki.producer).toBe('codex-wiki');
+    expect(wiki.fresh).toBe(true);
+    expect(wiki.wiki).toBeTruthy();
+    expect(wiki.wiki!.generated_by).toBe('codex-wiki');
+    expect(wiki.wiki!.payload.analysis.title).toBe('keystone-fixture');
+    expect(wiki.wiki!.payload.wikiPages).toHaveLength(1);
+    expect(wiki.wiki!.payload.wikiPages[0]).toMatchObject({ title: 'Protocol', category: 'Architecture' });
+    expect(wiki.wiki!.payload.diagrams[0].type).toBe('dataflow');
+    // the review artifact is untouched: two producers, one consumer
+    expect(result.artifacts!.find(a => a.format === 'review-findings/0.1')!.wiki).toBeUndefined();
   });
 
   it('should stay fresh after an .aidev-only commit and go stale on a code commit (R2 rule v0.2)', async () => {

@@ -30,6 +30,34 @@ export interface KeystoneReviewEnvelope {
   payload: { findings: KeystoneFinding[] };
 }
 
+export interface KeystoneWikiPage {
+  title: string;
+  summary: string;
+  category: string;
+  content: string;
+}
+
+export interface KeystoneDiagram {
+  title: string;
+  type: 'architecture' | 'dependency' | 'dataflow' | 'relations';
+  mermaid: string;
+}
+
+export interface KeystoneWikiEnvelope {
+  format: string;
+  format_version: string;
+  project_id: string;
+  source_sha: string;
+  generated_by: string;
+  generated_at: string;
+  payload: {
+    analysis: { title: string; sections: Array<{ heading: string; content: string; diagram: string | null }> };
+    wikiPages: KeystoneWikiPage[];
+    diagrams: KeystoneDiagram[];
+    suggestedQuestions: string[];
+  };
+}
+
 export interface KeystoneArtifact {
   kind: string;
   path: string;
@@ -43,6 +71,8 @@ export interface KeystoneArtifact {
   headSha: string | null;
   // Parsed envelope for review-findings/0.1 artifacts so the client can render findings
   review?: KeystoneReviewEnvelope | null;
+  // Parsed envelope for wiki/1 artifacts (codex-wiki's CodexResponse — SPEC.md §3)
+  wiki?: KeystoneWikiEnvelope | null;
 }
 
 export interface KeystoneManifestResult {
@@ -76,11 +106,17 @@ function effectiveCommit(cwd: string, ref: string): Promise<string | null> {
   return git(cwd, ['rev-list', '-1', ref, '--', ':(exclude).aidev']).then((out) => out || null);
 }
 
-function readReviewEnvelope(filePath: string): KeystoneReviewEnvelope | null {
+function readEnvelope<T>(filePath: string, label: string): T | null {
+  // A row pointing at a file that isn't there is a normal manifest state (artifact
+  // not generated yet) — worth one line, not a stack. Malformed JSON is the real error.
+  if (!fs.existsSync(filePath)) {
+    console.warn(`Keystone: ${label} artifact missing at ${filePath}`);
+    return null;
+  }
   try {
-    return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    return JSON.parse(fs.readFileSync(filePath, 'utf-8')) as T;
   } catch (e) {
-    console.error(`Failed to read review-findings artifact at ${filePath}`, e);
+    console.error(`Failed to read ${label} artifact at ${filePath}`, e);
     return null;
   }
 }
@@ -113,7 +149,10 @@ export async function getKeystoneManifest(repoPath: string): Promise<KeystoneMan
       headSha
     };
     if (row.format === 'review-findings/0.1' && row.path) {
-      artifact.review = readReviewEnvelope(path.join(resolved, row.path));
+      artifact.review = readEnvelope<KeystoneReviewEnvelope>(path.join(resolved, row.path), 'review-findings');
+    }
+    if (row.format === 'wiki/1' && row.path) {
+      artifact.wiki = readEnvelope<KeystoneWikiEnvelope>(path.join(resolved, row.path), 'wiki');
     }
     return artifact;
   });
