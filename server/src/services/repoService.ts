@@ -178,10 +178,18 @@ const CLI_NAME_RE = /^[a-zA-Z0-9.-]+$/;
 /**
  * Names that become CLI argv elements must also not start with '-' — without a
  * shell the next reinterpretation layer is the target binary's own option
- * parser, which would read a leading-dash value as a flag.
+ * parser, which would read a leading-dash value as a flag. '.'/'..' are
+ * rejected too: the same changeName is joined into paths after the CLI run
+ * (e.g. the .openspec.yaml write in createNewChange).
  */
 function isSafeCliName(value: string): boolean {
-  return typeof value === 'string' && CLI_NAME_RE.test(value) && !value.startsWith('-');
+  return (
+    typeof value === 'string' &&
+    CLI_NAME_RE.test(value) &&
+    !value.startsWith('-') &&
+    value !== '.' &&
+    value !== '..'
+  );
 }
 
 export async function getConnectedWorktrees(repoPath: string): Promise<WorktreeInfo[]> {
@@ -529,6 +537,8 @@ export async function updateProposeEngine(
     throw new Error('Invalid propose engine format');
   }
 
+  // S6: changeName is joined into a path below — same guard as updateChangeProvider.
+  assertSafeName(changeName, 'change name');
   const changeConfigFile = path.join(resolvedRepoPath, 'openspec', 'changes', changeName, '.openspec.yaml');
   if (!fs.existsSync(changeConfigFile)) {
     throw new Error(`Change configuration file not found for change: ${changeName}`);
@@ -570,6 +580,8 @@ export function getChangeFilesContent(
   changeName: string
 ): string {
   const resolvedRepoPath = resolvePath(repoPath);
+  // S6: changeName is joined into a path below — same guard as updateChangeProvider.
+  assertSafeName(changeName, 'change name');
   const changeDir = path.join(resolvedRepoPath, 'openspec', 'changes', changeName);
 
   if (!fs.existsSync(changeDir)) {

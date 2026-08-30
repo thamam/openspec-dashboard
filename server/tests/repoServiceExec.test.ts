@@ -122,7 +122,7 @@ describe('repoService — exec sink contract (S5 widened)', () => {
     expect(call!.args).toEqual(['propose', 'my-change', '--engine', 'gemini']);
   });
 
-  it.each(['x; touch /tmp/pwn', 'x$(id)', '`id`', '../etc', '-evil', ''])(
+  it.each(['x; touch /tmp/pwn', 'x$(id)', '`id`', '../etc', '-evil', '', '.', '..'])(
     'runProposeCommand rejects malicious changeName %j',
     async (changeName) => {
       await expect(runProposeCommand(gitDir, changeName, 'gemini')).rejects.toThrow(
