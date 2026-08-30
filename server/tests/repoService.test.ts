@@ -257,6 +257,26 @@ describe('repoService - initializeOpenSpec & createGitWorktree', () => {
     expect(customConfig).toContain('proposeEngine: "gemini"');
   });
 
+  it('should not execute shell metacharacters in a change description (S5, real binaries)', async () => {
+    const gitDir = path.join(tempDir, 'git-repo-pwn');
+    fs.mkdirSync(gitDir);
+    execSync('git init -b main', { cwd: gitDir });
+
+    const { initializeOpenSpec, createNewChange } = await import('../src/services/repoService.js');
+    await initializeOpenSpec(gitDir);
+
+    const pwnFile = path.join(tempDir, 's5-pwn-real');
+    const pwnFile2 = path.join(tempDir, 's5-pwn-real-2');
+    const description = `desc $(touch ${pwnFile}) \`touch ${pwnFile2}\` ; echo pwned`;
+
+    await createNewChange(gitDir, 'pwn-change', 'spec-driven', description);
+
+    // With no shell in the exec path, $(...) and backticks are inert literal text.
+    expect(fs.existsSync(pwnFile)).toBe(false);
+    expect(fs.existsSync(pwnFile2)).toBe(false);
+    expect(fs.existsSync(path.join(gitDir, 'openspec', 'changes', 'pwn-change'))).toBe(true);
+  });
+
   it('should parse and stringify YAML correctly', async () => {
     const { parseYaml, stringifyYaml } = await import('../src/services/repoService.js');
     

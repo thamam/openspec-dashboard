@@ -119,9 +119,9 @@ export async function checkRepoStatus(dirPath: string): Promise<RepoStatus> {
   };
 }
 
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 
-function execPromise(command: string, cwd: string): Promise<string> {
+function execFilePromise(file: string, args: string[], cwd: string): Promise<string> {
   const extraPaths = [
     '/opt/homebrew/bin',
     '/usr/local/bin',
@@ -154,7 +154,9 @@ function execPromise(command: string, cwd: string): Promise<string> {
     .join(':');
 
   return new Promise((resolve, reject) => {
-    exec(command, { 
+    // execFile spawns the binary directly (no shell): argv elements are passed
+    // verbatim, so interpolated values can never be reinterpreted as shell syntax.
+    execFile(file, args, {
       cwd,
       env: {
         ...process.env,
@@ -170,9 +172,20 @@ function execPromise(command: string, cwd: string): Promise<string> {
   });
 }
 
+const CLI_NAME_RE = /^[a-zA-Z0-9.-]+$/;
+
+/**
+ * Names that become CLI argv elements must also not start with '-' — without a
+ * shell the next reinterpretation layer is the target binary's own option
+ * parser, which would read a leading-dash value as a flag.
+ */
+function isSafeCliName(value: string): boolean {
+  return typeof value === 'string' && CLI_NAME_RE.test(value) && !value.startsWith('-');
+}
+
 export async function getConnectedWorktrees(repoPath: string): Promise<WorktreeInfo[]> {
   try {
-    const output = await execPromise('git worktree list --porcelain', repoPath);
+    const output = await execFilePromise('git', ['worktree', 'list', '--porcelain'], repoPath);
     const blocks = output.trim().split('\n\n');
     const worktrees: WorktreeInfo[] = [];
 
@@ -241,7 +254,7 @@ export async function initializeOpenSpec(dirPath: string): Promise<void> {
     throw new Error('Target path is not a valid Git repository');
   }
 
-  await execPromise('openspec init --tools none', resolvedPath);
+  await execFilePromise('openspec', ['init', '--tools', 'none'], resolvedPath);
 
   // Copy .agent, .claude, .codex, .cursor directories
   const directoriesToCopy = ['.agent', '.claude', '.codex', '.cursor'];
@@ -262,9 +275,10 @@ export async function createGitWorktree(
   const resolvedRepoPath = resolvePath(repoPath);
   const resolvedWorktreePath = resolvePath(worktreePath);
 
-  // Validate branch name
+  // Validate branch name ('/' allowed for feature branches, but no leading '-'
+  // so git's option parser cannot re-read it as a flag)
   const branchRegex = /^[a-zA-Z0-9._/-]+$/;
-  if (!branchRegex.test(branchName)) {
+  if (!branchRegex.test(branchName) || branchName.startsWith('-')) {
     throw new Error('Invalid branch name format');
   }
 
@@ -274,8 +288,9 @@ export async function createGitWorktree(
     throw new Error('Source path is not a valid Git repository');
   }
 
-  // Run git worktree add
-  await execPromise(`git worktree add -b "${branchName}" "${resolvedWorktreePath}"`, resolvedRepoPath);
+  // Run git worktree add. '--' ends git's option parsing so a worktree path
+  // starting with '-' cannot be reinterpreted as a flag (verified vs real git).
+  await execFilePromise('git', ['worktree', 'add', '-b', branchName, '--', resolvedWorktreePath], resolvedRepoPath);
 }
 
 export async function createLocalSchema(
@@ -286,9 +301,15 @@ export async function createLocalSchema(
   const resolvedRepoPath = resolvePath(repoPath);
 
   // Validate inputs
-  const nameRegex = /^[a-zA-Z0-9.-]+$/;
-  if (!nameRegex.test(schemaName)) {
+  if (!isSafeCliName(schemaName)) {
     throw new Error('Invalid schema name format');
+  }
+  // Artifacts are joined into one --artifacts value, so each must be a safe
+  // CLI name (this also blocks ',' which would smuggle in extra names).
+  for (const artifact of artifacts) {
+    if (!isSafeCliName(artifact)) {
+      throw new Error('Invalid artifact name format');
+    }
   }
 
   // Verify it exists and is a git repo first
@@ -298,8 +319,9 @@ export async function createLocalSchema(
   }
 
   const artifactsList = artifacts.join(',');
-  await execPromise(
-    `openspec schema init "${schemaName}" --artifacts "${artifactsList}" --no-default`,
+  await execFilePromise(
+    'openspec',
+    ['schema', 'init', schemaName, '--artifacts', artifactsList, '--no-default'],
     resolvedRepoPath
   );
 }
@@ -346,14 +368,13 @@ export async function createNewChange(
   const resolvedRepoPath = resolvePath(repoPath);
 
   // Validate inputs
-  const nameRegex = /^[a-zA-Z0-9.-]+$/;
-  if (!nameRegex.test(changeName)) {
+  if (!isSafeCliName(changeName)) {
     throw new Error('Invalid change name format');
   }
-  if (!nameRegex.test(schemaName)) {
+  if (!isSafeCliName(schemaName)) {
     throw new Error('Invalid schema name format');
   }
-  if (proposeEngine && !nameRegex.test(proposeEngine)) {
+  if (proposeEngine && !isSafeCliName(proposeEngine)) {
     throw new Error('Invalid propose engine format');
   }
 
@@ -363,13 +384,16 @@ export async function createNewChange(
     throw new Error('Target path is not a valid Git repository');
   }
 
-  let cmd = `openspec new change "${changeName}" --schema "${schemaName}"`;
+  // No shell: the description is a single literal argv token, so '$()',
+  // backticks and quotes in it cannot execute and need no escaping. The
+  // --flag=<value> form keeps even a leading '-' in the text from being
+  // re-read as a flag by openspec's option parser.
+  const args = ['new', 'change', changeName, '--schema', schemaName];
   if (description) {
-    const escapedDesc = description.replace(/"/g, '\\"');
-    cmd += ` --description "${escapedDesc}"`;
+    args.push(`--description=${description}`);
   }
 
-  await execPromise(cmd, resolvedRepoPath);
+  await execFilePromise('openspec', args, resolvedRepoPath);
 
   // Read generated .openspec.yaml and append proposeEngine (defaults to 'gemini')
   const changeConfigFile = path.join(resolvedRepoPath, 'openspec', 'changes', changeName, '.openspec.yaml');
@@ -393,7 +417,7 @@ export interface ChangeMetadata {
 
 export async function getChangeWorktree(repoPath: string, changeName: string): Promise<string | null> {
   try {
-    const output = await execPromise('git worktree list --porcelain', repoPath);
+    const output = await execFilePromise('git', ['worktree', 'list', '--porcelain'], repoPath);
     const blocks = output.split('\n\n');
     for (const block of blocks) {
       const lines = block.split('\n');
@@ -428,8 +452,15 @@ export async function runProposeCommand(
   engine: string
 ): Promise<string> {
   const resolvedRepoPath = resolvePath(repoPath);
-  const cmd = `openspec propose "${changeName}" --engine "${engine}"`;
-  return await execPromise(cmd, resolvedRepoPath);
+  // Validate before spawning — previously these reached a shell string with no
+  // validation at all.
+  if (!isSafeCliName(changeName)) {
+    throw new Error('Invalid change name format');
+  }
+  if (!isSafeCliName(engine)) {
+    throw new Error('Invalid engine format');
+  }
+  return await execFilePromise('openspec', ['propose', changeName, '--engine', engine], resolvedRepoPath);
 }
 
 export async function getChangeMetadata(
