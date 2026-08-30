@@ -32,8 +32,7 @@ export class LocalAgentWrapper {
       const args = ['run', '--cwd', repoPath, '--prompt', prompt];
       
       const child = spawn('agy', args, {
-        cwd: repoPath,
-        shell: true
+        cwd: repoPath
       });
 
       let fullOutput = '';
@@ -125,8 +124,7 @@ Respond helpfully and concisely. Available OpenSpec workflows include: /opsx-pro
       const args = ['run', '--cwd', repoPath, '--prompt', prompt];
       
       const child = spawn('agy', args, {
-        cwd: repoPath,
-        shell: true
+        cwd: repoPath
       });
 
       child.stdout.on('data', (data) => {
@@ -160,8 +158,7 @@ Output the complete, corrected file contents inside a STRICT code block starting
       const args = ['run', '--cwd', repoPath, '--prompt', prompt];
       
       const child = spawn('agy', args, {
-        cwd: repoPath,
-        shell: true
+        cwd: repoPath
       });
 
       let fullOutput = '';
