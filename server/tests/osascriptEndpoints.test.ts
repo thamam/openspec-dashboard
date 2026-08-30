@@ -96,7 +96,7 @@ describe('POST /api/open-terminal — osascript argv contract (S4)', () => {
     expect(response.status).toBe(200);
     expect(mockedExecFile).toHaveBeenCalledTimes(1);
     const [file, args, third] = mockedExecFile.mock.calls[0];
-    expect(file).toBe('osascript');
+    expect(file).toBe('/usr/bin/osascript');
     expect(args[args.length - 1]).toBe('tmux attach -t agent-my-change');
     expect(args[args.length - 2]).toBe('--');
     // 3-arg form: execFile(file, args, callback) — no options object, so no shell
@@ -112,7 +112,7 @@ describe('POST /api/open-terminal — osascript argv contract (S4)', () => {
     expect(response.status).toBe(200);
     expect(mockedExecFile).toHaveBeenCalledTimes(1);
     const [file, args] = mockedExecFile.mock.calls[0];
-    expect(file).toBe('osascript');
+    expect(file).toBe('/usr/bin/osascript');
     // Verbatim, single element, shielded behind --
     expect(args[args.length - 1]).toBe(command);
     expect(args[args.length - 2]).toBe('--');
@@ -146,7 +146,7 @@ describe('POST /api/browse-directory — osascript argv contract (S4)', () => {
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ success: true, path: '/chosen/dir' });
     const [file, args] = mockedExecFile.mock.calls[0];
-    expect(file).toBe('osascript');
+    expect(file).toBe('/usr/bin/osascript');
     expect(args[args.length - 1]).toBe(os.homedir());
     expect(args[args.length - 2]).toBe('--');
     expect(mockedExec).not.toHaveBeenCalled();
@@ -160,6 +160,16 @@ describe('POST /api/browse-directory — osascript argv contract (S4)', () => {
     expect(response.status).toBe(200);
     const [, args] = mockedExecFile.mock.calls[0];
     expect(args[args.length - 1]).toBe(path.resolve(os.tmpdir()));
+  });
+
+  it('treats a non-string defaultPath as missing and falls back to home', async () => {
+    execFileSucceeds('/chosen/dir\n');
+
+    const response = await request(app).post('/api/browse-directory').send({ defaultPath: 123 });
+
+    expect(response.status).toBe(200);
+    const [, args] = mockedExecFile.mock.calls[0];
+    expect(args[args.length - 1]).toBe(os.homedir());
   });
 
   it('falls back to home when defaultPath does not exist', async () => {
@@ -220,7 +230,7 @@ describe.runIf(fs.existsSync('/usr/bin/osascript'))('real osascript binary — a
     for (const payload of PAYLOADS) {
       const args = buildOsascriptArgs(PROBE, [payload]);
       const stdout = await new Promise<string>((resolve, reject) => {
-        realExecFile('osascript', args, (err, out) => (err ? reject(err) : resolve(String(out))));
+        realExecFile('/usr/bin/osascript', args, (err, out) => (err ? reject(err) : resolve(String(out))));
       });
       expect(stdout).toBe(payload + '\n');
     }
@@ -231,14 +241,46 @@ describe.runIf(fs.existsSync('/usr/bin/osascript'))('real osascript binary — a
     const withoutGuard = [...PROBE.flatMap((line) => ['-e', line]), '-e'];
     await expect(
       new Promise((resolve, reject) => {
-        realExecFile('osascript', withoutGuard, (err, out) => (err ? reject(err) : resolve(out)));
+        realExecFile('/usr/bin/osascript', withoutGuard, (err, out) => (err ? reject(err) : resolve(out)));
       })
     ).rejects.toThrow(); // osascript: option requires an argument -- e
 
     const withGuard = buildOsascriptArgs(PROBE, ['-e']);
     const stdout = await new Promise<string>((resolve, reject) => {
-      realExecFile('osascript', withGuard, (err, out) => (err ? reject(err) : resolve(String(out))));
+      realExecFile('/usr/bin/osascript', withGuard, (err, out) => (err ? reject(err) : resolve(String(out))));
     });
     expect(stdout).toBe('-e\n');
+  });
+});
+
+// The mocked contract tests never reach AppleScript, so a syntax error or
+// application-terminology collision (a variable name clashing with an app's
+// dictionary term) would ship green. Compile the EXACT script source each
+// endpoint sends, captured from the mocked execFile call.
+describe.runIf(fs.existsSync('/usr/bin/osacompile'))('production AppleScript compiles (S4)', () => {
+  function compile(lines: string[]): Promise<void> {
+    const src = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 's4-compile-')), 'script.applescript');
+    fs.writeFileSync(src, lines.join('\n'));
+    return new Promise((resolve, reject) => {
+      realExecFile('/usr/bin/osacompile', ['-o', `${src}.scpt`, src], (err, _out, stderr) =>
+        err ? reject(new Error(String(stderr) || err.message)) : resolve()
+      );
+    });
+  }
+
+  beforeEach(() => {
+    mockedExecFile.mockReset();
+  });
+
+  it('/api/open-terminal script compiles', async () => {
+    execFileSucceeds();
+    await request(app).post('/api/open-terminal').send({ command: 'zsh' });
+    await expect(compile(scriptLinesFrom(mockedExecFile.mock.calls[0][1]))).resolves.toBeUndefined();
+  });
+
+  it('/api/browse-directory script compiles', async () => {
+    execFileSucceeds('/chosen/dir\n');
+    await request(app).post('/api/browse-directory').send({});
+    await expect(compile(scriptLinesFrom(mockedExecFile.mock.calls[0][1]))).resolves.toBeUndefined();
   });
 });

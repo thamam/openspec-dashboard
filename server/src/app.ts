@@ -197,6 +197,10 @@ app.post('/api/execute', openspecController.executeCommand.bind(openspecControll
 // the script source and never parsed by a shell. The '--' is load-bearing:
 // without it, osascript's option parser re-interprets a leading '-e' payload
 // as an extra script statement (verified against /usr/bin/osascript).
+// Pin the binary: a PATH-resolved 'osascript' would run whatever a writable
+// PATH entry plants there, with the server's privileges.
+const OSASCRIPT_BIN = '/usr/bin/osascript';
+
 export function buildOsascriptArgs(scriptLines: string[], scriptArgs: string[]): string[] {
   return [...scriptLines.flatMap((line) => ['-e', line]), '--', ...scriptArgs];
 }
@@ -234,7 +238,7 @@ app.post('/api/open-terminal', (req, res) => {
     'end run',
   ];
 
-  execFile('osascript', buildOsascriptArgs(scriptLines, [command]), (err) => {
+  execFile(OSASCRIPT_BIN, buildOsascriptArgs(scriptLines, [command]), (err) => {
     if (err) {
       console.error('Failed to open native terminal:', err.message);
       res.status(500).json({ error: err.message });
@@ -246,7 +250,7 @@ app.post('/api/open-terminal', (req, res) => {
 
 // Endpoint: Native folder chooser dialog defaulting to home directory or provided path
 app.post('/api/browse-directory', (req, res) => {
-  const rawPath = req.body?.defaultPath || '';
+  const rawPath = typeof req.body?.defaultPath === 'string' ? req.body.defaultPath : '';
   const resolved = rawPath ? resolvePath(rawPath) : os.homedir();
   const targetDir = (resolved && fs.existsSync(resolved)) ? resolved : os.homedir();
 
@@ -270,7 +274,7 @@ app.post('/api/browse-directory', (req, res) => {
     'end run',
   ];
 
-  execFile('osascript', buildOsascriptArgs(scriptLines, [targetDir]), (err, stdout) => {
+  execFile(OSASCRIPT_BIN, buildOsascriptArgs(scriptLines, [targetDir]), (err, stdout) => {
     if (err) {
       console.error('Directory browse dialog cancelled or failed:', err.message);
       res.json({ cancelled: true });
