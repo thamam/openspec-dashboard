@@ -1,5 +1,8 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterAll } from 'vitest';
 import request from 'supertest';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import { app } from '../src/app.js';
 import * as repoService from '../src/services/repoService.js';
 
@@ -169,5 +172,118 @@ describe('API Routes - POST /api/browse-directory', () => {
   it('should accept defaultPath and attempt directory selection', async () => {
     const response = await request(app).post('/api/browse-directory').send({ defaultPath: '~' });
     expect(response.status).toBe(200);
+  });
+});
+
+describe('POST /api/execute — shell injection hardening (S2)', () => {
+  const pwnPath = path.join(os.tmpdir(), `s2-pwn-${process.pid}-${Date.now()}`);
+
+  afterAll(() => {
+    // Cleanup in case a regression ever lets the payload execute
+    try { fs.rmSync(pwnPath, { force: true }); } catch { /* ignore */ }
+  });
+
+  it('rejects args containing $() command substitution and does not execute them', async () => {
+    const response = await request(app).post('/api/execute').send({
+      repoPath: os.tmpdir(),
+      command: 'echo',
+      args: [`$(touch ${pwnPath})`],
+    });
+    expect(response.status).toBe(400);
+    // Asserting the specific error isolates the args guard (repoPath
+    // validation would 400 with a different message)
+    expect(response.body.error).toMatch(/Invalid args/);
+    expect(fs.existsSync(pwnPath)).toBe(false);
+  });
+
+  it('rejects args containing ; command chaining and does not execute them', async () => {
+    const response = await request(app).post('/api/execute').send({
+      repoPath: os.tmpdir(),
+      command: 'echo',
+      args: [`hello; touch ${pwnPath}`],
+    });
+    expect(response.status).toBe(400);
+    expect(response.body.error).toMatch(/Invalid args/);
+    expect(fs.existsSync(pwnPath)).toBe(false);
+  });
+
+  it('rejects a repoPath containing shell metacharacters', async () => {
+    const response = await request(app).post('/api/execute').send({
+      repoPath: `/tmp/x"; touch ${pwnPath}; #`,
+      command: 'echo',
+      args: ['hello'],
+    });
+    expect(response.status).toBe(400);
+    expect(fs.existsSync(pwnPath)).toBe(false);
+  });
+
+  it('rejects rm (removed from the allowlist)', async () => {
+    const response = await request(app).post('/api/execute').send({
+      repoPath: os.tmpdir(),
+      command: 'rm',
+      args: ['-f', pwnPath],
+    });
+    expect(response.status).toBe(400);
+  });
+
+  it('rejects an invalid repoPath', async () => {
+    vi.mocked(repoService.checkRepoStatus).mockResolvedValueOnce({
+      exists: false, isGit: false, isOpenSpec: false,
+    });
+    const response = await request(app).post('/api/execute').send({
+      repoPath: '/nonexistent/s2-path',
+      command: 'echo',
+      args: ['hello'],
+    });
+    expect(response.status).toBe(400);
+  });
+
+  it('still executes a legitimate allowlisted command', async () => {
+    vi.mocked(repoService.checkRepoStatus).mockResolvedValueOnce({
+      exists: true, isGit: true, isOpenSpec: true,
+    });
+    const response = await request(app).post('/api/execute').send({
+      repoPath: os.tmpdir(),
+      command: 'echo',
+      args: ['hello-s2'],
+    });
+    expect(response.status).toBe(200);
+    expect(response.text).toContain('hello-s2');
+  });
+
+  it('does not glob-expand args (proves shell:false)', async () => {
+    vi.mocked(repoService.checkRepoStatus).mockResolvedValueOnce({
+      exists: true, isGit: true, isOpenSpec: true,
+    });
+    const response = await request(app).post('/api/execute').send({
+      repoPath: os.tmpdir(),
+      command: 'echo',
+      args: ['*'],
+    });
+    expect(response.status).toBe(200);
+    // With a shell, '*' would expand to the cwd listing instead of a literal '*'
+    expect(response.text).toMatch(/^\*$/m);
+  });
+
+  it('rejects shell metacharacters in changeName (provider lifecycle path)', async () => {
+    const response = await request(app).post('/api/execute').send({
+      repoPath: os.tmpdir(),
+      command: 'opsx-apply',
+      changeName: `x"; touch ${pwnPath}; #`,
+    });
+    expect(response.status).toBe(400);
+    // Specific error isolates the changeName guard (it runs before repo validation)
+    expect(response.body.error).toMatch(/Invalid changeName/);
+    expect(fs.existsSync(pwnPath)).toBe(false);
+  });
+
+  it('rejects non-array args (Node would treat an object as spawn options)', async () => {
+    const response = await request(app).post('/api/execute').send({
+      repoPath: os.tmpdir(),
+      command: 'echo',
+      args: { cwd: '/etc', env: { PWNED: '1' } },
+    });
+    expect(response.status).toBe(400);
+    expect(response.body.error).toMatch(/Invalid args/);
   });
 });
