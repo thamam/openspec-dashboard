@@ -47,10 +47,16 @@ export class OpenSpecController {
     const safeArgs: string[] = Array.isArray(args) ? args : [];
 
     try {
-      // S2: validate caller-supplied repoPath instead of trusting it as cwd
+      // S2: validate caller-supplied repoPath instead of trusting it as cwd.
+      // Metacharacters are rejected too: providers embed the cwd in a quoted
+      // tmux shell string (e.g. AntiGravityProvider's --add-dir "${cwd}").
       let cwd: string;
       if (req.body.repoPath) {
-        const resolvedRepoPath = resolvePath(String(req.body.repoPath));
+        if (typeof req.body.repoPath !== 'string' || SHELL_METACHAR_PATTERN.test(req.body.repoPath)) {
+          res.status(400).json({ error: 'Invalid repoPath: must be a plain string without shell metacharacters' });
+          return;
+        }
+        const resolvedRepoPath = resolvePath(req.body.repoPath);
         const status = await checkRepoStatus(resolvedRepoPath);
         if (!status?.exists || !status.isGit) {
           res.status(400).json({ error: 'repoPath is not a valid Git repository' });
@@ -87,16 +93,23 @@ export class OpenSpecController {
           tmuxArgs = ['capture-pane', '-pt', sessionName];
         }
 
+        // With shell:false a spawn 'error' (e.g. tmux not installed) is now
+        // reachable; 'close' fires after it, so guard against double-response.
+        let settled = false;
         const child = spawn('tmux', tmuxArgs, { cwd });
         child.stdout.on('data', (data) => res.write(data));
         child.stderr.on('data', (data) => res.write(data));
         child.on('close', (code) => {
+          if (settled) return;
+          settled = true;
           if (code !== 0 && sessionName) {
             res.write(`\n[tmux session '${sessionName}' is not running or has completed]`);
           }
           res.end(`\n[Process exited with code ${code}]`);
         });
         child.on('error', (err) => {
+          if (settled) return;
+          settled = true;
           res.write(`\nFailed to execute tmux: ${err.message}`);
           res.end();
         });

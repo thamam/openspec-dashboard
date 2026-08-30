@@ -190,6 +190,9 @@ describe('POST /api/execute — shell injection hardening (S2)', () => {
       args: [`$(touch ${pwnPath})`],
     });
     expect(response.status).toBe(400);
+    // Asserting the specific error isolates the args guard (repoPath
+    // validation would 400 with a different message)
+    expect(response.body.error).toMatch(/Invalid args/);
     expect(fs.existsSync(pwnPath)).toBe(false);
   });
 
@@ -198,6 +201,17 @@ describe('POST /api/execute — shell injection hardening (S2)', () => {
       repoPath: os.tmpdir(),
       command: 'echo',
       args: [`hello; touch ${pwnPath}`],
+    });
+    expect(response.status).toBe(400);
+    expect(response.body.error).toMatch(/Invalid args/);
+    expect(fs.existsSync(pwnPath)).toBe(false);
+  });
+
+  it('rejects a repoPath containing shell metacharacters', async () => {
+    const response = await request(app).post('/api/execute').send({
+      repoPath: `/tmp/x"; touch ${pwnPath}; #`,
+      command: 'echo',
+      args: ['hello'],
     });
     expect(response.status).toBe(400);
     expect(fs.existsSync(pwnPath)).toBe(false);
