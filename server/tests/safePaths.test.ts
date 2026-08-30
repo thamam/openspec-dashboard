@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import path from 'path';
 import os from 'os';
-import { isSafeName, assertSafeName, resolveUnder } from '../src/utils/paths.js';
+import fs from 'fs';
+import { isSafeName, assertSafeName, resolveUnder, resolveUnderReal } from '../src/utils/paths.js';
 
 describe('utils/paths — isSafeName', () => {
   it.each(['add-login', 'fix_123', 'v1.2.3', 'ChangeABC'])('accepts legit name %s', (name) => {
@@ -69,5 +70,84 @@ describe('utils/paths — resolveUnder', () => {
 
   it('does not confuse a sibling prefix (root2) with containment', () => {
     expect(resolveUnder(root, '../resolve-under-root2/evil.json')).toBeNull();
+  });
+});
+
+describe('utils/paths — resolveUnderReal (symlink-aware write containment)', () => {
+  let root: string;
+  let outside: string;
+
+  beforeEach(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'resolve-real-root-'));
+    outside = fs.mkdtempSync(path.join(os.tmpdir(), 'resolve-real-outside-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(outside, { recursive: true, force: true });
+  });
+
+  it('resolves an existing in-repo file to its canonical path', () => {
+    const target = path.join(root, 'file.md');
+    fs.writeFileSync(target, 'x');
+    expect(resolveUnderReal(root, 'file.md')).toBe(fs.realpathSync(target));
+  });
+
+  it('resolves a not-yet-existing nested target via its nearest existing ancestor', () => {
+    expect(resolveUnderReal(root, 'new-dir/new-file.md')).toBe(
+      path.join(fs.realpathSync(root), 'new-dir', 'new-file.md')
+    );
+  });
+
+  it('rejects a symlink inside the repo that points outside', () => {
+    fs.symlinkSync(outside, path.join(root, 'link'));
+    expect(resolveUnderReal(root, 'link/pwn.md')).toBeNull();
+  });
+
+  it('accepts a symlink that stays inside the repo', () => {
+    const inner = path.join(root, 'inner');
+    fs.mkdirSync(inner);
+    fs.symlinkSync(inner, path.join(root, 'alias'));
+    expect(resolveUnderReal(root, 'alias/file.md')).toBe(
+      path.join(fs.realpathSync(inner), 'file.md')
+    );
+  });
+
+  it('rejects an absolute path outside the repo', () => {
+    expect(resolveUnderReal(root, path.join(outside, 'pwn.md'))).toBeNull();
+  });
+
+  it('rejects when the root does not exist', () => {
+    expect(resolveUnderReal(path.join(root, 'missing'), 'file.md')).toBeNull();
+  });
+});
+
+// Regression for review pass 2: existsSync follows symlinks, so a DANGLING
+// symlink looked non-existent and the ancestor walk skipped past it —
+// writeFileSync would then follow the link and create the outside target.
+describe('utils/paths — resolveUnderReal dangling symlink', () => {
+  let root: string;
+  let outside: string;
+
+  beforeEach(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'resolve-real-root-'));
+    outside = fs.mkdtempSync(path.join(os.tmpdir(), 'resolve-real-outside-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(outside, { recursive: true, force: true });
+  });
+
+  it('rejects a write path through a dangling symlink pointing outside', () => {
+    fs.symlinkSync(path.join(outside, 'does-not-exist-yet'), path.join(root, 'link'));
+    expect(resolveUnderReal(root, 'link/pwn.md')).toBeNull();
+    // And the outside target was not created as a side effect.
+    expect(fs.existsSync(path.join(outside, 'does-not-exist-yet'))).toBe(false);
+  });
+
+  it('rejects when the target itself is a dangling symlink outside', () => {
+    fs.symlinkSync(path.join(outside, 'pwn.md'), path.join(root, 'pwn.md'));
+    expect(resolveUnderReal(root, 'pwn.md')).toBeNull();
   });
 });

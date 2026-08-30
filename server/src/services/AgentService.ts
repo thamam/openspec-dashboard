@@ -3,6 +3,8 @@ import chokidar from 'chokidar';
 import path from 'path';
 import fs from 'fs';
 import { LocalAgentWrapper } from './LocalAgentWrapper.js';
+import { checkRepoStatus, resolvePath } from './repoService.js';
+import { SHELL_METACHAR_PATTERN } from '../utils/paths.js';
 
 export class AgentService {
   private io: Server;
@@ -23,13 +25,37 @@ export class AgentService {
     this.io.on('connection', (socket) => {
       console.log('Client connected to AgentService websocket');
       
-      socket.on('set_repo_path', (repoPath: string) => {
-        if (this.activeRepoPath !== repoPath) {
-          this.activeRepoPath = repoPath;
-          this.chatHistory = this.loadChatHistory();
-          this.restartWatcher();
+      socket.on('set_repo_path', async (repoPath: string) => {
+        // Socket trust boundary: this value becomes the containment root for
+        // autofix writes and the cwd for agent spawns — validate it the same
+        // way the REST surface does (openspecController), or one emit sets the
+        // root to /etc and "containment" writes anywhere.
+        try {
+          if (typeof repoPath !== 'string' || repoPath.length === 0 || SHELL_METACHAR_PATTERN.test(repoPath)) {
+            socket.emit('repo_error', { error: 'Invalid repoPath: must be a plain path string without shell metacharacters' });
+            return;
+          }
+          const resolvedRepoPath = resolvePath(repoPath);
+          const status = await checkRepoStatus(resolvedRepoPath);
+          if (!status?.exists || !status.isGit) {
+            socket.emit('repo_error', { error: 'repoPath is not a valid Git repository' });
+            return;
+          }
+          // checkRepoStatus finds .git by walking UPWARD — a submitted
+          // subdirectory (or $HOME on a dotfiles-repo machine) would
+          // otherwise become the containment root for autofix writes.
+          // Anchor to the actual git root.
+          const rootPath = status.repoRoot ?? resolvedRepoPath;
+          if (this.activeRepoPath !== rootPath) {
+            this.activeRepoPath = rootPath;
+            this.chatHistory = this.loadChatHistory();
+            this.restartWatcher();
+          }
+          socket.emit('chat_history', this.chatHistory);
+        } catch (err: any) {
+          console.error(`[AgentService] Error handling set_repo_path:`, err.message);
+          socket.emit('repo_error', { error: err.message });
         }
-        socket.emit('chat_history', this.chatHistory);
       });
 
       socket.on('chat_message', async (data) => {
@@ -70,7 +96,7 @@ export class AgentService {
         const { file, message } = data;
         console.log(`[AgentService] Triggering autofix for ${file}`);
         try {
-          const autofixPromise = this.agentWrapper.autofix(file, message);
+          const autofixPromise = this.agentWrapper.autofix(this.activeRepoPath, file, message);
           const timeoutPromise = new Promise<never>((_, reject) => 
             setTimeout(() => reject(new Error('Autofix timed out after 45 seconds')), 45000)
           );
