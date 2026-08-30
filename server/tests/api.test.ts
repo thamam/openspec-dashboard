@@ -266,27 +266,24 @@ describe('POST /api/execute — shell injection hardening (S2)', () => {
   });
 
   it('rejects shell metacharacters in changeName (provider lifecycle path)', async () => {
-    vi.mocked(repoService.checkRepoStatus).mockResolvedValueOnce({
-      exists: true, isGit: true, isOpenSpec: true,
-    });
     const response = await request(app).post('/api/execute').send({
       repoPath: os.tmpdir(),
       command: 'opsx-apply',
       changeName: `x"; touch ${pwnPath}; #`,
     });
     expect(response.status).toBe(400);
+    // Specific error isolates the changeName guard (it runs before repo validation)
+    expect(response.body.error).toMatch(/Invalid changeName/);
     expect(fs.existsSync(pwnPath)).toBe(false);
   });
 
   it('rejects non-array args (Node would treat an object as spawn options)', async () => {
-    vi.mocked(repoService.checkRepoStatus).mockResolvedValueOnce({
-      exists: true, isGit: true, isOpenSpec: true,
-    });
     const response = await request(app).post('/api/execute').send({
       repoPath: os.tmpdir(),
       command: 'echo',
       args: { cwd: '/etc', env: { PWNED: '1' } },
     });
     expect(response.status).toBe(400);
+    expect(response.body.error).toMatch(/Invalid args/);
   });
 });
