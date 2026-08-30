@@ -4,6 +4,7 @@ import { IAgentProvider } from './AgentProvider.js';
 import { AntiGravityProvider } from './providers/AntiGravityProvider.js';
 import { ClaudeProvider } from './providers/ClaudeProvider.js';
 import { CodexProvider } from './providers/CodexProvider.js';
+import { isSafeName } from '../utils/paths.js';
 
 function parseSimpleYaml(content: string): Record<string, string> {
   const result: Record<string, string> = {};
@@ -30,8 +31,11 @@ export function resolveProvider(workspacePath: string, changeName?: string): IAg
   // Precedence: change config (.openspec.yaml) -> AGENT_PROVIDER env -> default (codex).
   let providerType: string | undefined;
 
-  // 1. Resolve from change config (.openspec.yaml)
-  if (changeName) {
+  // 1. Resolve from change config (.openspec.yaml). S6: changeName is joined
+  // into the config path — a traversal value ('../../x') would read a config
+  // outside the workspace, so unsafe names skip the per-change config entirely
+  // and fall through to env/default.
+  if (changeName && isSafeName(changeName)) {
     const configPath = path.join(workspacePath, 'openspec', 'changes', changeName, '.openspec.yaml');
     if (fs.existsSync(configPath)) {
       try {

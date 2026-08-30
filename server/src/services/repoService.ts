@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import { assertSafeName } from '../utils/paths.js';
 
 export function resolvePath(targetPath: string): string {
   if (!targetPath) return targetPath;
@@ -468,6 +469,9 @@ export async function getChangeMetadata(
   changeName: string
 ): Promise<ChangeMetadata> {
   const resolvedRepoPath = resolvePath(repoPath);
+  // S6: changeName is joined into a path below — reject traversal segments at
+  // the service boundary too, not only in the route handler.
+  assertSafeName(changeName, 'change name');
   const changeDir = path.join(resolvedRepoPath, 'openspec', 'changes', changeName);
   
   if (!fs.existsSync(changeDir)) {
@@ -547,6 +551,9 @@ export async function updateChangeProvider(
     throw new Error('Invalid agent provider format');
   }
 
+  // S6: changeName reaches .openspec.yaml via path.join — without this,
+  // '../../x' writes outside the repo.
+  assertSafeName(changeName, 'change name');
   const changeConfigFile = path.join(resolvedRepoPath, 'openspec', 'changes', changeName, '.openspec.yaml');
   if (!fs.existsSync(changeConfigFile)) {
     throw new Error(`Change configuration file not found for change: ${changeName}`);

@@ -2,6 +2,7 @@ import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import { resolveProvider } from '../agents/ProviderResolver.js';
+import { isSafeName } from '../utils/paths.js';
 
 export class LocalAgentWrapper {
   /**
@@ -110,9 +111,11 @@ export class LocalAgentWrapper {
     }
 
     return new Promise((resolve) => {
-      // Build change artifacts context
+      // Build change artifacts context. S6: context.activeChange is socket-supplied
+      // and joined into a path — a traversal value would readdir an arbitrary
+      // directory and leak its file listing into the agent prompt.
       let artifactSummary = 'No active change selected.';
-      if (context?.activeChange && repoPath) {
+      if (context?.activeChange && repoPath && isSafeName(context.activeChange)) {
         const changeDir = path.join(repoPath, 'openspec', 'changes', context.activeChange);
         if (fs.existsSync(changeDir)) {
           const files = fs.readdirSync(changeDir);

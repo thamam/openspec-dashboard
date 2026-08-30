@@ -9,6 +9,7 @@ import { OpenSpecController } from './controllers/openspecController.js';
 import { parseTasks } from './services/markdownParser.js';
 import { getKeystoneManifest } from './services/keystoneService.js';
 import { corsOptions } from './cors.js';
+import { isSafeName } from './utils/paths.js';
 
 const app = express();
 const openspecController = new OpenSpecController();
@@ -107,6 +108,13 @@ app.get('/api/artifacts', async (req, res) => {
   
   if (!repoPath || !changeName) {
     res.status(400).json({ error: 'Missing path or change' });
+    return;
+  }
+
+  // S6: changeName becomes a path segment under openspec/changes — a value like
+  // '../../../etc' would escape it and read arbitrary *.md files into the response.
+  if (!isSafeName(changeName)) {
+    res.status(400).json({ error: 'Invalid change name' });
     return;
   }
 
@@ -336,6 +344,13 @@ app.post('/api/changes/:change/provider', async (req, res) => {
 
   if (!repoPath || !agentProvider) {
     res.status(400).json({ error: 'Missing path or provider parameter' });
+    return;
+  }
+
+  // S6: Express decodes %2f in route params, so '../../x' reaches here as a
+  // literal path segment and would make updateChangeProvider write outside the repo.
+  if (!isSafeName(changeName)) {
+    res.status(400).json({ error: 'Invalid change name' });
     return;
   }
 
