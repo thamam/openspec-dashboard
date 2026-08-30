@@ -143,6 +143,28 @@ describe('API Routes - POST /api/schema', () => {
   });
 });
 
+describe('CORS policy (S1)', () => {
+  it('should reflect the Access-Control-Allow-Origin header for the Vite dev origin', async () => {
+    const response = await request(app)
+      .get('/api/status')
+      .set('Origin', 'http://localhost:5183');
+    expect(response.headers['access-control-allow-origin']).toBe('http://localhost:5183');
+  });
+
+  it('should not emit Access-Control-Allow-Origin for disallowed origins', async () => {
+    const response = await request(app)
+      .get('/api/status')
+      .set('Origin', 'http://evil.com');
+    expect(response.headers['access-control-allow-origin']).toBeUndefined();
+  });
+
+  it('should allow requests without an Origin header (curl, server-to-server)', async () => {
+    const response = await request(app).get('/api/status');
+    // Route still executes; 400 here is the route's own missing-param response.
+    expect(response.status).toBe(400);
+  });
+});
+
 describe('API Routes - POST /api/browse-directory', () => {
   it('should accept defaultPath and attempt directory selection', async () => {
     const response = await request(app).post('/api/browse-directory').send({ defaultPath: '~' });

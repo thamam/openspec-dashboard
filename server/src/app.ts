@@ -8,11 +8,12 @@ import { checkRepoStatus, initializeOpenSpec, updateChangeProvider, getChangeMet
 import { OpenSpecController } from './controllers/openspecController.js';
 import { parseTasks } from './services/markdownParser.js';
 import { getKeystoneManifest } from './services/keystoneService.js';
+import { corsOptions } from './cors.js';
 
 const app = express();
 const openspecController = new OpenSpecController();
 
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Legacy endpoints retained for workspace initialization
