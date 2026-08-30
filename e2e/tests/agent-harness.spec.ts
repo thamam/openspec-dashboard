@@ -54,7 +54,8 @@ test.describe('Agent Harness E2E', () => {
     await expect(page.locator('.analysis-status')).toContainText('Watching', { timeout: 10000 });
     const statusText = await page.locator('.analysis-status').innerText();
     const match = statusText.match(/Watching (.*?) for OpenSpec changes/);
-    const watchedRepoPath = match ? match[1] : repoPath;
+    expect(match, `analysis-status should report the watched repo (got: ${JSON.stringify(statusText)})`).not.toBeNull();
+    const watchedRepoPath = match![1];
     expect(watchedRepoPath).toContain('toy-project');
 
     const actualDummyFilePath = path.join(watchedRepoPath, 'openspec', 'changes', 'dummy-test-file.md');
