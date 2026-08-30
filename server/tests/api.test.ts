@@ -287,3 +287,50 @@ describe('POST /api/execute — shell injection hardening (S2)', () => {
     expect(response.body.error).toMatch(/Invalid args/);
   });
 });
+
+describe('POST /api/send-message — shell injection hardening (S3)', () => {
+  const pwnPath = path.join(os.tmpdir(), `s3-pwn-${process.pid}-${Date.now()}`);
+
+  afterAll(() => {
+    // Cleanup in case a regression ever lets the payload execute
+    try { fs.rmSync(pwnPath, { force: true }); } catch { /* ignore */ }
+  });
+
+  it('rejects a sessionName containing shell metacharacters and does not execute them', async () => {
+    const response = await request(app).post('/api/send-message').send({
+      sessionName: `x; touch ${pwnPath}; #`,
+      message: 'hello',
+    });
+    expect(response.status).toBe(400);
+    expect(response.body.error).toMatch(/Invalid sessionName/);
+    expect(fs.existsSync(pwnPath)).toBe(false);
+  });
+
+  it('rejects an injection payload smuggled through changeName (derived sessionName)', async () => {
+    const response = await request(app).post('/api/send-message').send({
+      changeName: `x; touch ${pwnPath}; #`,
+      message: 'hello',
+    });
+    expect(response.status).toBe(400);
+    expect(response.body.error).toMatch(/Invalid sessionName/);
+    expect(fs.existsSync(pwnPath)).toBe(false);
+  });
+
+  it('does not execute $() command substitution inside the message', async () => {
+    // tmux may fail (no such session in tests) — the security assertion is that
+    // the payload never reaches a shell, so no pwn file is created.
+    await request(app).post('/api/send-message').send({
+      sessionName: 'agent-s3-test',
+      message: `$(touch ${pwnPath})`,
+    });
+    expect(fs.existsSync(pwnPath)).toBe(false);
+  });
+
+  it('does not execute backticks, semicolons, or quotes inside the message', async () => {
+    await request(app).post('/api/send-message').send({
+      sessionName: 'agent-s3-test',
+      message: `a \`touch ${pwnPath}\` ; "b" 'c' \\d`,
+    });
+    expect(fs.existsSync(pwnPath)).toBe(false);
+  });
+});

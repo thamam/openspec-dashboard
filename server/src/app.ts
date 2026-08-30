@@ -255,33 +255,41 @@ app.post('/api/browse-directory', (req, res) => {
 });
 
 // Endpoint: Send a raw text message to an existing agent tmux session
+const SESSION_NAME_RE = /^[a-zA-Z0-9_.-]+$/;
+
 app.post('/api/send-message', (req, res) => {
   const { changeName, sessionName: reqSession, message } = req.body;
   const sessionName = reqSession || (changeName ? `agent-${changeName}` : '');
 
-  if (!sessionName || !message) {
+  if (!sessionName || !message || typeof message !== 'string') {
     res.status(400).json({ error: 'Missing sessionName/changeName or message' });
     return;
   }
 
-  try {
-    // Escape double quotes and backslashes for bash
-    const escapedMessage = message.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-    
-    // We send the message surrounded by quotes, and follow it with C-m (Enter)
-    const cmd = `tmux send-keys -t ${sessionName} "${escapedMessage}" C-m`;
-    const child = spawn(cmd, { shell: true });
-    
-    child.on('close', (code) => {
-      if (code === 0) {
-        res.json({ success: true });
-      } else {
-        res.status(500).json({ error: `Failed to send message to tmux session '${sessionName}'` });
-      }
-    });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
+  if (typeof sessionName !== 'string' || !SESSION_NAME_RE.test(sessionName)) {
+    res.status(400).json({ error: 'Invalid sessionName' });
+    return;
   }
+
+  // No shell: message is a single literal argv element, so no escaping is needed
+  // and shell metacharacters in it cannot execute.
+  const child = spawn('tmux', ['send-keys', '-t', sessionName, message, 'C-m']);
+
+  let responded = false;
+  child.on('error', (err) => {
+    if (responded) return;
+    responded = true;
+    res.status(500).json({ error: `Failed to spawn tmux: ${err.message}` });
+  });
+  child.on('close', (code) => {
+    if (responded) return;
+    responded = true;
+    if (code === 0) {
+      res.json({ success: true });
+    } else {
+      res.status(500).json({ error: `Failed to send message to tmux session '${sessionName}'` });
+    }
+  });
 });
 
 app.post('/api/changes/:change/provider', async (req, res) => {
