@@ -1,7 +1,9 @@
+#!/usr/bin/env node
 import { Command } from 'commander';
 import fs from 'fs';
 import path from 'path';
 import readline from 'readline';
+import { pathToFileURL } from 'url';
 import { checkRepoStatus } from '../../server/src/services/repoService.js';
 import { getChangeDag } from '../../server/src/services/dagService.js';
 import { exec } from 'child_process';
@@ -342,4 +344,9 @@ ${designs.slice(0, 5).map((d: any) => `- ${d.label}`).join('\n')}`;
     }
   });
 
-program.parse(process.argv);
+// Only parse argv when executed directly (bin entry) — importing this module
+// (e.g. via `export *` from index.js) must not run the CLI as a side effect.
+// realpathSync because npm-linked bins are symlinks to this file.
+if (process.argv[1] && import.meta.url === pathToFileURL(fs.realpathSync(process.argv[1])).href) {
+  program.parse(process.argv);
+}

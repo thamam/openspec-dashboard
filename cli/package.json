@@ -3,17 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "main": "dist/index.js",
+  "main": "./dist/cli/src/index.js",
   "bin": {
-    "openspec-cli": "./dist/cli.js",
-    "openspec-mcp": "./dist/mcp.js"
+    "openspec-cli": "./dist/cli/src/cli.js",
+    "openspec-mcp": "./dist/cli/src/mcp.js"
   },
   "scripts": {
     "dev:cli": "tsx src/cli.ts",
     "dev:mcp": "tsx src/mcp.ts",
     "build": "tsc",
-    "start:cli": "node dist/cli.js",
-    "start:mcp": "node dist/mcp.js"
+    "start:cli": "node dist/cli/src/cli.js",
+    "start:mcp": "node dist/cli/src/mcp.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^0.6.0",
