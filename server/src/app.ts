@@ -3,7 +3,7 @@ import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { spawn, exec } from 'child_process';
+import { spawn, execFile } from 'child_process';
 import { checkRepoStatus, initializeOpenSpec, updateChangeProvider, getChangeMetadata, createLocalSchema, createNewChange, resolvePath } from './services/repoService.js';
 import { OpenSpecController } from './controllers/openspecController.js';
 import { parseTasks } from './services/markdownParser.js';
@@ -191,35 +191,54 @@ app.get('/api/keystone/manifest', async (req, res) => {
 // Endpoint: Execute CLI command
 app.post('/api/execute', openspecController.executeCommand.bind(openspecController));
 
+// Build an osascript invocation with no shell: each script line is its own
+// '-e' element, and user-controlled values go AFTER '--' so they reach the
+// script's `on run argv` handler as literal data — never interpolated into
+// the script source and never parsed by a shell. The '--' is load-bearing:
+// without it, osascript's option parser re-interprets a leading '-e' payload
+// as an extra script statement (verified against /usr/bin/osascript).
+// Pin the binary: a PATH-resolved 'osascript' would run whatever a writable
+// PATH entry plants there, with the server's privileges.
+const OSASCRIPT_BIN = '/usr/bin/osascript';
+
+export function buildOsascriptArgs(scriptLines: string[], scriptArgs: string[]): string[] {
+  return [...scriptLines.flatMap((line) => ['-e', line]), '--', ...scriptArgs];
+}
+
 // Endpoint: Open Terminal natively (Mac only with iTerm + Terminal.app fallback)
 app.post('/api/open-terminal', (req, res) => {
   const { command } = req.body;
-  if (!command) {
+  if (!command || typeof command !== 'string') {
     res.status(400).json({ error: 'Missing command' });
     return;
   }
-  
-  const escapedCmd = command.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-  const script = `osascript -e '
-    try
-      tell application "iTerm"
-        activate
-        if (count of windows) = 0 then
-          create window with default profile
-        else
-          tell current window to create tab with default profile
-        end if
-        tell current session of current window to write text "${escapedCmd}"
-      end tell
-    on error
-      tell application "Terminal"
-        activate
-        do script "${escapedCmd}"
-      end tell
-    end try
-  '`;
-  
-  exec(script, (err) => {
+
+  // No shell: execFile spawns osascript directly, and `command` is delivered
+  // via `on run argv` as data, so it is never interpolated into the script
+  // source. write text/do script receive it as an AppleScript variable.
+  const scriptLines = [
+    'on run argv',
+    'set cmd to item 1 of argv',
+    'try',
+    'tell application "iTerm"',
+    'activate',
+    'if (count of windows) = 0 then',
+    'create window with default profile',
+    'else',
+    'tell current window to create tab with default profile',
+    'end if',
+    'tell current session of current window to write text cmd',
+    'end tell',
+    'on error',
+    'tell application "Terminal"',
+    'activate',
+    'do script cmd',
+    'end tell',
+    'end try',
+    'end run',
+  ];
+
+  execFile(OSASCRIPT_BIN, buildOsascriptArgs(scriptLines, [command]), (err) => {
     if (err) {
       console.error('Failed to open native terminal:', err.message);
       res.status(500).json({ error: err.message });
@@ -231,14 +250,31 @@ app.post('/api/open-terminal', (req, res) => {
 
 // Endpoint: Native folder chooser dialog defaulting to home directory or provided path
 app.post('/api/browse-directory', (req, res) => {
-  const rawPath = req.body?.defaultPath || '';
+  const rawPath = typeof req.body?.defaultPath === 'string' ? req.body.defaultPath : '';
   const resolved = rawPath ? resolvePath(rawPath) : os.homedir();
   const targetDir = (resolved && fs.existsSync(resolved)) ? resolved : os.homedir();
-  
-  const escapedTarget = targetDir.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-  const script = `osascript -e 'try' -e 'set startFolder to POSIX file "${escapedTarget}"' -e 'set chosenFolder to choose folder default location startFolder' -e 'POSIX path of chosenFolder' -e 'on error' -e 'try' -e 'set chosenFolder to choose folder' -e 'POSIX path of chosenFolder' -e 'on error' -e 'return "CANCELLED"' -e 'end try' -e 'end try'`;
 
-  exec(script, (err, stdout) => {
+  // Same contract as /api/open-terminal: targetDir reaches AppleScript via
+  // `on run argv`, not via string interpolation into the script source.
+  const scriptLines = [
+    'on run argv',
+    'set startPath to item 1 of argv',
+    'try',
+    'set startFolder to POSIX file startPath',
+    'set chosenFolder to choose folder default location startFolder',
+    'POSIX path of chosenFolder',
+    'on error',
+    'try',
+    'set chosenFolder to choose folder',
+    'POSIX path of chosenFolder',
+    'on error',
+    'return "CANCELLED"',
+    'end try',
+    'end try',
+    'end run',
+  ];
+
+  execFile(OSASCRIPT_BIN, buildOsascriptArgs(scriptLines, [targetDir]), (err, stdout) => {
     if (err) {
       console.error('Directory browse dialog cancelled or failed:', err.message);
       res.json({ cancelled: true });

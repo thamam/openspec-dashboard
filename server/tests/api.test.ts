@@ -15,6 +15,14 @@ vi.mock('child_process', async (importOriginal) => {
         cb(null, '/Users/tomerhamam/personal/projects/openspec-dashboard');
       }
     }),
+    // /api/browse-directory and /api/open-terminal use execFile('osascript', ...)
+    // post-S4; mock it so tests never open a real dialog or terminal.
+    execFile: vi.fn((file: string, args: string[], cb: any) => {
+      const callback = typeof args === 'function' ? args : cb;
+      if (typeof callback === 'function') {
+        callback(null, '/Users/tomerhamam/personal/projects/openspec-dashboard', '');
+      }
+    }),
   };
 });
 
