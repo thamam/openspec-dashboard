@@ -2,7 +2,7 @@ import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import { resolveProvider } from '../agents/ProviderResolver.js';
-import { isSafeName } from '../utils/paths.js';
+import { isSafeName, resolveUnder } from '../utils/paths.js';
 
 export class LocalAgentWrapper {
   /**
@@ -157,20 +157,31 @@ Respond helpfully and concisely. Available OpenSpec workflows include: /opsx-pro
 
   /**
    * Invokes the local agent to automatically rewrite a file to fix a violation.
+   * @param repoPath The active repository root — filePath must resolve under it
+   * @param filePath Target file (absolute or repo-relative); socket-controlled,
+   *   so it is containment-checked BEFORE any write (including Test Mode).
    */
-  public async autofix(filePath: string, warningMessage: string): Promise<void> {
+  public async autofix(repoPath: string, filePath: string, warningMessage: string): Promise<void> {
+    // trigger_autofix hands us a fully client-controlled path that previously
+    // reached fs.writeFileSync verbatim — an arbitrary file write. Contain it.
+    if (!repoPath) {
+      throw new Error('Invalid autofix target: no active repository path');
+    }
+    const resolved = resolveUnder(repoPath, filePath);
+    if (!resolved) {
+      throw new Error(`Invalid autofix target: path escapes the active repository (got ${JSON.stringify(filePath)})`);
+    }
+
     if (process.env.TEST_MODE === 'true') {
       return new Promise((resolve) => {
-        fs.writeFileSync(filePath, `# Fixed in Test Mode\nOriginal warning: ${warningMessage}`);
-        console.log(`[LocalAgentWrapper] Autofixed ${filePath} (Test Mode)`);
+        fs.writeFileSync(resolved, `# Fixed in Test Mode\nOriginal warning: ${warningMessage}`);
+        console.log(`[LocalAgentWrapper] Autofixed ${resolved} (Test Mode)`);
         setTimeout(() => resolve(), 500);
       });
     }
 
     return new Promise((resolve) => {
-      const fileName = path.basename(filePath);
-      const repoPath = path.dirname(filePath); // Approximate, but sufficient for cwd
-      
+      const fileName = path.basename(resolved);
       const prompt = `The file ${fileName} has a policy violation: "${warningMessage}".
 Rewrite the ENTIRE file to fix this violation. 
 Output the complete, corrected file contents inside a STRICT code block starting with \`\`\`markdown and ending with \`\`\`. Do not include any other text.`;
@@ -197,8 +208,8 @@ Output the complete, corrected file contents inside a STRICT code block starting
         try {
           const match = fullOutput.match(/```(?:markdown)?\s*([\s\S]*?)\s*```/);
           if (match && match[1]) {
-            fs.writeFileSync(filePath, match[1].trim());
-            console.log(`[LocalAgentWrapper] Autofixed ${filePath}`);
+            fs.writeFileSync(resolved, match[1].trim());
+            console.log(`[LocalAgentWrapper] Autofixed ${resolved}`);
           } else {
              console.warn(`[LocalAgentWrapper] No markdown block found for autofix fallback`);
           }
@@ -237,7 +248,9 @@ Output the complete, corrected file contents inside a STRICT code block starting
       stream.onData((data) => onChunk(data));
       stream.onError((err) => onChunk(`⚠️ [Provider Error]: ${err}`));
       stream.onExit((code) => {
-        onChunk(`\n[Workflow /${workflow} session completed with exit code ${code}]\n`);
+        // The child is the `tmux new-session -d` LAUNCHER — it exits as soon
+        // as the detached session is created, not when the agent finishes.
+        onChunk(`\n[Workflow /${workflow} agent launched in tmux (launcher exited with code ${code}); the agent continues to run detached]\n`);
         resolve();
       });
     });

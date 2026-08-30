@@ -64,7 +64,7 @@ describe('LocalAgentWrapper', () => {
     const filePath = path.join(tempDir, 'autofix-me.md');
     fs.writeFileSync(filePath, '# Before autofix');
 
-    await wrapper.autofix(filePath, 'Policy violation alert');
+    await wrapper.autofix(tempDir, filePath, 'Policy violation alert');
     const content = fs.readFileSync(filePath, 'utf8');
 
     expect(content).toContain('Fixed in Test Mode');

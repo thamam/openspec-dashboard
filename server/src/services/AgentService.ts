@@ -70,7 +70,7 @@ export class AgentService {
         const { file, message } = data;
         console.log(`[AgentService] Triggering autofix for ${file}`);
         try {
-          const autofixPromise = this.agentWrapper.autofix(file, message);
+          const autofixPromise = this.agentWrapper.autofix(this.activeRepoPath, file, message);
           const timeoutPromise = new Promise<never>((_, reject) => 
             setTimeout(() => reject(new Error('Autofix timed out after 45 seconds')), 45000)
           );

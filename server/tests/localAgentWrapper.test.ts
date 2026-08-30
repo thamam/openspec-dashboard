@@ -106,14 +106,14 @@ describe('LocalAgentWrapper — spawn contract (S5)', () => {
 
   it('autofix passes an adversarial warning message as literal prompt text, no shell', async () => {
     const warningMessage = 'violation $(touch s5-pwn3) `id` "quoted"';
-    await wrapper.autofix('/repo/file.md', warningMessage);
+    await wrapper.autofix('/repo', '/repo/file.md', warningMessage);
 
     expect(mockedSpawn).toHaveBeenCalledTimes(1);
     const [cmd, args, opts] = mockedSpawn.mock.calls[0];
     expect(cmd).toBe('agy');
     expect(args).toEqual([
       'run',
-      `--cwd=${path.dirname('/repo/file.md')}`,
+      '--cwd=/repo',
       expect.stringContaining(`"${warningMessage}"`),
     ]);
     expect((args as string[])[2].startsWith('--prompt=')).toBe(true);
@@ -139,6 +139,71 @@ describe('LocalAgentWrapper — spawn contract (S5)', () => {
 
   it('autofix resolves (no crash) when agy is missing (spawn ENOENT)', async () => {
     mockedSpawn.mockReturnValue(fakeErrorChild(Object.assign(new Error('spawn agy ENOENT'), { code: 'ENOENT' })));
-    await expect(wrapper.autofix('/repo/file.md', 'warn')).resolves.toBeUndefined();
+    await expect(wrapper.autofix('/repo', '/repo/file.md', 'warn')).resolves.toBeUndefined();
+  });
+});
+
+// Socket-trust-boundary fix (cycle 7): trigger_autofix hands autofix() a
+// fully client-controlled path that previously reached fs.writeFileSync
+// verbatim — an arbitrary file write. autofix must contain the target under
+// the active repo. TEST_MODE exercises the guard without spawning agy.
+describe('LocalAgentWrapper — autofix path containment', () => {
+  let wrapper: LocalAgentWrapper;
+  let repo: string;
+  let outside: string;
+
+  beforeEach(async () => {
+    vi.stubEnv('TEST_MODE', 'true');
+    wrapper = new LocalAgentWrapper();
+    const fs = await import('fs');
+    const os = await import('os');
+    repo = fs.mkdtempSync(path.join(os.tmpdir(), 's13-autofix-repo-'));
+    outside = fs.mkdtempSync(path.join(os.tmpdir(), 's13-autofix-outside-'));
+  });
+
+  afterEach(async () => {
+    vi.unstubAllEnvs();
+    const fs = await import('fs');
+    fs.rmSync(repo, { recursive: true, force: true });
+    fs.rmSync(outside, { recursive: true, force: true });
+  });
+
+  it('rejects an absolute path outside the repo and leaves the sentinel untouched', async () => {
+    const fs = await import('fs');
+    const sentinel = path.join(outside, 'sentinel.md');
+    fs.writeFileSync(sentinel, 'ORIGINAL');
+
+    await expect(wrapper.autofix(repo, sentinel, 'warn')).rejects.toThrow(/outside|escape|invalid/i);
+    expect(fs.readFileSync(sentinel, 'utf8')).toBe('ORIGINAL');
+  });
+
+  it('rejects a ../ traversal that escapes the repo', async () => {
+    const fs = await import('fs');
+    const sentinel = path.join(outside, 'sentinel.md');
+    fs.writeFileSync(sentinel, 'ORIGINAL');
+    const rel = path.relative(repo, sentinel); // e.g. ../s13-autofix-outside-xxx/sentinel.md
+    expect(rel.startsWith('..')).toBe(true);
+
+    await expect(wrapper.autofix(repo, rel, 'warn')).rejects.toThrow(/outside|escape|invalid/i);
+    expect(fs.readFileSync(sentinel, 'utf8')).toBe('ORIGINAL');
+  });
+
+  it('rejects when no repo path is active', async () => {
+    await expect(wrapper.autofix('', 'anything.md', 'warn')).rejects.toThrow();
+  });
+
+  it('writes an in-repo relative path', async () => {
+    const fs = await import('fs');
+    const target = path.join(repo, 'file.md');
+    fs.writeFileSync(target, '# Before');
+    await wrapper.autofix(repo, 'file.md', 'warn');
+    expect(fs.readFileSync(target, 'utf8')).toContain('Fixed in Test Mode');
+  });
+
+  it('writes an in-repo absolute path (legit client flow: chokidar sends absolute paths)', async () => {
+    const fs = await import('fs');
+    const target = path.join(repo, 'abs.md');
+    await wrapper.autofix(repo, target, 'warn');
+    expect(fs.readFileSync(target, 'utf8')).toContain('Fixed in Test Mode');
   });
 });

@@ -1,5 +1,5 @@
-import { spawn } from 'child_process';
 import { IAgentProvider, ExecutionStream } from '../AgentProvider.js';
+import { spawnTmuxSession } from '../tmuxSession.js';
 
 export class AntiGravityProvider implements IAgentProvider {
   
@@ -16,34 +16,21 @@ export class AntiGravityProvider implements IAgentProvider {
       prompt = `Please run the OpenSpec command /${command} ${args.join(' ')}`;
     }
 
-    const targetCommand = `agy --mode accept-edits --add-dir "${workspacePath}" -p "${prompt}" --dangerously-skip-permissions`;
-    return this.spawnTmux(sessionName, targetCommand, workspacePath);
+    return spawnTmuxSession(sessionName, this.agyArgv(workspacePath, prompt), workspacePath);
   }
 
   public async executeTask(taskContext: string, workspacePath: string): Promise<ExecutionStream> {
     const sessionName = `agent-task-${Date.now()}`;
     const prompt = `Please complete the following task from the OpenSpec tasks.md:\n\n${taskContext}`;
-    const targetCommand = `agy --mode accept-edits --add-dir "${workspacePath}" -p "${prompt}" --dangerously-skip-permissions`;
     
-    return this.spawnTmux(sessionName, targetCommand, workspacePath);
+    return spawnTmuxSession(sessionName, this.agyArgv(workspacePath, prompt), workspacePath);
   }
 
-  private spawnTmux(sessionName: string, command: string, cwd: string): ExecutionStream {
-    const child = spawn('tmux', ['new-session', '-d', '-s', sessionName, command], { cwd });
-
-    return {
-      process: child,
-      onData: (callback) => {
-        // Stream a friendly message detailing the tmux session name
-        callback(`\n[Agent Delegation via Dashboard API]\nSuccessfully launched agent in a detached tmux session: ${sessionName}\n\nTo interact with the agent, open your terminal and run:\n\n    tmux attach -t ${sessionName}\n\n`);
-        child.stdout.on('data', (data) => callback(data.toString()));
-      },
-      onError: (callback) => {
-        child.stderr.on('data', (data) => callback(data.toString()));
-      },
-      onExit: (callback) => {
-        child.on('close', (code) => callback(code));
-      }
-    };
+  // workspacePath is socket-controlled (set_repo_path): it rides as a single
+  // --add-dir=<value> token (agy is Go-flag style and accepts '='), so a value
+  // leading with '-' can never be re-read as a flag. The prompt is always
+  // 'Please ...'-prefixed, so the -p value can never lead with '-' either.
+  private agyArgv(workspacePath: string, prompt: string): string[] {
+    return ['agy', '--mode', 'accept-edits', `--add-dir=${workspacePath}`, '-p', prompt, '--dangerously-skip-permissions'];
   }
 }

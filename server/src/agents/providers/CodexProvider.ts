@@ -1,5 +1,5 @@
-import { spawn } from 'child_process';
 import { IAgentProvider, ExecutionStream } from '../AgentProvider.js';
+import { spawnTmuxSession } from '../tmuxSession.js';
 
 export class CodexProvider implements IAgentProvider {
 
@@ -15,34 +15,23 @@ export class CodexProvider implements IAgentProvider {
     }
 
     // Non-interactive (no approval prompts), scoped to workspace writes — the Codex analog of Claude's --permission-mode auto.
-    const targetCommand = `codex --ask-for-approval never --sandbox workspace-write "${instruction}"`;
-    return this.spawnTmux(sessionName, targetCommand, workspacePath);
+    // argv form (no shell): the instruction is one literal positional element,
+    // always 'Please ...'-prefixed so it can never lead with '-'.
+    return spawnTmuxSession(
+      sessionName,
+      ['codex', '--ask-for-approval', 'never', '--sandbox', 'workspace-write', instruction],
+      workspacePath
+    );
   }
 
   public async executeTask(taskContext: string, workspacePath: string): Promise<ExecutionStream> {
     const sessionName = `agent-task-${Date.now()}`;
     const prompt = `Please complete the following task from the OpenSpec tasks.md:\n\n${taskContext}`;
-    const targetCommand = `codex --ask-for-approval never --sandbox workspace-write "${prompt}"`;
 
-    return this.spawnTmux(sessionName, targetCommand, workspacePath);
-  }
-
-  private spawnTmux(sessionName: string, command: string, cwd: string): ExecutionStream {
-    const child = spawn('tmux', ['new-session', '-d', '-s', sessionName, command], { cwd });
-
-    return {
-      process: child,
-      onData: (callback) => {
-        // Stream a friendly message detailing the tmux session name
-        callback(`\n[Agent Delegation via Dashboard API]\nSuccessfully launched agent in a detached tmux session: ${sessionName}\n\nTo interact with the agent, open your terminal and run:\n\n    tmux attach -t ${sessionName}\n\n`);
-        child.stdout.on('data', (data) => callback(data.toString()));
-      },
-      onError: (callback) => {
-        child.stderr.on('data', (data) => callback(data.toString()));
-      },
-      onExit: (callback) => {
-        child.on('close', (code) => callback(code));
-      }
-    };
+    return spawnTmuxSession(
+      sessionName,
+      ['codex', '--ask-for-approval', 'never', '--sandbox', 'workspace-write', prompt],
+      workspacePath
+    );
   }
 }
