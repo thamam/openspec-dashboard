@@ -104,4 +104,23 @@ describe('AgentService — socket trust boundary (set_repo_path + trigger_autofi
     await waitForEvent(emitted, 'autofix_error');
     expect(fs.readFileSync(sentinel, 'utf8')).toBe('ORIGINAL');
   });
+
+  it('anchors the autofix root to the git repoRoot, not the submitted subdirectory', async () => {
+    // checkRepoStatus finds .git by walking upward; a submitted subdirectory
+    // (or $HOME on a dotfiles-repo machine) must not become the root.
+    const subdir = path.join(repo, 'sub', 'dir');
+    fs.mkdirSync(subdir, { recursive: true });
+    mockedCheckRepoStatus.mockResolvedValue({ exists: true, isGit: true, isOpenSpec: true, repoRoot: repo });
+
+    const { handlers, emitted } = connect();
+    await handlers['set_repo_path'](subdir);
+    expect(emitted.some((e) => e.event === 'repo_error')).toBe(false);
+
+    // A path inside the repo but OUTSIDE the submitted subdir must be writable
+    // (root is the repo), and an out-of-repo path must still be rejected.
+    const inRepoOutsideSubdir = path.join(repo, 'top.md');
+    await handlers['trigger_autofix']({ file: inRepoOutsideSubdir, message: 'violation' });
+    await waitForEvent(emitted, 'autofix_complete');
+    expect(fs.readFileSync(inRepoOutsideSubdir, 'utf8')).toContain('Fixed in Test Mode');
+  });
 });

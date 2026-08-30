@@ -121,3 +121,33 @@ describe('utils/paths — resolveUnderReal (symlink-aware write containment)', (
     expect(resolveUnderReal(path.join(root, 'missing'), 'file.md')).toBeNull();
   });
 });
+
+// Regression for review pass 2: existsSync follows symlinks, so a DANGLING
+// symlink looked non-existent and the ancestor walk skipped past it —
+// writeFileSync would then follow the link and create the outside target.
+describe('utils/paths — resolveUnderReal dangling symlink', () => {
+  let root: string;
+  let outside: string;
+
+  beforeEach(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'resolve-real-root-'));
+    outside = fs.mkdtempSync(path.join(os.tmpdir(), 'resolve-real-outside-'));
+  });
+
+  afterEach(() => {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(outside, { recursive: true, force: true });
+  });
+
+  it('rejects a write path through a dangling symlink pointing outside', () => {
+    fs.symlinkSync(path.join(outside, 'does-not-exist-yet'), path.join(root, 'link'));
+    expect(resolveUnderReal(root, 'link/pwn.md')).toBeNull();
+    // And the outside target was not created as a side effect.
+    expect(fs.existsSync(path.join(outside, 'does-not-exist-yet'))).toBe(false);
+  });
+
+  it('rejects when the target itself is a dangling symlink outside', () => {
+    fs.symlinkSync(path.join(outside, 'pwn.md'), path.join(root, 'pwn.md'));
+    expect(resolveUnderReal(root, 'pwn.md')).toBeNull();
+  });
+});

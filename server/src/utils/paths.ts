@@ -71,10 +71,18 @@ export function resolveUnderReal(root: string, relPath: unknown): string | null 
     return null;
   }
   // Walk up to the nearest existing ancestor (the target itself may not
-  // exist yet) and canonicalize it.
+  // exist yet) and canonicalize it. lstat, NOT existsSync: existsSync
+  // follows symlinks, so a DANGLING symlink (e.g. repo/link ->
+  // /outside/missing, checked in verbatim by git) would look non-existent,
+  // the walk would skip past it, and writeFileSync would follow the link
+  // and create the outside target. With lstat the walk terminates AT the
+  // dangling link and realpathSync then throws -> null.
   let ancestor = resolved;
   const missing: string[] = [];
-  while (!fs.existsSync(ancestor)) {
+  const lexists = (p: string): boolean => {
+    try { fs.lstatSync(p); return true; } catch { return false; }
+  };
+  while (!lexists(ancestor)) {
     missing.unshift(path.basename(ancestor));
     const parent = path.dirname(ancestor);
     if (parent === ancestor) return null;

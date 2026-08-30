@@ -41,8 +41,13 @@ export class AgentService {
             socket.emit('repo_error', { error: 'repoPath is not a valid Git repository' });
             return;
           }
-          if (this.activeRepoPath !== resolvedRepoPath) {
-            this.activeRepoPath = resolvedRepoPath;
+          // checkRepoStatus finds .git by walking UPWARD — a submitted
+          // subdirectory (or $HOME on a dotfiles-repo machine) would
+          // otherwise become the containment root for autofix writes.
+          // Anchor to the actual git root.
+          const rootPath = status.repoRoot ?? resolvedRepoPath;
+          if (this.activeRepoPath !== rootPath) {
+            this.activeRepoPath = rootPath;
             this.chatHistory = this.loadChatHistory();
             this.restartWatcher();
           }
