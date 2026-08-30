@@ -272,8 +272,9 @@ app.post('/api/send-message', (req, res) => {
   }
 
   // No shell: message is a single literal argv element, so no escaping is needed
-  // and shell metacharacters in it cannot execute.
-  const child = spawn('tmux', ['send-keys', '-t', sessionName, message, 'C-m']);
+  // and shell metacharacters in it cannot execute. '--' stops tmux's option
+  // parser so a message starting with '-' is not read as a send-keys flag.
+  const child = spawn('tmux', ['send-keys', '-t', sessionName, '--', message, 'C-m']);
 
   let responded = false;
   child.on('error', (err) => {

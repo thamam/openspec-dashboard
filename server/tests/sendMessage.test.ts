@@ -48,7 +48,7 @@ describe('POST /api/send-message — spawn contract (S3)', () => {
     expect(response.body).toEqual({ success: true });
     expect(mockedSpawn).toHaveBeenCalledWith(
       'tmux',
-      ['send-keys', '-t', 'agent-my-change', 'hello world', 'C-m']
+      ['send-keys', '-t', 'agent-my-change', '--', 'hello world', 'C-m']
     );
     // No shell option — metacharacters cannot be interpreted
     const opts = mockedSpawn.mock.calls[0][2];
@@ -66,7 +66,7 @@ describe('POST /api/send-message — spawn contract (S3)', () => {
     expect(response.status).toBe(200);
     expect(mockedSpawn).toHaveBeenCalledWith(
       'tmux',
-      ['send-keys', '-t', 'agent-my-change', 'hi', 'C-m']
+      ['send-keys', '-t', 'agent-my-change', '--', 'hi', 'C-m']
     );
   });
 
@@ -82,7 +82,22 @@ describe('POST /api/send-message — spawn contract (S3)', () => {
     expect(response.status).toBe(200);
     expect(mockedSpawn).toHaveBeenCalledWith(
       'tmux',
-      ['send-keys', '-t', 'agent-x', message, 'C-m']
+      ['send-keys', '-t', 'agent-x', '--', message, 'C-m']
+    );
+  });
+
+  it('shields a message starting with "-" behind "--" so tmux does not parse it as a flag', async () => {
+    mockedSpawn.mockReturnValue(fakeChild(0));
+
+    const response = await request(app).post('/api/send-message').send({
+      sessionName: 'agent-x',
+      message: '-X cancel',
+    });
+
+    expect(response.status).toBe(200);
+    expect(mockedSpawn).toHaveBeenCalledWith(
+      'tmux',
+      ['send-keys', '-t', 'agent-x', '--', '-X cancel', 'C-m']
     );
   });
 
