@@ -28,11 +28,20 @@ export class LocalAgentWrapper {
       // Prompt the agent to analyze the file and output JSON
       const prompt = `Review the latest changes in ${fileName}. Analyze it against the principles defined in AGENTS.md in this repository. Think step-by-step. At the very end, output a STRICT JSON block starting with \`\`\`json and ending with \`\`\` containing the results with the schema: { "status": "success" | "warning", "message": "short summary" }. DO NOT output anything after the JSON block.`;
 
-      // Use `agy run` to run the task
-      const args = ['run', '--cwd', repoPath, '--prompt', prompt];
-      
+      // Use `agy run` to run the task. No shell: args are passed verbatim.
+      // Option values use --flag=<value> so a value starting with '-' cannot
+      // be re-read as a flag by agy's own option parser.
+      const args = ['run', `--cwd=${repoPath}`, `--prompt=${prompt}`];
+
       const child = spawn('agy', args, {
         cwd: repoPath
+      });
+
+      // Without a shell, a missing agy binary raises 'error' (ENOENT) instead
+      // of exiting 127 — handle it or the server process crashes.
+      child.on('error', (err) => {
+        console.error(`[LocalAgentWrapper] Failed to spawn agy: ${err.message}`);
+        resolve(null);
       });
 
       let fullOutput = '';
@@ -121,10 +130,18 @@ User Request: "${message}"
 
 Respond helpfully and concisely. Available OpenSpec workflows include: /opsx-propose, /opsx-continue, /opsx-sync, /opsx-verify, /opsx-archive. Suggest exact workflows or actions when relevant.`;
 
-      const args = ['run', '--cwd', repoPath, '--prompt', prompt];
-      
+      const args = ['run', `--cwd=${repoPath}`, `--prompt=${prompt}`];
+
       const child = spawn('agy', args, {
         cwd: repoPath
+      });
+
+      // Without a shell, a missing agy binary raises 'error' (ENOENT) instead
+      // of exiting 127 — handle it or the server process crashes.
+      child.on('error', (err) => {
+        console.error(`[LocalAgentWrapper] Failed to spawn agy: ${err.message}`);
+        onChunk(`⚠️ [Agent Error]: ${err.message}`);
+        resolve();
       });
 
       child.stdout.on('data', (data) => {
@@ -155,10 +172,17 @@ Respond helpfully and concisely. Available OpenSpec workflows include: /opsx-pro
 Rewrite the ENTIRE file to fix this violation. 
 Output the complete, corrected file contents inside a STRICT code block starting with \`\`\`markdown and ending with \`\`\`. Do not include any other text.`;
 
-      const args = ['run', '--cwd', repoPath, '--prompt', prompt];
-      
+      const args = ['run', `--cwd=${repoPath}`, `--prompt=${prompt}`];
+
       const child = spawn('agy', args, {
         cwd: repoPath
+      });
+
+      // Without a shell, a missing agy binary raises 'error' (ENOENT) instead
+      // of exiting 127 — handle it or the server process crashes.
+      child.on('error', (err) => {
+        console.error(`[LocalAgentWrapper] Failed to spawn agy: ${err.message}`);
+        resolve();
       });
 
       let fullOutput = '';

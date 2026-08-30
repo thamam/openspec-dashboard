@@ -384,11 +384,13 @@ export async function createNewChange(
     throw new Error('Target path is not a valid Git repository');
   }
 
-  // No shell: the description is a single literal argv element, so '$()',
-  // backticks and quotes in it cannot execute and need no escaping.
+  // No shell: the description is a single literal argv token, so '$()',
+  // backticks and quotes in it cannot execute and need no escaping. The
+  // --flag=<value> form keeps even a leading '-' in the text from being
+  // re-read as a flag by openspec's option parser.
   const args = ['new', 'change', changeName, '--schema', schemaName];
   if (description) {
-    args.push('--description', description);
+    args.push(`--description=${description}`);
   }
 
   await execFilePromise('openspec', args, resolvedRepoPath);

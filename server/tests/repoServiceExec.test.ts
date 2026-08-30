@@ -54,8 +54,6 @@ describe('repoService — exec sink contract (S5 widened)', () => {
     );
     expect(add).toBeDefined();
     expect(add!.args).toEqual(['worktree', 'add', '-b', 'feature/my-branch', '--', '/tmp/wt-dest']);
-    // execFile never runs a shell; no string command interpolation anywhere.
-    expect(typeof add!.args).not.toBe('string');
   });
 
   it('createGitWorktree rejects a branchName starting with "-" (git option-parser layer)', async () => {
@@ -73,14 +71,16 @@ describe('repoService — exec sink contract (S5 widened)', () => {
 
     const call = execCalls().find((c) => c.file === 'openspec');
     expect(call).toBeDefined();
+    // Free-form description rides as ONE --description=<value> token: no shell
+    // to reinterpret metacharacters, and a leading '-' in the text cannot be
+    // re-read as a flag by openspec's option parser.
     expect(call!.args).toEqual([
       'new',
       'change',
       'my-change',
       '--schema',
       'spec-driven',
-      '--description',
-      description,
+      `--description=${description}`,
     ]);
   });
 
