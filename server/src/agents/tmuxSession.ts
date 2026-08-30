@@ -23,6 +23,13 @@ export function spawnTmuxSession(sessionName: string, agentArgv: string[], cwd: 
   // after derivation so a derivation change can never smuggle a tmux target.
   assertSafeName(sessionName, 'tmux session name');
 
+  // tmux runs a SINGLE command argument via `sh -c`; only multi-argument
+  // commands are exec'd directly. Enforce the argv form so a future caller
+  // can never silently reintroduce the shell.
+  if (agentArgv.length < 2) {
+    throw new Error('tmux agent argv must have at least 2 elements — a single command string would be executed via sh -c');
+  }
+
   const child = spawn('tmux', ['new-session', '-d', '-s', sessionName, '--', ...agentArgv], { cwd });
 
   // Without a shell, a missing tmux binary raises 'error' (ENOENT) instead of

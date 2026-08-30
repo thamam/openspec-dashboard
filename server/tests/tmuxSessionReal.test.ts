@@ -47,4 +47,9 @@ describe('spawnTmuxSession — real tmux (S13)', () => {
   itTmux('rejects an unsafe session name without spawning', () => {
     expect(() => spawnTmuxSession('bad;$(touch /tmp/x)', ['printf', 'x'], os.tmpdir())).toThrow(/session name/i);
   });
+
+  it('rejects a single-element agent argv — tmux would run it via sh -c', () => {
+    // No tmux needed: the guard fires before spawn.
+    expect(() => spawnTmuxSession('ok-name', ['echo hi'], os.tmpdir())).toThrow(/sh -c|at least 2/i);
+  });
 });

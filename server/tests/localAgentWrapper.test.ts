@@ -41,17 +41,25 @@ function fakeErrorChild(err: Error) {
 
 describe('LocalAgentWrapper — spawn contract (S5)', () => {
   let wrapper: LocalAgentWrapper;
+  // autofix containment canonicalizes the root with realpath, so spawn-contract
+  // tests need a repo dir that actually exists on disk.
+  let realRepo: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     mockedSpawn.mockReset();
     mockedSpawn.mockReturnValue(fakeChild(0));
     // Bypass the TEST_MODE mock path so the real spawn contract is exercised.
     vi.stubEnv('TEST_MODE', 'false');
     wrapper = new LocalAgentWrapper();
+    const fs = await import('fs');
+    const os = await import('os');
+    realRepo = fs.mkdtempSync(path.join(os.tmpdir(), 's13-spawn-repo-'));
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.unstubAllEnvs();
+    const fs = await import('fs');
+    fs.rmSync(realRepo, { recursive: true, force: true });
   });
 
   it('analyzeFile spawns agy with argv array and NO shell', async () => {
@@ -106,14 +114,14 @@ describe('LocalAgentWrapper — spawn contract (S5)', () => {
 
   it('autofix passes an adversarial warning message as literal prompt text, no shell', async () => {
     const warningMessage = 'violation $(touch s5-pwn3) `id` "quoted"';
-    await wrapper.autofix('/repo', '/repo/file.md', warningMessage);
+    await wrapper.autofix(realRepo, path.join(realRepo, 'file.md'), warningMessage);
 
     expect(mockedSpawn).toHaveBeenCalledTimes(1);
     const [cmd, args, opts] = mockedSpawn.mock.calls[0];
     expect(cmd).toBe('agy');
     expect(args).toEqual([
       'run',
-      '--cwd=/repo',
+      `--cwd=${realRepo}`,
       expect.stringContaining(`"${warningMessage}"`),
     ]);
     expect((args as string[])[2].startsWith('--prompt=')).toBe(true);
@@ -139,7 +147,7 @@ describe('LocalAgentWrapper — spawn contract (S5)', () => {
 
   it('autofix resolves (no crash) when agy is missing (spawn ENOENT)', async () => {
     mockedSpawn.mockReturnValue(fakeErrorChild(Object.assign(new Error('spawn agy ENOENT'), { code: 'ENOENT' })));
-    await expect(wrapper.autofix('/repo', '/repo/file.md', 'warn')).resolves.toBeUndefined();
+    await expect(wrapper.autofix(realRepo, path.join(realRepo, 'file.md'), 'warn')).resolves.toBeUndefined();
   });
 });
 
@@ -205,5 +213,15 @@ describe('LocalAgentWrapper — autofix path containment', () => {
     const target = path.join(repo, 'abs.md');
     await wrapper.autofix(repo, target, 'warn');
     expect(fs.readFileSync(target, 'utf8')).toContain('Fixed in Test Mode');
+  });
+
+  it('rejects a symlink inside the repo that points outside (write would follow it)', async () => {
+    const fs = await import('fs');
+    fs.symlinkSync(outside, path.join(repo, 'link'));
+    const sentinel = path.join(outside, 'sentinel.md');
+    fs.writeFileSync(sentinel, 'ORIGINAL');
+
+    await expect(wrapper.autofix(repo, 'link/sentinel.md', 'warn')).rejects.toThrow(/outside|escape|invalid/i);
+    expect(fs.readFileSync(sentinel, 'utf8')).toBe('ORIGINAL');
   });
 });

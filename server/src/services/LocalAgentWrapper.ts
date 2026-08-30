@@ -2,7 +2,7 @@ import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import { resolveProvider } from '../agents/ProviderResolver.js';
-import { isSafeName, resolveUnder } from '../utils/paths.js';
+import { isSafeName, resolveUnderReal } from '../utils/paths.js';
 
 export class LocalAgentWrapper {
   /**
@@ -167,7 +167,7 @@ Respond helpfully and concisely. Available OpenSpec workflows include: /opsx-pro
     if (!repoPath) {
       throw new Error('Invalid autofix target: no active repository path');
     }
-    const resolved = resolveUnder(repoPath, filePath);
+    const resolved = resolveUnderReal(repoPath, filePath);
     if (!resolved) {
       throw new Error(`Invalid autofix target: path escapes the active repository (got ${JSON.stringify(filePath)})`);
     }

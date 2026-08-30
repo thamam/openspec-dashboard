@@ -1,4 +1,9 @@
 import path from 'path';
+import fs from 'fs';
+
+// Shell-metacharacter denylist shared by the REST surface
+// (openspecController) and the socket surface (AgentService.set_repo_path).
+export const SHELL_METACHAR_PATTERN = /[$`;&|<>()\n\r"'\\]/;
 
 // S6: central path-traversal guards.
 //
@@ -46,3 +51,45 @@ export function resolveUnder(root: string, relPath: unknown): string | null {
   }
   return resolved;
 }
+
+/**
+ * resolveUnder + symlink resolution, for WRITE targets: a symlink inside
+ * root pointing outside would pass the string-level check and then be
+ * followed by writeFileSync. Both root and the target's nearest existing
+ * ancestor are canonicalized with realpath before the containment check.
+ * Returns the canonical target path, or null when it escapes (or root does
+ * not exist). Note: still subject to TOCTOU between check and write — the
+ * window is acceptable for a local single-user dashboard.
+ */
+export function resolveUnderReal(root: string, relPath: unknown): string | null {
+  const resolved = resolveUnder(root, relPath);
+  if (!resolved) return null;
+  let realRoot: string;
+  try {
+    realRoot = fs.realpathSync(root);
+  } catch {
+    return null;
+  }
+  // Walk up to the nearest existing ancestor (the target itself may not
+  // exist yet) and canonicalize it.
+  let ancestor = resolved;
+  const missing: string[] = [];
+  while (!fs.existsSync(ancestor)) {
+    missing.unshift(path.basename(ancestor));
+    const parent = path.dirname(ancestor);
+    if (parent === ancestor) return null;
+    ancestor = parent;
+  }
+  let realAncestor: string;
+  try {
+    realAncestor = fs.realpathSync(ancestor);
+  } catch {
+    return null;
+  }
+  const realTarget = path.join(realAncestor, ...missing);
+  if (realTarget !== realRoot && !realTarget.startsWith(realRoot + path.sep)) {
+    return null;
+  }
+  return realTarget;
+}
+

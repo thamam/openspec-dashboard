@@ -2,12 +2,13 @@ import { Request, Response } from 'express';
 import { spawn, ChildProcess } from 'child_process';
 import { resolveProvider } from '../agents/ProviderResolver.js';
 import { checkRepoStatus, resolvePath } from '../services/repoService.js';
+import { SHELL_METACHAR_PATTERN } from '../utils/paths.js';
 
 // S2: shell metacharacters are rejected in args/changeName as defense-in-depth
 // (spawns use shell:false, so these would be literal — but they should never
 // reach a child process from this endpoint at all; quotes are also rejected
 // because providers embed lifecycle args into a quoted tmux shell string).
-const SHELL_METACHAR_PATTERN = /[$`;&|<>()\n\r"'\\]/;
+// The pattern lives in utils/paths.ts, shared with the socket surface.
 
 // Pipes a spawned child's output into the response and ends it exactly once.
 // With shell:false a spawn 'error' (binary missing) is reachable, and Node
