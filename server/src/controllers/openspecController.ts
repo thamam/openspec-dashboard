@@ -3,10 +3,11 @@ import { spawn } from 'child_process';
 import { resolveProvider } from '../agents/ProviderResolver.js';
 import { checkRepoStatus, resolvePath } from '../services/repoService.js';
 
-// S2: shell metacharacters are rejected in args as defense-in-depth
+// S2: shell metacharacters are rejected in args/changeName as defense-in-depth
 // (spawns use shell:false, so these would be literal — but they should never
-// reach a child process from this endpoint at all).
-const SHELL_METACHAR_PATTERN = /[$`;&|<>()\n\r]/;
+// reach a child process from this endpoint at all; quotes are also rejected
+// because providers embed lifecycle args into a quoted tmux shell string).
+const SHELL_METACHAR_PATTERN = /[$`;&|<>()\n\r"']/;
 
 export class OpenSpecController {
 
@@ -26,12 +27,24 @@ export class OpenSpecController {
       return;
     }
 
-    // S2: args must be an array of plain strings without shell metacharacters
-    const inputArgs: unknown[] = Array.isArray(args) ? args : [];
-    if (inputArgs.some(a => typeof a !== 'string' || SHELL_METACHAR_PATTERN.test(a))) {
-      res.status(400).json({ error: 'Invalid args: arguments must be plain strings without shell metacharacters' });
-      return;
+    // S2: args must be an array of plain strings without shell metacharacters.
+    // A non-array object would be treated by Node's spawn as the options
+    // argument, silently overriding the validated cwd — reject it outright.
+    if (args !== undefined && args !== null) {
+      if (!Array.isArray(args) || args.some(a => typeof a !== 'string' || SHELL_METACHAR_PATTERN.test(a))) {
+        res.status(400).json({ error: 'Invalid args: arguments must be plain strings without shell metacharacters' });
+        return;
+      }
     }
+    // S2: changeName flows into provider lifecycle commands (which build tmux
+    // shell strings), so it gets the same guard.
+    if (changeName !== undefined && changeName !== null) {
+      if (typeof changeName !== 'string' || SHELL_METACHAR_PATTERN.test(changeName)) {
+        res.status(400).json({ error: 'Invalid changeName: must be a plain string without shell metacharacters' });
+        return;
+      }
+    }
+    const safeArgs: string[] = Array.isArray(args) ? args : [];
 
     try {
       // S2: validate caller-supplied repoPath instead of trusting it as cwd
@@ -50,7 +63,7 @@ export class OpenSpecController {
 
       // Normalize command aliases
       let execCmd = command;
-      let execArgs = args || [];
+      let execArgs: string[] = safeArgs;
 
       if (execCmd === 'ag' || execCmd === 'antigravity') {
         execCmd = 'agy';
@@ -58,18 +71,18 @@ export class OpenSpecController {
 
       if (execCmd === 'openspec') {
         execCmd = 'npx';
-        execArgs = ['openspec', ...(args || [])];
+        execArgs = ['openspec', ...safeArgs];
       }
 
       if (command === 'tmux') {
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
         res.setHeader('Transfer-Encoding', 'chunked');
 
-        const sessionIndex = args ? args.indexOf('-t') : -1;
-        const sessionName = sessionIndex !== -1 && args[sessionIndex + 1] ? args[sessionIndex + 1] : '';
+        const sessionIndex = safeArgs.indexOf('-t');
+        const sessionName = sessionIndex !== -1 && safeArgs[sessionIndex + 1] ? safeArgs[sessionIndex + 1] : '';
 
-        let tmuxArgs = args || [];
-        if (args && args.includes('attach') && sessionName) {
+        let tmuxArgs = safeArgs;
+        if (safeArgs.includes('attach') && sessionName) {
           // Replace attach with capture-pane -pt for non-interactive streaming
           tmuxArgs = ['capture-pane', '-pt', sessionName];
         }
@@ -106,7 +119,7 @@ export class OpenSpecController {
       }
 
       if (command === 'opsx-new') {
-        const rawName = args?.[0] || 'default';
+        const rawName = safeArgs[0] || 'default';
         // Force the name to lowercase kebab-case to satisfy openspec CLI constraints
         const kebabName = rawName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
         const child = spawn('npx', ['openspec', 'new', 'change', kebabName], { cwd });
@@ -122,7 +135,7 @@ export class OpenSpecController {
           res.end();
         });
       } else if (command === 'opsx-verify') {
-        const target = changeName || args?.[0] || 'main';
+        const target = changeName || safeArgs[0] || 'main';
         const child = spawn('npx', ['openspec', 'status', '--change', target], { cwd });
         
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
@@ -137,10 +150,10 @@ export class OpenSpecController {
         });
       } else {
         // Resolve active provider dynamically
-        const provider = resolveProvider(cwd, changeName || args?.[0]);
-        
+        const provider = resolveProvider(cwd, changeName || safeArgs[0]);
+
         // Execute the lifecycle command via the provider
-        const processArgs = args || (changeName ? [changeName] : []);
+        const processArgs = args ? safeArgs : (changeName ? [changeName] : []);
         const stream = await provider.executeLifecycle(command, processArgs, cwd);
 
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');

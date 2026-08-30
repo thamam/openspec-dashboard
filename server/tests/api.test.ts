@@ -236,4 +236,43 @@ describe('POST /api/execute — shell injection hardening (S2)', () => {
     expect(response.status).toBe(200);
     expect(response.text).toContain('hello-s2');
   });
+
+  it('does not glob-expand args (proves shell:false)', async () => {
+    vi.mocked(repoService.checkRepoStatus).mockResolvedValueOnce({
+      exists: true, isGit: true, isOpenSpec: true,
+    });
+    const response = await request(app).post('/api/execute').send({
+      repoPath: os.tmpdir(),
+      command: 'echo',
+      args: ['*'],
+    });
+    expect(response.status).toBe(200);
+    // With a shell, '*' would expand to the cwd listing instead of a literal '*'
+    expect(response.text).toMatch(/^\*$/m);
+  });
+
+  it('rejects shell metacharacters in changeName (provider lifecycle path)', async () => {
+    vi.mocked(repoService.checkRepoStatus).mockResolvedValueOnce({
+      exists: true, isGit: true, isOpenSpec: true,
+    });
+    const response = await request(app).post('/api/execute').send({
+      repoPath: os.tmpdir(),
+      command: 'opsx-apply',
+      changeName: `x"; touch ${pwnPath}; #`,
+    });
+    expect(response.status).toBe(400);
+    expect(fs.existsSync(pwnPath)).toBe(false);
+  });
+
+  it('rejects non-array args (Node would treat an object as spawn options)', async () => {
+    vi.mocked(repoService.checkRepoStatus).mockResolvedValueOnce({
+      exists: true, isGit: true, isOpenSpec: true,
+    });
+    const response = await request(app).post('/api/execute').send({
+      repoPath: os.tmpdir(),
+      command: 'echo',
+      args: { cwd: '/etc', env: { PWNED: '1' } },
+    });
+    expect(response.status).toBe(400);
+  });
 });
