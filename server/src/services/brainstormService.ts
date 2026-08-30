@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { createNewChange, resolvePath } from './repoService.js';
+import { assertSafeName, resolveUnder } from '../utils/paths.js';
 
 /**
  * Recursively reads all markdown specs under openspec/specs/
@@ -52,10 +53,24 @@ export async function commitBrainstormChange(
 ): Promise<void> {
   const resolvedRepoPath = resolvePath(repoPath);
 
+  // S6: validate everything before any side effect (createNewChange spawns the
+  // openspec CLI). changeName is a path segment; files.specs keys are relative
+  // paths that legitimately contain '/', so they get a containment check.
+  assertSafeName(changeName, 'change name');
+  const changeDir = path.join(resolvedRepoPath, 'openspec', 'changes', changeName);
+  const specEntries: Array<[string, string]> = [];
+  if (files.specs) {
+    for (const [relPath, content] of Object.entries(files.specs)) {
+      const fullSpecPath = resolveUnder(changeDir, relPath);
+      if (!fullSpecPath) {
+        throw new Error(`Invalid spec path: ${JSON.stringify(relPath)} escapes the change directory`);
+      }
+      specEntries.push([fullSpecPath, content]);
+    }
+  }
+
   // 1. Create standard change structure using standard helper
   await createNewChange(resolvedRepoPath, changeName, 'spec-driven');
-
-  const changeDir = path.join(resolvedRepoPath, 'openspec', 'changes', changeName);
 
   // 2. Overwrite default files with brainstormed contents
   if (files.proposal) {
@@ -68,12 +83,9 @@ export async function commitBrainstormChange(
     fs.writeFileSync(path.join(changeDir, 'tasks.md'), files.tasks, 'utf8');
   }
 
-  // 3. Write spec files recursively
-  if (files.specs) {
-    for (const [relPath, content] of Object.entries(files.specs)) {
-      const fullSpecPath = path.join(changeDir, relPath);
-      fs.mkdirSync(path.dirname(fullSpecPath), { recursive: true });
-      fs.writeFileSync(fullSpecPath, content, 'utf8');
-    }
+  // 3. Write spec files recursively (paths already containment-checked above)
+  for (const [fullSpecPath, content] of specEntries) {
+    fs.mkdirSync(path.dirname(fullSpecPath), { recursive: true });
+    fs.writeFileSync(fullSpecPath, content, 'utf8');
   }
 }

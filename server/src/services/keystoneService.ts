@@ -3,6 +3,7 @@ import path from 'path';
 import { execFile } from 'child_process';
 import { parse as parseYamlDocument } from 'yaml';
 import { resolvePath } from './repoService.js';
+import { resolveUnder } from '../utils/paths.js';
 
 // Keystone handshake v0.1 manifest reader (thamam/keystone SPEC.md §1).
 // The dashboard consumes .aidev/manifest.yaml so it can render artifacts it did not produce.
@@ -148,11 +149,18 @@ export async function getKeystoneManifest(repoPath: string): Promise<KeystoneMan
       fresh: headSha !== null && (effectiveBySha.get(row.source_sha) ?? null) === effectiveHead,
       headSha
     };
-    if (row.format === 'review-findings/0.1' && row.path) {
-      artifact.review = readEnvelope<KeystoneReviewEnvelope>(path.join(resolved, row.path), 'review-findings');
+    // S6: row.path comes from the repo's own manifest, which may be malicious —
+    // it legitimately contains '/', so enforce containment under the repo root
+    // instead of a no-separator regex. Out-of-root rows are skipped, not read.
+    const envelopePath = row.path ? resolveUnder(resolved, row.path) : null;
+    if (row.path && !envelopePath) {
+      console.warn(`Keystone: artifact path escapes repo root, skipped: ${JSON.stringify(row.path)}`);
     }
-    if (row.format === 'wiki/1' && row.path) {
-      artifact.wiki = readEnvelope<KeystoneWikiEnvelope>(path.join(resolved, row.path), 'wiki');
+    if (row.format === 'review-findings/0.1' && envelopePath) {
+      artifact.review = readEnvelope<KeystoneReviewEnvelope>(envelopePath, 'review-findings');
+    }
+    if (row.format === 'wiki/1' && envelopePath) {
+      artifact.wiki = readEnvelope<KeystoneWikiEnvelope>(envelopePath, 'wiki');
     }
     return artifact;
   });
