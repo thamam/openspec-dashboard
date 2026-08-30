@@ -16,8 +16,8 @@ const io = new Server(httpServer, {
     ...corsOptions,
     methods: ['GET', 'POST']
   },
-  // Enforce the origin allowlist on the WebSocket handshake too
-  // (the cors option above only covers HTTP long-polling).
+  // Defense in depth: engine.io applies the cors option to the WS upgrade
+  // too; allowRequest additionally rejects disallowed origins at the handshake.
   allowRequest: (req, callback) => {
     callback(null, isAllowedOrigin(req.headers.origin));
   }
