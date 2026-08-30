@@ -1,5 +1,8 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterAll } from 'vitest';
 import request from 'supertest';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import { app } from '../src/app.js';
 import * as repoService from '../src/services/repoService.js';
 
@@ -169,5 +172,68 @@ describe('API Routes - POST /api/browse-directory', () => {
   it('should accept defaultPath and attempt directory selection', async () => {
     const response = await request(app).post('/api/browse-directory').send({ defaultPath: '~' });
     expect(response.status).toBe(200);
+  });
+});
+
+describe('POST /api/execute — shell injection hardening (S2)', () => {
+  const pwnPath = path.join(os.tmpdir(), `s2-pwn-${process.pid}-${Date.now()}`);
+
+  afterAll(() => {
+    // Cleanup in case a regression ever lets the payload execute
+    try { fs.rmSync(pwnPath, { force: true }); } catch { /* ignore */ }
+  });
+
+  it('rejects args containing $() command substitution and does not execute them', async () => {
+    const response = await request(app).post('/api/execute').send({
+      repoPath: os.tmpdir(),
+      command: 'echo',
+      args: [`$(touch ${pwnPath})`],
+    });
+    expect(response.status).toBe(400);
+    expect(fs.existsSync(pwnPath)).toBe(false);
+  });
+
+  it('rejects args containing ; command chaining and does not execute them', async () => {
+    const response = await request(app).post('/api/execute').send({
+      repoPath: os.tmpdir(),
+      command: 'echo',
+      args: [`hello; touch ${pwnPath}`],
+    });
+    expect(response.status).toBe(400);
+    expect(fs.existsSync(pwnPath)).toBe(false);
+  });
+
+  it('rejects rm (removed from the allowlist)', async () => {
+    const response = await request(app).post('/api/execute').send({
+      repoPath: os.tmpdir(),
+      command: 'rm',
+      args: ['-f', pwnPath],
+    });
+    expect(response.status).toBe(400);
+  });
+
+  it('rejects an invalid repoPath', async () => {
+    vi.mocked(repoService.checkRepoStatus).mockResolvedValueOnce({
+      exists: false, isGit: false, isOpenSpec: false,
+    });
+    const response = await request(app).post('/api/execute').send({
+      repoPath: '/nonexistent/s2-path',
+      command: 'echo',
+      args: ['hello'],
+    });
+    expect(response.status).toBe(400);
+  });
+
+  it('still executes a legitimate allowlisted command', async () => {
+    vi.mocked(repoService.checkRepoStatus).mockResolvedValueOnce({
+      exists: true, isGit: true, isOpenSpec: true,
+    });
+    const response = await request(app).post('/api/execute').send({
+      repoPath: os.tmpdir(),
+      command: 'echo',
+      args: ['hello-s2'],
+    });
+    expect(response.status).toBe(200);
+    expect(response.text).toContain('hello-s2');
   });
 });

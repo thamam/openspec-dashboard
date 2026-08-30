@@ -1,9 +1,15 @@
 import { Request, Response } from 'express';
 import { spawn } from 'child_process';
 import { resolveProvider } from '../agents/ProviderResolver.js';
+import { checkRepoStatus, resolvePath } from '../services/repoService.js';
+
+// S2: shell metacharacters are rejected in args as defense-in-depth
+// (spawns use shell:false, so these would be literal — but they should never
+// reach a child process from this endpoint at all).
+const SHELL_METACHAR_PATTERN = /[$`;&|<>()\n\r]/;
 
 export class OpenSpecController {
-  
+
   /**
    * Executes a lifecycle command (e.g., opsx-continue) via child process.
    * In a full implementation, this would stream output to the client via WebSockets or SSE.
@@ -11,17 +17,36 @@ export class OpenSpecController {
    */
   public async executeCommand(req: Request, res: Response): Promise<void> {
     const { command, args, changeName } = req.body;
-    
+
     const lifecycleCommands = ['opsx-new', 'opsx-continue', 'opsx-propose', 'opsx-verify', 'opsx-archive', 'opsx-sync', 'opsx-apply'];
-    const shellCommands = ['agy', 'ag', 'antigravity', 'claude', 'tmux', 'git', 'openspec', 'ls', 'pwd', 'cat', 'echo', 'node', 'npm', 'which', 'clear', 'mkdir', 'touch', 'rm'];
-    
+    const shellCommands = ['agy', 'ag', 'antigravity', 'claude', 'tmux', 'git', 'openspec', 'ls', 'pwd', 'cat', 'echo', 'which', 'clear', 'mkdir', 'touch'];
+
     if (!lifecycleCommands.includes(command) && !shellCommands.includes(command)) {
       res.status(400).json({ error: `Command '${command}' not allowed` });
       return;
     }
 
+    // S2: args must be an array of plain strings without shell metacharacters
+    const inputArgs: unknown[] = Array.isArray(args) ? args : [];
+    if (inputArgs.some(a => typeof a !== 'string' || SHELL_METACHAR_PATTERN.test(a))) {
+      res.status(400).json({ error: 'Invalid args: arguments must be plain strings without shell metacharacters' });
+      return;
+    }
+
     try {
-      const cwd = req.body.repoPath || process.env.REPO_PATH || process.cwd();
+      // S2: validate caller-supplied repoPath instead of trusting it as cwd
+      let cwd: string;
+      if (req.body.repoPath) {
+        const resolvedRepoPath = resolvePath(String(req.body.repoPath));
+        const status = await checkRepoStatus(resolvedRepoPath);
+        if (!status?.exists || !status.isGit) {
+          res.status(400).json({ error: 'repoPath is not a valid Git repository' });
+          return;
+        }
+        cwd = resolvedRepoPath;
+      } else {
+        cwd = process.env.REPO_PATH || process.cwd();
+      }
 
       // Normalize command aliases
       let execCmd = command;
@@ -49,7 +74,7 @@ export class OpenSpecController {
           tmuxArgs = ['capture-pane', '-pt', sessionName];
         }
 
-        const child = spawn('tmux', tmuxArgs, { cwd, shell: true });
+        const child = spawn('tmux', tmuxArgs, { cwd });
         child.stdout.on('data', (data) => res.write(data));
         child.stderr.on('data', (data) => res.write(data));
         child.on('close', (code) => {
@@ -69,7 +94,7 @@ export class OpenSpecController {
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
         res.setHeader('Transfer-Encoding', 'chunked');
 
-        const child = spawn(execCmd, execArgs, { cwd, shell: true });
+        const child = spawn(execCmd, execArgs, { cwd });
         child.stdout.on('data', (data) => res.write(data));
         child.stderr.on('data', (data) => res.write(data));
         child.on('close', (code) => res.end(`\n[Process exited with code ${code}]`));
@@ -84,7 +109,7 @@ export class OpenSpecController {
         const rawName = args?.[0] || 'default';
         // Force the name to lowercase kebab-case to satisfy openspec CLI constraints
         const kebabName = rawName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-        const child = spawn('npx', ['openspec', 'new', 'change', kebabName], { cwd, shell: true });
+        const child = spawn('npx', ['openspec', 'new', 'change', kebabName], { cwd });
         
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
         res.setHeader('Transfer-Encoding', 'chunked');
@@ -98,7 +123,7 @@ export class OpenSpecController {
         });
       } else if (command === 'opsx-verify') {
         const target = changeName || args?.[0] || 'main';
-        const child = spawn('npx', ['openspec', 'status', '--change', target], { cwd, shell: true });
+        const child = spawn('npx', ['openspec', 'status', '--change', target], { cwd });
         
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
         res.setHeader('Transfer-Encoding', 'chunked');
