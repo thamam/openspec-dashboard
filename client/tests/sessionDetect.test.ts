@@ -2,8 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   AGENT_SESSION_PATTERN,
   EXIT_MARKER,
-  detectActiveSession,
-  SessionDetector
+  detectActiveSession
 } from '../src/terminal/sessionDetect';
 
 // Reference oracle: the legacy inline scan previously duplicated verbatim in
@@ -103,55 +102,10 @@ describe('detectActiveSession (batch)', () => {
   });
 });
 
-describe('SessionDetector (incremental)', () => {
-  it('feeding line-by-line equals feeding all at once equals batch', () => {
-    const lines = [
-      'noise',
-      'started openspec-session-123',
-      'working',
-      '[Process exited with code 0]',
-      'started agent-789',
-      'more work'
-    ];
-    const batch = detectActiveSession(lines);
-
-    const allAtOnce = new SessionDetector();
-    expect(allAtOnce.feedLines(lines)).toBe(batch);
-
-    const lineByLine = new SessionDetector();
-    let result = '';
-    for (const line of lines) {
-      result = lineByLine.feed(line);
-    }
-    expect(result).toBe(batch);
-    expect(lineByLine.activeSession).toBe('agent-789');
-  });
-
-  it('only processes new lines across successive feedLines calls', () => {
-    const d = new SessionDetector();
-    expect(d.feedLines(['noise', 'started agent-1'])).toBe('agent-1');
-    // Feed the grown array (old prefix + new lines) — prefix must not be reprocessed.
-    expect(d.feedLines(['noise', 'started agent-1', '[Process exited with code 0]'])).toBe('');
-    expect(d.feedLines(['noise', 'started agent-1', '[Process exited with code 0]', 'started agent-2'])).toBe('agent-2');
-  });
-
-  it('resets when the lines array shrinks (terminal cleared)', () => {
-    const d = new SessionDetector();
-    expect(d.feedLines(['started agent-1', 'working'])).toBe('agent-1');
-    // 'clear' empties the array; next lines must be evaluated fresh.
-    expect(d.feedLines([])).toBe('');
-    expect(d.feedLines(['no session here'])).toBe('');
-    expect(d.feedLines(['no session here', 'started agent-7'])).toBe('agent-7');
-  });
-
-  it('re-processes when a same-length array replaces the fed tail (pane capture splice)', () => {
-    const d = new SessionDetector();
-    expect(d.feedLines(['--- Active Session: agent-1 ---', 'pane line A'])).toBe('agent-1');
-    // captureTmuxPane replaces from the marker onward; if the tail changes
-    // without growing, the detector must notice via the last-line fingerprint.
-    expect(d.feedLines(['--- Active Session: agent-1 ---', '[Process exited with code 0]'])).toBe('');
-  });
-});
+// NOTE: an incremental SessionDetector class was implemented first and removed
+// in review — its reset heuristic couldn't see prefix rewrites, and with the
+// C7 cap a full scan is bounded O(MAX_TERMINAL_LINES) over an array that only
+// changes on user commands. The batch helper above is the single shared scan.
 
 describe('exported constants', () => {
   it('AGENT_SESSION_PATTERN and EXIT_MARKER match the legacy literals', () => {

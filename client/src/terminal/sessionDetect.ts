@@ -3,6 +3,12 @@
 // and App.tsx (handleRunTerminalCommand), re-running over the WHOLE lines array
 // on every chunk (O(n²) over a session). This module is the single source of
 // truth; both call sites use it.
+//
+// Note: an incremental SessionDetector class was considered and dropped in
+// review — once C7 caps the buffer at MAX_TERMINAL_LINES, a full scan is a
+// bounded O(2000) that only runs when the user executes a command (PTY output
+// goes straight to xterm, never into this array), and front-trimming at the
+// cap would have invalidated any incrementality anyway.
 
 export const AGENT_SESSION_PATTERN = /(openspec-session-[0-9]+|agent-[0-9]+)/;
 export const EXIT_MARKER = '[Process exited with code';
@@ -30,67 +36,4 @@ export function detectActiveSession(lines: string[]): string {
     }
   }
   return sessionName;
-}
-
-// Incremental variant: feed only new lines as they arrive; O(new lines) per
-// update instead of rescanning the whole buffer. feedLines() accepts the FULL
-// (capped) lines array and internally skips what it has already processed, so
-// callers never have to diff chunks themselves.
-export class SessionDetector {
-  private fed = 0;
-  private lastLine: string | undefined = undefined;
-  private candidate = '';
-  private exited = false;
-
-  get activeSession(): string {
-    return this.exited ? '' : this.candidate;
-  }
-
-  reset(): void {
-    this.fed = 0;
-    this.lastLine = undefined;
-    this.candidate = '';
-    this.exited = false;
-  }
-
-  // Feed the full lines array; returns the current active session.
-  // Resets automatically when the buffer was cleared (shrank) or when its
-  // already-fed tail was spliced in place (pane capture replaces from the
-  // "--- Active Session ---" marker onward — detected via a last-line
-  // fingerprint). The fingerprint only guards the same-length splice corner;
-  // growth is the common path and is processed purely incrementally.
-  feedLines(lines: string[]): string {
-    if (
-      lines.length < this.fed ||
-      (this.fed > 0 && lines[this.fed - 1] !== this.lastLine)
-    ) {
-      this.reset();
-    }
-    for (let i = this.fed; i < lines.length; i++) {
-      this.feedLine(lines[i]);
-    }
-    this.fed = lines.length;
-    this.lastLine = this.fed > 0 ? lines[this.fed - 1] : undefined;
-    return this.activeSession;
-  }
-
-  // Feed genuinely NEW lines (chunks as they arrive), one or a few at a time.
-  // Use this OR feedLines — not both; feed() assumes every line passed here is
-  // appended to the stream, so it never triggers the splice/shrink reset.
-  feed(line: string): string {
-    this.feedLine(line);
-    this.fed++;
-    this.lastLine = line;
-    return this.activeSession;
-  }
-
-  private feedLine(line: string): void {
-    const match = line.match(AGENT_SESSION_PATTERN);
-    if (match) {
-      this.candidate = match[0];
-      this.exited = false;
-    } else if (line.includes(EXIT_MARKER)) {
-      this.exited = true;
-    }
-  }
 }
