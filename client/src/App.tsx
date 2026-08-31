@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import './App.css';
 import { CommandCenter } from './components/CommandCenter';
 import { ArtifactViewer } from './components/ArtifactViewer';
@@ -14,6 +14,8 @@ import { isDrifted, readPinnedContext } from './keystone/pinnedContext';
 const urlParams = new URLSearchParams(window.location.search);
 const INITIAL_REPO_PATH = urlParams.get('path') || '/tmp/toy-openspec-project';
 const INITIAL_CHANGE = urlParams.get('change') || 'main';
+
+const EMPTY_ARTIFACTS: Artifacts = { proposal: '', spec: '', design: '', tasks: '' };
 
 function App() {
   const [repoPath, setRepoPath] = useState<string>(INITIAL_REPO_PATH);
@@ -86,14 +88,31 @@ function App() {
     document.addEventListener('mouseup', onMouseUp);
   }, [terminalHeight]);
 
+  // Monotonic request ids + in-flight flag so a slower, older response can
+  // never overwrite state written by a newer request (C1), and so the 2s poll
+  // can skip ticks while a load is still running.
+  const changesRequestIdRef = useRef(0);
+  const artifactsRequestIdRef = useRef(0);
+  const artifactsInFlightRef = useRef(false);
+
   const loadChanges = async () => {
+    const requestId = ++changesRequestIdRef.current;
     try {
       const res = await fetch(`/api/changes?path=${encodeURIComponent(repoPath)}`);
-      const data = await res.json();
-      setChanges(data);
-      if (data.length > 0 && activeChange === 'main') {
-        setActiveChange(data[0].id);
+      if (requestId !== changesRequestIdRef.current) return; // superseded by a newer load
+      if (!res.ok) {
+        setChanges([]);
+        return;
       }
+      const data = await res.json();
+      if (requestId !== changesRequestIdRef.current) return;
+      if (!Array.isArray(data)) {
+        // e.g. an {error: ...} body — never hand a non-array to CommandCenter.
+        setChanges([]);
+        return;
+      }
+      setChanges(data);
+      setActiveChange(prev => (prev === 'main' && data.length > 0 ? data[0].id : prev));
     } catch (e) {
       console.error(e);
     }
@@ -101,9 +120,21 @@ function App() {
 
   const loadArtifacts = async (changeName: string) => {
     if (changeName === 'main') return;
+    const requestId = ++artifactsRequestIdRef.current;
+    artifactsInFlightRef.current = true;
     try {
       const res = await fetch(`/api/artifacts?path=${encodeURIComponent(repoPath)}&change=${encodeURIComponent(changeName)}`);
+      if (requestId !== artifactsRequestIdRef.current) return; // stale: superseded by a newer load
+      if (!res.ok) {
+        // e.g. the change doesn't exist in this workspace — don't leave the
+        // previous workspace's artifacts on screen.
+        setArtifacts(EMPTY_ARTIFACTS);
+        setTasks([]);
+        setFiles([]);
+        return;
+      }
       const data = await res.json();
+      if (requestId !== artifactsRequestIdRef.current) return; // stale
       if (data.artifacts) {
         setArtifacts({
           ...data.artifacts,
@@ -114,22 +145,44 @@ function App() {
         if (data.agentProvider) {
           setAgentProvider(data.agentProvider);
         }
+      } else {
+        setArtifacts(EMPTY_ARTIFACTS);
+        setTasks([]);
+        setFiles([]);
       }
     } catch (e) {
       console.error(e);
+    } finally {
+      if (requestId === artifactsRequestIdRef.current) {
+        artifactsInFlightRef.current = false;
+      }
     }
   };
 
+  const isInitialRepoLoad = useRef(true);
   useEffect(() => {
+    if (isInitialRepoLoad.current) {
+      isInitialRepoLoad.current = false;
+    } else {
+      // Workspace switch: drop the previous workspace's selection and artifacts
+      // immediately so nothing stale stays on screen while the new repo loads.
+      setActiveChange('main');
+      setArtifacts(EMPTY_ARTIFACTS);
+      setTasks([]);
+      setFiles([]);
+    }
     loadChanges();
   }, [repoPath]);
 
   useEffect(() => {
     loadArtifacts(activeChange);
-    
-    // Auto-polling every 2 seconds
+
+    // Auto-polling every 2 seconds; skip the tick while a load is in flight
+    // so requests can't pile up when latency exceeds the poll interval.
     const interval = setInterval(() => {
-      loadArtifacts(activeChange);
+      if (!artifactsInFlightRef.current) {
+        loadArtifacts(activeChange);
+      }
     }, 2000);
     
     // Update URL state

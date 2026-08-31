@@ -164,7 +164,10 @@ export const KeystoneView: React.FC<Props> = ({ repoPath }) => {
     setManifest(null);
     setError(null);
     fetch(`/api/keystone/manifest?path=${encodeURIComponent(repoPath)}`)
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
       .then(data => {
         if (cancelled) return;
         if (data.error) {

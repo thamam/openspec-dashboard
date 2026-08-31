@@ -37,3 +37,12 @@ This journal maintains a continuous, unbroken record of development cycles, huma
   - *Iteration 8:* Added Quick Action buttons (`▶ Continue`, `🔄 Sync`, `✓ Verify`) and slash command auto-triggering in `AgentHarness.tsx`.
   - *Iteration 9:* Updated `AgentHarness.css` with quick action styles, error state banners, and status badges.
   - *Iteration 10:* Added `server/tests/agentService.test.ts` verifying 57/57 unit tests pass.
+
+### [Cycle #012] - 2026-08-31 - Client Data-Flow Hardening (C1-C4)
+- **Objective:** Close the client-side data-flow HIGHs without visual/UX change (per Zoom Level framework — behavior-preserving fixes only).
+- **Key Changes:**
+  - `App.tsx` `loadArtifacts`: monotonic request-id guard discards stale responses; in-flight flag makes the 2s poll skip overlapping ticks; failed loads (non-ok or missing `artifacts`) now clear artifacts/tasks/files instead of leaving the previous workspace's data on screen.
+  - `App.tsx` workspace switch: `repoPath` change resets `activeChange` to `main` and clears artifact state before reloading; `loadChanges` selects the first change via functional `setActiveChange` (no stale closure) and validates `res.ok` + `Array.isArray` before `setChanges`.
+  - `RawView.tsx`: feedback posts to relative `/api/send-message` (was hardcoded `http://localhost:3011`).
+  - `KeystoneView.tsx`: manifest fetch checks `res.ok` before parsing.
+  - 5 new vitest regression tests (stale-response discard, poll skip, workspace-switch reset, error-body no-crash, relative URL), all verified red against the pre-fix code first.
