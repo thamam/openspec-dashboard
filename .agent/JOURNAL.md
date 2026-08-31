@@ -64,3 +64,12 @@ This journal maintains a continuous, unbroken record of development cycles, huma
   - `App.tsx` `terminalLines` is now capped at 2000 lines (`client/src/terminal/lineBuffer.ts`). The array only feeds agent-session detection since TerminalPane became a live PTY (xterm owns the real 10k-line scrollback); unbounded growth was a redundant slow memory leak plus a re-render per chunk. All append sites route through `appendTerminalLines`/`capTerminalLines`, including `captureTmuxPane`'s marker-splice rebuild.
   - The agent-session regex scan (duplicated verbatim in `TerminalPane/index.tsx` and `App.tsx`) is extracted into `client/src/terminal/sessionDetect.ts` as a single `detectActiveSession` helper, byte-identical semantics to the legacy inline loops (incl. the same-line exit-marker edge). An incremental `SessionDetector` class was implemented first, then removed in review: its reset heuristic couldn't see prefix rewrites, and with the cap a full scan is bounded O(2000) over an array that only changes on user commands — incrementality had no payoff left. Both call sites use the batch helper.
   - 17 new vitest tests (cap keeps newest N, session-start/exit/multiple-session detection, legacy-oracle equivalence matrix).
+
+### [Cycle #015] - 2026-08-31 - Dead Client Code Deletion (C11)
+- **Objective:** Remove ~5000 lines of unreferenced client code so the review surface only contains living modules (reduces cognitive load per Zoom Level framework — dead files are noise at every level).
+- **Key Changes:**
+  - Deleted `client/src/components/ReviewChat.tsx` + `ReviewChat.css` — the only references to `ReviewChat` anywhere in the repo were inside those two files themselves (zero importers).
+  - Deleted `client/src/App.legacy.txt` + `App.legacy.css` — zero references; `client/index.html` entry is `/src/main.tsx` → `App.tsx` only.
+  - Deleted orphan stylesheets `client/src/components/BrainstormWizard.css` + `DagViewer.css` — their components no longer exist; the only `BrainstormWizard`/`DagViewer` references left are inside the deleted `App.legacy.txt`, an archived openspec change, and a stale README tree comment. No living file imports either stylesheet.
+  - Dead-file sweep found nothing else: every remaining module under `client/src` (components, `terminal/`, `keystone/`) has a live importer.
+  - No behavior change: client tsc clean, client vitest 59/59, `npm run build -w client` succeeds, server 214/214 — identical before and after deletion.
