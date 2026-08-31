@@ -378,11 +378,13 @@ describe('TerminalPane session tabs (C13 a11y)', () => {
 
     const mainTab = screen.getByRole('button', { name: 'Main Shell' });
     expect(mainTab).toHaveAttribute('type', 'button');
-    const session2Tab = screen.getByRole('button', { name: /session-2/ });
+    const session2Tab = screen.getByRole('button', { name: 'session-2' });
     expect(session2Tab).toHaveAttribute('type', 'button');
     const closeBtn = within(session2Tab.parentElement!).getByTitle('Close session');
     expect(closeBtn.tagName).toBe('BUTTON');
     expect(closeBtn).toHaveAttribute('type', 'button');
+    // Accessible name must not be just "×" (text content beats title).
+    expect(closeBtn).toHaveAttribute('aria-label', 'Close session session-2');
   });
 
   it('session tabs switch session on Enter via keyboard focus', async () => {

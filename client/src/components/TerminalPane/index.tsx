@@ -529,8 +529,9 @@ export const TerminalPane: React.FC<Props> = ({ onExecuteCommand, terminalHeight
                   <button
                     type="button"
                     onClick={() => handleCloseSession(sess.id)}
-                    style={{ color: '#8b949e', fontSize: '12px', fontWeight: 'bold', marginLeft: '4px', marginRight: '12px', cursor: 'pointer', background: 'transparent', border: 'none', padding: 0, fontFamily: 'inherit' }}
+                    style={{ color: '#8b949e', fontSize: '12px', fontWeight: 'bold', marginLeft: '4px', marginRight: '12px', cursor: 'pointer', background: 'transparent', border: 'none', padding: 0, fontFamily: 'monospace' }}
                     title="Close session"
+                    aria-label={`Close session ${sess.id}`}
                   >
                     ×
                   </button>

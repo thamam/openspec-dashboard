@@ -28,6 +28,8 @@
   border-bottom: none;
   width: 100%;
   font-family: inherit;
+  /* No global box-sizing reset: width:100% + padding must not overflow the pane */
+  box-sizing: border-box;
 }
 .agent-harness-collapsed:hover {
   background-color: var(--border-color);

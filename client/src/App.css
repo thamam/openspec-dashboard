@@ -130,6 +130,8 @@ header {
   font-family: inherit;
   text-align: left;
   width: 100%;
+  /* No global box-sizing reset: width:100% + padding must not overflow the fixed 260px column */
+  box-sizing: border-box;
 }
 
 .nav-item:hover {
