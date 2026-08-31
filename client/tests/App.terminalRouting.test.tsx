@@ -17,6 +17,19 @@ import App from '../src/App.js';
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
+// Keep the terminal socket disconnected so prompt input deterministically
+// takes the onExecuteCommand fallback into App — otherwise a dev server on
+// 127.0.0.1:3011 could win the race and the prompt would go to the PTY.
+vi.mock('socket.io-client', () => ({
+  io: vi.fn().mockReturnValue({
+    on: vi.fn(),
+    emit: vi.fn(),
+    disconnect: vi.fn(),
+    connected: false,
+    io: { on: vi.fn() }
+  })
+}));
+
 // xterm (rendered by TerminalPane inside App) probes matchMedia on open.
 if (typeof window !== 'undefined' && !window.matchMedia) {
   Object.defineProperty(window, 'matchMedia', {

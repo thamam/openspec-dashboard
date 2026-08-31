@@ -225,9 +225,8 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ repoPath, command, args })
       });
-      // Drain the streamed response to completion; the output renders in the
-      // PTY terminal, not in App state (the old write-only terminalLines log
-      // was removed with C16).
+      // Drain the streamed response to completion; the output is discarded
+      // (the old write-only terminalLines log it fed was removed with C16).
       const reader = res.body?.getReader();
       if (reader) {
         while (!(await reader.read()).done) { /* drain */ }
