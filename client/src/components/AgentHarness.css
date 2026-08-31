@@ -22,6 +22,14 @@
   color: var(--text-muted);
   font-size: 13px;
   transition: background-color 0.15s ease, color 0.15s ease;
+  /* C13: rendered as <button> — neutralize UA button chrome */
+  border-top: none;
+  border-right: none;
+  border-bottom: none;
+  width: 100%;
+  font-family: inherit;
+  /* No global box-sizing reset: width:100% + padding must not overflow the pane */
+  box-sizing: border-box;
 }
 .agent-harness-collapsed:hover {
   background-color: var(--border-color);

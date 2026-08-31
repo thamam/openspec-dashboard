@@ -102,15 +102,16 @@ export const RawView: React.FC<Props> = ({ artifacts, activeChange }) => {
           const isPopulated = artifacts[tab.key] && artifacts[tab.key].length > 0;
           const statusClass = isPopulated ? 'completed' : 'pending';
           return (
-            <div 
-              key={tab.label} 
+            <button
+              type="button"
+              key={tab.label}
               id={`tab-${tab.key}`}
               className={`tab ${activeTab === tab.label ? 'active' : ''} ${statusClass}`}
               onClick={() => setActiveTab(tab.label)}
             >
               {isPopulated ? '✓ ' : '⏳ '}
               {tab.label}
-            </div>
+            </button>
           );
         })}
       </div>

@@ -403,8 +403,7 @@ export const TerminalPane: React.FC<Props> = ({ onExecuteCommand, terminalHeight
     handleSwitchSession(newSessionId);
   };
 
-  const handleCloseSession = (e: React.MouseEvent, sessionId: string) => {
-    e.stopPropagation();
+  const handleCloseSession = (sessionId: string) => {
     if (sessions.length <= 1) return; // Keep at least one active session
 
     if (socketRef.current && socketRef.current.connected) {
@@ -494,33 +493,48 @@ export const TerminalPane: React.FC<Props> = ({ onExecuteCommand, terminalHeight
           {sessions.map((sess) => {
             const isActive = sess.id === activeSession;
             return (
+              // Wrapper keeps the tab chrome (active background/border); the
+              // two interactive parts are real sibling buttons — a button
+              // nested inside a button is invalid HTML and confuses AT.
               <div
                 key={sess.id}
-                onClick={() => handleSwitchSession(sess.id)}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px',
-                  padding: '6px 12px',
-                  fontSize: '11px',
-                  fontFamily: 'monospace',
-                  fontWeight: isActive ? 600 : 400,
-                  color: isActive ? '#f0f6fc' : '#8b949e',
                   backgroundColor: isActive ? '#0d1117' : 'transparent',
                   borderRight: '1px solid #30363d',
-                  borderTop: isActive ? '2px solid #58a6ff' : '2px solid transparent',
-                  cursor: 'pointer'
+                  borderTop: isActive ? '2px solid #58a6ff' : '2px solid transparent'
                 }}
               >
-                <span>{sess.id === 'main' ? 'Main Shell' : sess.id}</span>
+                <button
+                  type="button"
+                  onClick={() => handleSwitchSession(sess.id)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: sessions.length > 1 ? '6px 6px 6px 12px' : '6px 12px',
+                    fontSize: '11px',
+                    fontFamily: 'monospace',
+                    fontWeight: isActive ? 600 : 400,
+                    color: isActive ? '#f0f6fc' : '#8b949e',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {sess.id === 'main' ? 'Main Shell' : sess.id}
+                </button>
                 {sessions.length > 1 && (
-                  <span
-                    onClick={(e) => handleCloseSession(e, sess.id)}
-                    style={{ color: '#8b949e', fontSize: '12px', fontWeight: 'bold', marginLeft: '4px', cursor: 'pointer' }}
+                  <button
+                    type="button"
+                    onClick={() => handleCloseSession(sess.id)}
+                    style={{ color: '#8b949e', fontSize: '12px', fontWeight: 'bold', marginLeft: '4px', marginRight: '12px', cursor: 'pointer', background: 'transparent', border: 'none', padding: 0, fontFamily: 'monospace' }}
                     title="Close session"
+                    aria-label={`Close session ${sess.id}`}
                   >
                     ×
-                  </span>
+                  </button>
                 )}
               </div>
             );
