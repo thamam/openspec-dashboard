@@ -7,6 +7,7 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { io, Socket } from 'socket.io-client';
 import '@xterm/xterm/css/xterm.css';
+import { SessionDetector } from '../../terminal/sessionDetect';
 
 interface SessionItem {
   id: string;
@@ -44,26 +45,16 @@ export const TerminalPane: React.FC<Props> = ({ lines = [], onExecuteCommand, te
   const [useRegex, setUseRegex] = useState<boolean>(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Detect active agent tmux session from recent logs
+  // Detect active agent tmux session from recent logs (C8: shared incremental
+  // detector — processes only newly appended lines instead of rescanning the
+  // whole array on every chunk; resets itself if the buffer is cleared or
+  // spliced in place by captureTmuxPane).
+  const sessionDetectorRef = useRef<SessionDetector | null>(null);
   useEffect(() => {
-    let sessionName = '';
-    for (let i = lines.length - 1; i >= 0; i--) {
-      const match = lines[i].match(/(openspec-session-[0-9]+|agent-[0-9]+)/);
-      if (match) {
-        let exited = false;
-        for (let j = i + 1; j < lines.length; j++) {
-          if (lines[j].includes('[Process exited with code')) {
-            exited = true;
-            break;
-          }
-        }
-        if (!exited) {
-          sessionName = match[0];
-        }
-        break;
-      }
+    if (!sessionDetectorRef.current) {
+      sessionDetectorRef.current = new SessionDetector();
     }
-    setActiveAgentSession(sessionName);
+    setActiveAgentSession(sessionDetectorRef.current.feedLines(lines));
   }, [lines]);
 
   const fitTerminal = useCallback(() => {

@@ -57,3 +57,10 @@ This journal maintains a continuous, unbroken record of development cycles, huma
   - `SkylineCard.tsx`: removed "5-Sec Quick Approve" — `alert()` placeholder with no approval capability. A real approve marker (persisted review state) remains a candidate follow-up.
   - `App.tsx`: create-change success now merges into existing query params via exported `buildPostCreateSearch` instead of replacing the search string — `?project=`/`?sha=` Keystone pin params survive the reload, so the pinned Deck context and drift badge persist after creating a change.
   - 12 new vitest regression tests (TaskHub x4, WizardView x3, SkylineCard x1, post-create search builder x4), verified red pre-fix where observable (jsdom cannot intercept `location.search` assignment, so C6 red was the missing helper seam — noted in PR).
+
+### [Cycle #014] - 2026-08-31 - Terminal Pipeline Performance (C7-C8)
+- **Objective:** Bound the terminal data pipeline's hidden costs without any visual/behavior change (per Zoom Level framework — behavior-preserving fixes only).
+- **Key Changes:**
+  - `App.tsx` `terminalLines` is now capped at 2000 lines (`client/src/terminal/lineBuffer.ts`). The array only feeds agent-session detection since TerminalPane became a live PTY (xterm owns the real 10k-line scrollback); unbounded growth was a redundant slow memory leak plus a re-render per chunk. All append sites route through `appendTerminalLines`/`capTerminalLines`, including `captureTmuxPane`'s marker-splice rebuild.
+  - The agent-session regex scan (duplicated verbatim in `TerminalPane/index.tsx` and `App.tsx`) is extracted into `client/src/terminal/sessionDetect.ts`: `detectActiveSession` (batch, byte-identical semantics incl. the same-line exit-marker edge) plus `SessionDetector`, an incremental tracker that processes only newly appended lines and auto-resets on buffer clear or in-place splice. TerminalPane uses the incremental detector; App's command dispatch uses the batch helper.
+  - 21 new vitest tests (cap keeps newest N, session-start/exit/multiple-session detection, incremental ≡ batch ≡ legacy-oracle equivalence).
