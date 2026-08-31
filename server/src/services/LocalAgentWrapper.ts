@@ -102,7 +102,7 @@ export class LocalAgentWrapper {
    * @param context Dashboard context (active change, etc.)
    * @param onChunk Callback when the agent streams stdout
    */
-  public async chat(repoPath: string, message: string, context: any, onChunk: (chunk: string) => void): Promise<void> {
+  public async chat(repoPath: string, message: string, context: any, onChunk: (chunk: string) => void, signal?: AbortSignal): Promise<void> {
     if (process.env.TEST_MODE === 'true') {
       return new Promise((resolve) => {
         onChunk(`Mocked reply to: "${message}"`);
@@ -139,11 +139,24 @@ Respond helpfully and concisely. Available OpenSpec workflows include: /opsx-pro
         cwd: repoPath
       });
 
+      // S8: AgentService passes an AbortSignal from its 45s chat timeout —
+      // aborting must kill the agy child, not leave it streaming into a
+      // conversation the server has already given up on.
+      const onAbort = () => child.kill('SIGTERM');
+      if (signal) {
+        if (signal.aborted) {
+          onAbort();
+        } else {
+          signal.addEventListener('abort', onAbort, { once: true });
+        }
+      }
+
       // Without a shell, a missing agy binary raises 'error' (ENOENT) instead
       // of exiting 127 — handle it or the server process crashes.
       child.on('error', (err) => {
         console.error(`[LocalAgentWrapper] Failed to spawn agy: ${err.message}`);
         onChunk(`⚠️ [Agent Error]: ${err.message}`);
+        signal?.removeEventListener('abort', onAbort);
         resolve();
       });
 
@@ -151,7 +164,10 @@ Respond helpfully and concisely. Available OpenSpec workflows include: /opsx-pro
         onChunk(data.toString());
       });
 
-      child.on('close', () => resolve());
+      child.on('close', () => {
+        signal?.removeEventListener('abort', onAbort);
+        resolve();
+      });
     });
   }
 
@@ -161,7 +177,7 @@ Respond helpfully and concisely. Available OpenSpec workflows include: /opsx-pro
    * @param filePath Target file (absolute or repo-relative); socket-controlled,
    *   so it is containment-checked BEFORE any write (including Test Mode).
    */
-  public async autofix(repoPath: string, filePath: string, warningMessage: string): Promise<void> {
+  public async autofix(repoPath: string, filePath: string, warningMessage: string, signal?: AbortSignal): Promise<void> {
     // trigger_autofix hands us a fully client-controlled path that previously
     // reached fs.writeFileSync verbatim — an arbitrary file write. Contain it.
     if (!repoPath) {
@@ -192,10 +208,23 @@ Output the complete, corrected file contents inside a STRICT code block starting
         cwd: repoPath
       });
 
+      // S8: abort kills the child, and an aborted autofix must NOT apply the
+      // partial output — a killed agent's truncated markdown is not a fix.
+      let aborted = false;
+      const onAbort = () => { aborted = true; child.kill('SIGTERM'); };
+      if (signal) {
+        if (signal.aborted) {
+          onAbort();
+        } else {
+          signal.addEventListener('abort', onAbort, { once: true });
+        }
+      }
+
       // Without a shell, a missing agy binary raises 'error' (ENOENT) instead
       // of exiting 127 — handle it or the server process crashes.
       child.on('error', (err) => {
         console.error(`[LocalAgentWrapper] Failed to spawn agy: ${err.message}`);
+        signal?.removeEventListener('abort', onAbort);
         resolve();
       });
 
@@ -205,6 +234,11 @@ Output the complete, corrected file contents inside a STRICT code block starting
       });
 
       child.on('close', () => {
+        signal?.removeEventListener('abort', onAbort);
+        if (aborted) {
+          resolve();
+          return;
+        }
         try {
           const match = fullOutput.match(/```(?:markdown)?\s*([\s\S]*?)\s*```/);
           if (match && match[1]) {
