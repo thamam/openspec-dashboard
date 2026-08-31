@@ -24,7 +24,7 @@ function App() {
   const [activeChange, setActiveChange] = useState<string>(
     () => new URLSearchParams(window.location.search).get('change') || 'main'
   );
-  const [artifacts, setArtifacts] = useState<Artifacts>({ proposal: '', spec: '', design: '', tasks: '' });
+  const [artifacts, setArtifacts] = useState<Artifacts>(EMPTY_ARTIFACTS);
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [files, setFiles] = useState<string[]>([]);
   const [terminalLines, setTerminalLines] = useState<string[]>(['OpenSpec CLI v1.2.0 (Deterministic Engine)']);
@@ -123,8 +123,13 @@ function App() {
   };
 
   const loadArtifacts = async (changeName: string) => {
-    if (changeName === 'main') return;
+    // Bump the request id even for 'main' so an in-flight fetch for a
+    // previously-selected change is invalidated the moment the user leaves it.
     const requestId = ++artifactsRequestIdRef.current;
+    if (changeName === 'main') {
+      artifactsInFlightRef.current = false;
+      return;
+    }
     artifactsInFlightRef.current = true;
     try {
       // 30s timeout: a hung request must not wedge the in-flight flag (and

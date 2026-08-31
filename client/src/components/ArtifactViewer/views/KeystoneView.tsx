@@ -172,10 +172,12 @@ export const KeystoneView: React.FC<Props> = ({ repoPath }) => {
       })
       .then(data => {
         if (cancelled) return;
-        if (data.error) {
+        if (data?.error) {
           setError(data.error);
-        } else {
+        } else if (data) {
           setManifest(data);
+        } else {
+          setError('Empty or unparseable response from server');
         }
       })
       .catch(e => {

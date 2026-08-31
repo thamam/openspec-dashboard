@@ -187,6 +187,7 @@ describe('App data flow (C1/C2/C4)', () => {
   });
 
   it('C4: an {error} body from /api/changes does not crash the changes list', async () => {
+    // Case 1: non-ok status with an error body (res.ok guard).
     mockFetch.mockImplementation((url: string) => {
       if (url.includes('/api/changes')) {
         return Promise.resolve(jsonResponse({ error: 'boom' }, false, 500));
@@ -194,10 +195,24 @@ describe('App data flow (C1/C2/C4)', () => {
       return Promise.reject(new Error(`unexpected fetch: ${url}`));
     });
 
-    render(<App />);
+    const { unmount } = render(<App />);
     await flush();
 
     // The app shell still renders and the changes pane shows no bogus entries.
+    expect(screen.getByText('OpenSpec')).toBeInTheDocument();
+    expect(screen.getByText('Changes')).toBeInTheDocument();
+    unmount();
+
+    // Case 2: ok status but a non-array body (Array.isArray guard).
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes('/api/changes')) {
+        return Promise.resolve(jsonResponse({ error: 'boom' }));
+      }
+      return Promise.reject(new Error(`unexpected fetch: ${url}`));
+    });
+
+    render(<App />);
+    await flush();
     expect(screen.getByText('OpenSpec')).toBeInTheDocument();
     expect(screen.getByText('Changes')).toBeInTheDocument();
   });
