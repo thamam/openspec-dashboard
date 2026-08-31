@@ -336,20 +336,6 @@ header {
   margin-bottom: 10px;
 }
 
-.task-action {
-  width: 100%;
-  padding: 6px;
-  background: transparent;
-  border: 1px solid var(--border-color);
-  color: var(--text-muted);
-  border-radius: 4px;
-  cursor: pointer;
-  position: relative;
-}
-.task-action:hover {
-  background: var(--hover);
-  color: var(--text-main);
-}
 
 /* Bottom Terminal */
 .terminal-pane {

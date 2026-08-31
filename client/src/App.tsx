@@ -14,6 +14,17 @@ import { isDrifted, readPinnedContext } from './keystone/pinnedContext';
 const urlParams = new URLSearchParams(window.location.search);
 const INITIAL_REPO_PATH = urlParams.get('path') || '/tmp/toy-openspec-project';
 
+// C6: build the post-create query string by MERGING into the current params
+// instead of replacing them — a bare `?change=...&path=...` reload dropped the
+// Keystone pin params (?project=/?sha=), and with them the pinned Deck context
+// and drift badge.
+export function buildPostCreateSearch(currentSearch: string, changeName: string, repoPath: string): string {
+  const params = new URLSearchParams(currentSearch);
+  params.set('change', changeName);
+  params.set('path', repoPath);
+  return params.toString();
+}
+
 const EMPTY_ARTIFACTS: Artifacts = { proposal: '', spec: '', design: '', tasks: '' };
 
 function App() {
@@ -457,7 +468,7 @@ function App() {
               repoPath={repoPath}
               onCreateSuccess={(changeName) => {
                 setShowCreateChange(false);
-                window.location.search = `?change=${encodeURIComponent(changeName)}&path=${encodeURIComponent(repoPath)}`;
+                window.location.search = buildPostCreateSearch(window.location.search, changeName, repoPath);
               }}
               onCancel={() => setShowCreateChange(false)}
             />

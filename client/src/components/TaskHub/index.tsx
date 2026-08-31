@@ -26,12 +26,6 @@ export const TaskHub: React.FC<Props> = ({ tasks }) => {
             <div className="task-title" style={{ textDecoration: task.status === 'done' ? 'line-through' : 'none' }}>
               {task.title}
             </div>
-            {task.status !== 'done' && !task.assignee && (
-              <>
-                <button className="task-action" style={{ marginBottom: '5px' }}>Claim Task (Agent)</button>
-                <button className="task-action">Claim Task (Human)</button>
-              </>
-            )}
           </div>
         ))}
       </div>
