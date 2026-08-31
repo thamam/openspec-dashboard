@@ -10,12 +10,6 @@ import { WorkspaceSelector } from './components/WorkspaceSelector';
 import { ChangeItem, TaskItem, Artifacts } from './types';
 import { isDrifted, readPinnedContext } from './keystone/pinnedContext';
 
-// C16: the active agent tmux session is explicit state (see activeAgentSession
-// below), set when the user attaches via `tmux attach -t <name>`. Only
-// agent-named sessions get the /api/send-message routing treatment — the same
-// restriction the old log scan had, but anchored to the full session name.
-const AGENT_SESSION_PATTERN = /^(openspec-session-[0-9]+|agent-[0-9]+)$/;
-
 // For E2E testing, we allow passing the repo path via query param
 const urlParams = new URLSearchParams(window.location.search);
 const INITIAL_REPO_PATH = urlParams.get('path') || '/tmp/toy-openspec-project';
@@ -44,15 +38,6 @@ function App() {
   const [artifacts, setArtifacts] = useState<Artifacts>(EMPTY_ARTIFACTS);
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [files, setFiles] = useState<string[]>([]);
-  // C16: the agent session the terminal prompt is currently routed to.
-  // Explicit state instead of parsing the old `terminalLines` log: every
-  // /api/execute reply ends with `[Process exited with code N]`, so the old
-  // exit-marker heuristic always read the session as gone, and the C7 cap
-  // could evict the session marker entirely. Set on `tmux attach -t <agent-N>`,
-  // cleared by `exit`/`disconnect`. (The log array itself was write-only since
-  // the PTY rework — xterm owns the visible scrollback — so it was removed
-  // along with the detection it fed.)
-  const [activeAgentSession, setActiveAgentSession] = useState<string>('');
   const [agentProvider, setAgentProvider] = useState<string>('codex');
   const [rightPaneWidth, setRightPaneWidth] = useState(320);
   const [terminalHeight, setTerminalHeight] = useState(220);
@@ -234,17 +219,6 @@ function App() {
   }, [activeChange, repoPath]);
 
   const executeCommand = async (command: string, args: string[] = []) => {
-    if (command === 'tmux' && args.includes('attach')) {
-      const sessionIdx = args.indexOf('-t');
-      const sessionName = sessionIdx !== -1 && args[sessionIdx + 1] ? args[sessionIdx + 1] : '';
-      if (sessionName) {
-        // C16: record the attach explicitly. Only agent-named sessions get the
-        // message-routing treatment (same restriction the old log scan had).
-        setActiveAgentSession(AGENT_SESSION_PATTERN.test(sessionName) ? sessionName : '');
-        return;
-      }
-    }
-
     try {
       const res = await fetch('/api/execute', {
         method: 'POST',
@@ -252,8 +226,8 @@ function App() {
         body: JSON.stringify({ repoPath, command, args })
       });
       // Drain the streamed response to completion; the output renders in the
-      // PTY terminal, not in App state (the old write-only log was removed
-      // with C16).
+      // PTY terminal, not in App state (the old write-only terminalLines log
+      // was removed with C16).
       const reader = res.body?.getReader();
       if (reader) {
         while (!(await reader.read()).done) { /* drain */ }
@@ -265,34 +239,18 @@ function App() {
     }
   };
 
+  // Reached only from TerminalPane's socket-DISCONNECTED fallback (when the
+  // socket is up, prompt input goes straight to the PTY). The pre-PTY agent
+  // layer (attach detection, /api/send-message routing, Attach button) was
+  // removed in C16: it was unreachable in production, and agent interaction
+  // works by typing `tmux attach` in the PTY itself.
   const handleRunTerminalCommand = async (fullCommand: string) => {
     const trimmed = fullCommand.trim();
     if (!trimmed) return;
 
-    // C16: `exit`/`disconnect` detach from the routed agent session.
-    if (trimmed === 'exit' || trimmed === 'disconnect') {
-      setActiveAgentSession('');
-    }
-
-    // If an agent tmux session is attached and user is not explicitly running a local tool command
-    const isExplicitLocalCmd = trimmed.startsWith('opsx-') || trimmed.startsWith('git ') || trimmed.startsWith('openspec ') || trimmed.startsWith('cd ') || trimmed.startsWith('ls ') || trimmed.startsWith('pwd');
-
-    if (activeAgentSession && !isExplicitLocalCmd && trimmed !== 'exit' && trimmed !== 'disconnect') {
-      try {
-        const res = await fetch('/api/send-message', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionName: activeAgentSession, message: trimmed })
-        });
-        const data = await res.json();
-        if (data.error) {
-          console.error('send-message failed:', data.error);
-        }
-      } catch (e: any) {
-        console.error('send-message failed:', e);
-      }
-      return;
-    }
+    // No-op: nothing client-side to clear (the old log is gone), and the
+    // server allowlists a `clear` binary that would spawn into the void.
+    if (trimmed === 'clear') return;
 
     const parts = trimmed.split(/\s+/);
     const command = parts[0];
@@ -377,7 +335,7 @@ function App() {
         />
       </div>
       <div className="terminal-resizer" onMouseDown={startResizingTerminal} title="Drag to resize terminal height" />
-      <TerminalPane onExecuteCommand={handleRunTerminalCommand} terminalHeight={terminalHeight} activeAgentSession={activeAgentSession} />
+      <TerminalPane onExecuteCommand={handleRunTerminalCommand} terminalHeight={terminalHeight} />
       
       {showCreateChange && (
         <div className="modal-overlay" style={{

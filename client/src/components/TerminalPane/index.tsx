@@ -17,15 +17,9 @@ interface SessionItem {
 interface Props {
   onExecuteCommand?: (cmd: string) => void;
   terminalHeight?: number;
-  // C16: the active agent tmux session is explicit App state (set on
-  // `tmux attach -t <agent-N>`), no longer parsed out of the capped
-  // terminalLines log — every /api/execute reply ends with an exit marker, so
-  // log-based detection always read the session as gone (and the C7 cap could
-  // evict the session marker entirely).
-  activeAgentSession?: string;
 }
 
-export const TerminalPane: React.FC<Props> = ({ onExecuteCommand, terminalHeight, activeAgentSession = '' }) => {
+export const TerminalPane: React.FC<Props> = ({ onExecuteCommand, terminalHeight }) => {
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -325,15 +319,16 @@ export const TerminalPane: React.FC<Props> = ({ onExecuteCommand, terminalHeight
     }
   };
 
-  // C9: monotonic counter for new-session ids. Deriving the id from
-  // `sessions.length + 1` collided with an existing tab after any close; the
-  // old prev.some guard blocked the duplicate state entry but the
-  // terminal-create-session emit and the session switch still fired for the
-  // colliding id.
-  const sessionCounterRef = useRef(1);
-
   const handleCreateSession = () => {
-    const newSessionId = `session-${++sessionCounterRef.current}`;
+    // C9: lowest free id from the LIVE session list. `sessions.length + 1`
+    // collided after closes, and a mount-local counter collides after a page
+    // reload (the server's PtyService sessions survive and are pushed to us
+    // via terminal-init-ack). Neither bug is possible when the id is derived
+    // from the list itself.
+    const used = new Set(sessions.map(s => s.id));
+    let n = 2;
+    while (used.has(`session-${n}`)) n++;
+    const newSessionId = `session-${n}`;
     setSessions(prev => [...prev, { id: newSessionId, cols: 100, rows: 30 }]);
     if (socketRef.current && socketRef.current.connected) {
       socketRef.current.emit('terminal-create-session', {
@@ -379,19 +374,6 @@ export const TerminalPane: React.FC<Props> = ({ onExecuteCommand, terminalHeight
     setInputVal('');
   };
 
-  const handleAttachTmux = () => {
-    if (!activeAgentSession) return;
-    const cmd = `tmux attach -t ${activeAgentSession}`;
-    if (socketRef.current && socketRef.current.connected) {
-      socketRef.current.emit('terminal-input', {
-        sessionId: activeSession,
-        data: `${cmd}\r`
-      });
-    } else if (onExecuteCommand) {
-      onExecuteCommand(cmd);
-    }
-  };
-
   const handleClear = () => {
     if (xtermRef.current) {
       xtermRef.current.clear();
@@ -405,11 +387,10 @@ export const TerminalPane: React.FC<Props> = ({ onExecuteCommand, terminalHeight
   };
 
   const handleOpenITerm = () => {
-    const cmd = activeAgentSession ? `tmux attach -t ${activeAgentSession}` : 'zsh';
     fetch('/api/open-terminal', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ command: cmd })
+      body: JSON.stringify({ command: 'zsh' })
     });
   };
 
@@ -523,15 +504,6 @@ export const TerminalPane: React.FC<Props> = ({ onExecuteCommand, terminalHeight
           >
             Search
           </button>
-
-          {activeAgentSession && (
-            <button
-              onClick={handleAttachTmux}
-              style={{ padding: '3px 8px', fontSize: '11px', fontWeight: 600, backgroundColor: '#10b981', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-            >
-              Attach {activeAgentSession}
-            </button>
-          )}
 
           <button
             onClick={handleClear}
