@@ -9,6 +9,8 @@ import CreateChangeForm from './components/CreateChangeForm';
 import { WorkspaceSelector } from './components/WorkspaceSelector';
 import { ChangeItem, TaskItem, Artifacts } from './types';
 import { isDrifted, readPinnedContext } from './keystone/pinnedContext';
+import { appendTerminalLines, capTerminalLines } from './terminal/lineBuffer';
+import { detectActiveSession } from './terminal/sessionDetect';
 
 // For E2E testing, we allow passing the repo path via query param
 const urlParams = new URLSearchParams(window.location.search);
@@ -251,18 +253,19 @@ function App() {
       setTerminalLines(prev => {
         const marker = `--- Active Session: ${sessionName} ---`;
         const existingIdx = prev.findIndex(line => line.startsWith('--- Active Session:'));
+        // C7: the rebuilt array is capped too — xterm owns the real scrollback.
+        // The freshly inserted marker survives capping because `capture-pane -pt`
+        // grabs only the visible pane (a few dozen lines); if this ever switches
+        // to full-history capture (`-S -`), paneLines alone could exceed the cap
+        // and evict the marker, silently breaking session detection routing.
         if (existingIdx !== -1) {
-          return [
+          return capTerminalLines([
             ...prev.slice(0, existingIdx),
             marker,
             ...paneLines
-          ];
+          ]);
         }
-        return [
-          ...prev,
-          marker,
-          ...paneLines
-        ];
+        return appendTerminalLines(prev, [marker, ...paneLines]);
       });
     } catch (e: any) {
       console.error('Failed to capture tmux pane:', e);
@@ -280,7 +283,7 @@ function App() {
     }
 
     const fullCmdDisplay = args.length > 0 ? `${command} ${args.join(' ')}` : command;
-    setTerminalLines(prev => [...prev, `$ ${fullCmdDisplay}`]);
+    setTerminalLines(prev => appendTerminalLines(prev, [`$ ${fullCmdDisplay}`]));
     try {
       const res = await fetch('/api/execute', {
         method: 'POST',
@@ -301,12 +304,12 @@ function App() {
           if (!line.trim() && idx > 0 && !arr[idx - 1].trim()) return false;
           return true;
         });
-        setTerminalLines(prev => [...prev, ...newLines]);
+        setTerminalLines(prev => appendTerminalLines(prev, newLines));
       }
       // Reload artifacts after execution
       loadArtifacts(activeChange);
     } catch (e: any) {
-      setTerminalLines(prev => [...prev, `ERROR: ${e.message}`]);
+      setTerminalLines(prev => appendTerminalLines(prev, [`ERROR: ${e.message}`]));
     }
   };
 
@@ -319,31 +322,15 @@ function App() {
       return;
     }
 
-    // Find the latest active agent session from terminal logs
-    let activeSession = '';
-    for (let i = terminalLines.length - 1; i >= 0; i--) {
-      const match = terminalLines[i].match(/(openspec-session-[0-9]+|agent-[0-9]+)/);
-      if (match) {
-        // Check if the session process exited after this line
-        let exited = false;
-        for (let j = i + 1; j < terminalLines.length; j++) {
-          if (terminalLines[j].includes('[Process exited with code')) {
-            exited = true;
-            break;
-          }
-        }
-        if (!exited) {
-          activeSession = match[0];
-        }
-        break;
-      }
-    }
+    // Find the latest active agent session from terminal logs (C8: shared
+    // helper, same semantics as the old inline backward scan).
+    const activeSession = detectActiveSession(terminalLines);
 
     // If an agent tmux session is active and user is not explicitly running a local tool command
     const isExplicitLocalCmd = trimmed.startsWith('opsx-') || trimmed.startsWith('git ') || trimmed.startsWith('openspec ') || trimmed.startsWith('cd ') || trimmed.startsWith('ls ') || trimmed.startsWith('pwd');
 
     if (activeSession && !isExplicitLocalCmd && trimmed !== 'exit' && trimmed !== 'disconnect') {
-      setTerminalLines(prev => [...prev, `$ [${activeSession}] ${trimmed}`]);
+      setTerminalLines(prev => appendTerminalLines(prev, [`$ [${activeSession}] ${trimmed}`]));
       try {
         const res = await fetch('/api/send-message', {
           method: 'POST',
@@ -352,13 +339,13 @@ function App() {
         });
         const data = await res.json();
         if (data.error) {
-          setTerminalLines(prev => [...prev, `ERROR: ${data.error}`]);
+          setTerminalLines(prev => appendTerminalLines(prev, [`ERROR: ${data.error}`]));
         } else {
           // Capture the updated tmux pane output after 400ms
           setTimeout(() => captureTmuxPane(activeSession), 400);
         }
       } catch (e: any) {
-        setTerminalLines(prev => [...prev, `ERROR: ${e.message}`]);
+        setTerminalLines(prev => appendTerminalLines(prev, [`ERROR: ${e.message}`]));
       }
       return;
     }

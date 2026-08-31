@@ -7,6 +7,7 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { io, Socket } from 'socket.io-client';
 import '@xterm/xterm/css/xterm.css';
+import { detectActiveSession } from '../../terminal/sessionDetect';
 
 interface SessionItem {
   id: string;
@@ -44,26 +45,11 @@ export const TerminalPane: React.FC<Props> = ({ lines = [], onExecuteCommand, te
   const [useRegex, setUseRegex] = useState<boolean>(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Detect active agent tmux session from recent logs
+  // Detect active agent tmux session from recent logs (C8: shared helper —
+  // was an inline O(n²)-per-chunk rescan duplicated in App.tsx; the buffer is
+  // now capped, so this is a bounded scan over recent lines only).
   useEffect(() => {
-    let sessionName = '';
-    for (let i = lines.length - 1; i >= 0; i--) {
-      const match = lines[i].match(/(openspec-session-[0-9]+|agent-[0-9]+)/);
-      if (match) {
-        let exited = false;
-        for (let j = i + 1; j < lines.length; j++) {
-          if (lines[j].includes('[Process exited with code')) {
-            exited = true;
-            break;
-          }
-        }
-        if (!exited) {
-          sessionName = match[0];
-        }
-        break;
-      }
-    }
-    setActiveAgentSession(sessionName);
+    setActiveAgentSession(detectActiveSession(lines));
   }, [lines]);
 
   const fitTerminal = useCallback(() => {
