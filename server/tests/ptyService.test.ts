@@ -260,6 +260,24 @@ describe('PtyService - S7/L3/C17 lifecycle hardening', () => {
     expect(list.some(s => s.id === 'work')).toBe(false);
   });
 
+  it('S7: reaps an orphaned session whose subscriber never arrives', () => {
+    vi.useFakeTimers();
+    const ptyService = makeService(mockIo);
+    ptyService.init();
+    const { socketCallbacks } = connectSocket('s-orphan');
+
+    // terminal-create-session without any follow-up terminal-init: the
+    // session has zero subscribers and must not be immortal — with the cap,
+    // nine of these would permanently block terminal creation.
+    socketCallbacks['terminal-create-session']({ sessionId: 'orphan' });
+    expect(ptyService.getSession('orphan')).toBeDefined();
+
+    vi.advanceTimersByTime(REAP_GRACE_MS - 1);
+    expect(ptyService.getSession('orphan')).toBeDefined();
+    vi.advanceTimersByTime(1);
+    expect(ptyService.getSession('orphan')).toBeUndefined();
+  });
+
   it('S7: a resubscriber cancels the pending reap', () => {
     vi.useFakeTimers();
     const ptyService = makeService(mockIo);

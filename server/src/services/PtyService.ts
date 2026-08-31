@@ -176,6 +176,13 @@ export class PtyService {
       }
     });
 
+    // S7: a freshly created session has zero subscribers; if the client's
+    // terminal-init never arrives (tab closed mid-create, socket drop, or a
+    // create-spamming client) it must not live forever — with MAX_SESSIONS
+    // that would permanently exhaust the cap. The normal init flow cancels
+    // this timer on subscribe.
+    this.maybeReap(session);
+
     return session;
   }
 

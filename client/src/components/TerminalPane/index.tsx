@@ -236,9 +236,14 @@ export const TerminalPane: React.FC<Props> = ({ onExecuteCommand, terminalHeight
     // rejected after we added the tab optimistically). Switch away if the
     // dead session was the active one.
     const dropSession = (sessionId: string) => {
+      // Never drop 'main': the tab strip must keep at least one session (the
+      // invariant handleCloseSession enforces), and switching to main re-runs
+      // terminal-init, which recreates it server-side after a spawn failure.
+      if (sessionId === 'main') return;
+      // Functional update: two drops inside one React batch must not clobber
+      // each other (terminal-error has no follow-up broadcast to self-heal).
+      setSessions(prev => prev.filter(s => s.id !== sessionId));
       const remaining = sessionsRef.current.filter(s => s.id !== sessionId);
-      if (remaining.length === sessionsRef.current.length) return;
-      setSessions(remaining);
       if (activeSessionRef.current === sessionId && remaining.length > 0) {
         handleSwitchSession(remaining[0].id);
       }

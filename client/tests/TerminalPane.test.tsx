@@ -292,4 +292,12 @@ describe('TerminalPane Component', () => {
 
     expect(screen.queryByText('session-2')).not.toBeInTheDocument();
   });
+
+  it('S7: terminal-error never drops the main tab (tab strip keeps one session)', () => {
+    render(<TerminalPane />);
+    pushSocketEvent(0, 'terminal-error', { sessionId: 'main', message: 'Failed to create terminal session' });
+    expect(screen.getByText('Main Shell')).toBeInTheDocument();
+    pushSocketEvent(0, 'terminal-exit', { sessionId: 'main', exitCode: 1 });
+    expect(screen.getByText('Main Shell')).toBeInTheDocument();
+  });
 });
