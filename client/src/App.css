@@ -124,6 +124,12 @@ header {
   gap: 10px;
   color: var(--text-main);
   position: relative;
+  /* C13: rendered as <button> — neutralize UA button chrome */
+  background: none;
+  border: none;
+  font-family: inherit;
+  text-align: left;
+  width: 100%;
 }
 
 .nav-item:hover {
@@ -187,6 +193,12 @@ header {
   cursor: pointer;
   border-bottom: 2px solid transparent;
   font-size: 14px;
+  /* C13: rendered as <button> — neutralize UA button chrome */
+  background: none;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  font-family: inherit;
 }
 
 .tab:hover {

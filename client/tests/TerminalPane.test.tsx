@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, within, act } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { io } from 'socket.io-client';
 import { Terminal } from '@xterm/xterm';
@@ -363,5 +364,57 @@ describe('TerminalPane Component', () => {
     expect(initCalls).toHaveLength(0);
     // The dead main tab is not resurrected into view either.
     expect(screen.getByText('session-2')).toBeInTheDocument();
+  });
+});
+
+// C13: session tabs and their × close controls were clickable <div>/<span> —
+// no keyboard focus, no role. They are now native sibling <button type="button">
+// elements (a button nested in a button would be invalid HTML). Pin the
+// semantics: role, type, focusability, keyboard activation.
+describe('TerminalPane session tabs (C13 a11y)', () => {
+  it('renders the session tab and close control as native buttons', () => {
+    render(<TerminalPane />);
+    fireEvent.click(screen.getByTitle('Create New Terminal Session')); // session-2
+
+    const mainTab = screen.getByRole('button', { name: 'Main Shell' });
+    expect(mainTab).toHaveAttribute('type', 'button');
+    const session2Tab = screen.getByRole('button', { name: /session-2/ });
+    expect(session2Tab).toHaveAttribute('type', 'button');
+    const closeBtn = within(session2Tab.parentElement!).getByTitle('Close session');
+    expect(closeBtn.tagName).toBe('BUTTON');
+    expect(closeBtn).toHaveAttribute('type', 'button');
+  });
+
+  it('session tabs switch session on Enter via keyboard focus', async () => {
+    render(<TerminalPane />);
+    const user = userEvent.setup();
+    fireEvent.click(screen.getByTitle('Create New Terminal Session')); // session-2, active
+
+    const emitMock = socketOf(0).emit;
+    emitMock.mockClear();
+
+    const mainTab = screen.getByRole('button', { name: 'Main Shell' });
+    mainTab.focus();
+    expect(mainTab).toHaveFocus();
+    await user.keyboard('{Enter}');
+
+    const switchCalls = emitMock.mock.calls.filter(
+      (c: unknown[]) => c[0] === 'terminal-init' && (c[1] as { sessionId: string }).sessionId === 'main'
+    );
+    expect(switchCalls.length).toBeGreaterThan(0);
+  });
+
+  it('close control closes its session on Space via keyboard focus', async () => {
+    render(<TerminalPane />);
+    const user = userEvent.setup();
+    fireEvent.click(screen.getByTitle('Create New Terminal Session')); // session-2
+    expect(screen.getByText('session-2')).toBeInTheDocument();
+
+    const closeBtn = within(screen.getByText('session-2').parentElement!).getByTitle('Close session');
+    closeBtn.focus();
+    expect(closeBtn).toHaveFocus();
+    await user.keyboard(' ');
+
+    expect(screen.queryByText('session-2')).not.toBeInTheDocument();
   });
 });

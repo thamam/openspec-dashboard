@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { AgentHarness } from '../src/components/AgentHarness';
 
 // Mock socket.io-client
@@ -86,5 +87,33 @@ describe('AgentHarness Component', () => {
     render(<AgentHarness {...mockProps} />);
 
     expect(screen.getByText(/2 semantic linkages verified/i)).toBeDefined();
+  });
+});
+
+// C13: the collapsed Agent Harness bar was a clickable <div> — no keyboard
+// focus, no role. It is now a native <button type="button">.
+describe('AgentHarness collapsed bar (C13 a11y)', () => {
+  const collapsedProps = {
+    repoPath: '/tmp/test-repo',
+    activeChange: 'feature-test',
+    agentProvider: 'codex',
+    artifacts: { proposal: '', spec: '', design: '', tasks: '', linkages: [] }
+  };
+
+  it('is a native focusable button activated by Enter', async () => {
+    render(<AgentHarness {...collapsedProps} />);
+
+    // Collapse first so the collapsed bar renders.
+    fireEvent.click(screen.getByRole('button', { name: '_' }));
+    const collapsedBar = screen.getByTitle('Expand Agent Pane');
+    expect(collapsedBar.tagName).toBe('BUTTON');
+    expect(collapsedBar).toHaveAttribute('type', 'button');
+
+    const user = userEvent.setup();
+    collapsedBar.focus();
+    expect(collapsedBar).toHaveFocus();
+    await user.keyboard('{Enter}');
+
+    expect(screen.getByText('Agent Harness')).toBeDefined();
   });
 });

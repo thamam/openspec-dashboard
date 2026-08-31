@@ -208,11 +208,11 @@ export function AgentHarness({ repoPath, activeChange, agentProvider = 'codex', 
 
   if (!isExpanded) {
     return (
-      <div className="agent-harness-collapsed" onClick={() => setIsExpanded(true)} title="Expand Agent Pane">
+      <button type="button" className="agent-harness-collapsed" onClick={() => setIsExpanded(true)} title="Expand Agent Pane">
         <span className={`status-dot ${connectionState}`}></span>
         <span className="agent-icon">🤖</span>
         <span>Agent ({agentProvider.toUpperCase()})</span>
-      </div>
+      </button>
     );
   }
 

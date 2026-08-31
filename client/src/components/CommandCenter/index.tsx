@@ -24,20 +24,21 @@ export const CommandCenter: React.FC<Props> = ({
     <div className="left-pane">
       <div className="pane-header">Changes</div>
       <div className="nav-group">
-        <div className={`nav-item ${activeChange === 'main' ? 'active' : ''}`} onClick={() => setActiveChange('main')} id="nav-item-main">
+        <button type="button" className={`nav-item ${activeChange === 'main' ? 'active' : ''}`} onClick={() => setActiveChange('main')} id="nav-item-main">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
           main
-        </div>
+        </button>
         {changes.map(change => (
-          <div 
-            key={change.id} 
-            className={`nav-item ${activeChange === change.id ? 'active' : ''}`} 
+          <button
+            type="button"
+            key={change.id}
+            className={`nav-item ${activeChange === change.id ? 'active' : ''}`}
             onClick={() => setActiveChange(change.id)}
             id={`nav-item-${change.id}`}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
             {change.title} {activeChange === change.id ? '(Active)' : ''}
-          </div>
+          </button>
         ))}
       </div>
 
