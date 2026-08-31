@@ -122,7 +122,7 @@ describe('repoService - checkRepoStatus', () => {
   });
 });
 
-describe('repoService - initializeOpenSpec & createGitWorktree', () => {
+describe('repoService - initializeOpenSpec & change commands', () => {
   let tempDir: string;
   const { execSync } = require('child_process');
 
@@ -157,10 +157,10 @@ describe('repoService - initializeOpenSpec & createGitWorktree', () => {
     expect(status.isTraceReady).toBe(true);
   });
 
-  it('should create a git worktree successfully', async () => {
+  it('checkRepoStatus lists connected worktrees (real git worktree add)', async () => {
     const gitDir = path.join(tempDir, 'git-repo-worktree');
     fs.mkdirSync(gitDir);
-    
+
     // Initialize git repo and make an initial commit
     execSync('git init -b main', { cwd: gitDir });
     execSync('git config user.name "Test"', { cwd: gitDir });
@@ -169,14 +169,12 @@ describe('repoService - initializeOpenSpec & createGitWorktree', () => {
     execSync('git add README.md && git commit -m "Initial commit"', { cwd: gitDir });
 
     const worktreeDest = path.join(tempDir, 'worktree-dest');
-
-    const { createGitWorktree } = await import('../src/services/repoService.js');
-    await createGitWorktree(gitDir, 'feature/my-worktree', worktreeDest);
+    execSync(`git worktree add -b feature/my-worktree -- "${worktreeDest}"`, { cwd: gitDir });
 
     // Verify directory exists and has a .git file (worktree pointer)
     expect(fs.existsSync(worktreeDest)).toBe(true);
     expect(fs.existsSync(path.join(worktreeDest, '.git'))).toBe(true);
-    
+
     // Verify branch exists in the original repo
     const branches = execSync('git branch', { cwd: gitDir }).toString();
     expect(branches).toContain('feature/my-worktree');
@@ -189,15 +187,6 @@ describe('repoService - initializeOpenSpec & createGitWorktree', () => {
     expect(fs.realpathSync(status.worktrees![0].path)).toBe(fs.realpathSync(gitDir));
     expect(status.worktrees![1].isMain).toBe(false);
     expect(fs.realpathSync(status.worktrees![1].path)).toBe(fs.realpathSync(worktreeDest));
-  });
-
-  it('should throw validation error when branch name is invalid', async () => {
-    const gitDir = path.join(tempDir, 'git-repo-worktree');
-    const { createGitWorktree } = await import('../src/services/repoService.js');
-
-    await expect(createGitWorktree(gitDir, 'invalid branch; rm -rf /', '/some/path')).rejects.toThrow(
-      'Invalid branch name format'
-    );
   });
 
   it('should create a local schema successfully', async () => {
@@ -217,7 +206,7 @@ describe('repoService - initializeOpenSpec & createGitWorktree', () => {
     fs.mkdirSync(gitDir);
     execSync('git init -b main', { cwd: gitDir });
 
-    const { initializeOpenSpec, createLocalSchema, createNewChange, getChangeMetadata, updateProposeEngine } = await import('../src/services/repoService.js');
+    const { initializeOpenSpec, createLocalSchema, createNewChange, getChangeMetadata } = await import('../src/services/repoService.js');
     await initializeOpenSpec(gitDir);
 
     // Create change with predefined schema and a specific engine (claude)
@@ -241,11 +230,6 @@ describe('repoService - initializeOpenSpec & createGitWorktree', () => {
       agentProvider: 'antigravity',
       worktreeBranch: null,
     });
-
-    // Update propose engine to cursor
-    await updateProposeEngine(gitDir, 'standard-change', 'cursor');
-    const updatedMetadata = await getChangeMetadata(gitDir, 'standard-change');
-    expect(updatedMetadata.proposeEngine).toBe('cursor');
 
     // Create custom schema first, then create change with it (defaults to gemini engine)
     await createLocalSchema(gitDir, 'my-custom-schema', ['proposal', 'tasks']);
@@ -311,48 +295,3 @@ describe('repoService - initializeOpenSpec & createGitWorktree', () => {
   });
 });
 
-describe('repoService - getChangeFilesContent', () => {
-  let tempDir: string;
-
-  beforeAll(() => {
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'openspec-dashboard-get-content-test-'));
-  });
-
-  afterAll(() => {
-    if (fs.existsSync(tempDir)) {
-      fs.rmSync(tempDir, { recursive: true, force: true });
-    }
-  });
-
-  it('should throw an error when the change directory does not exist', async () => {
-    const { getChangeFilesContent } = await import('../src/services/repoService.js');
-    expect(() => getChangeFilesContent(tempDir, 'non-existent')).toThrow(
-      'Change directory not found: non-existent'
-    );
-  });
-
-  it('should aggregate markdown file contents recursively', async () => {
-    const changeName = 'my-test-change';
-    const changeDir = path.join(tempDir, 'openspec', 'changes', changeName);
-    fs.mkdirSync(path.dirname(changeDir), { recursive: true });
-    fs.mkdirSync(changeDir);
-
-    // Create a flat md file
-    fs.writeFileSync(path.join(changeDir, 'proposal.md'), '# Proposal Content');
-
-    // Create a nested md file
-    const specsDir = path.join(changeDir, 'specs');
-    fs.mkdirSync(specsDir);
-    fs.writeFileSync(path.join(specsDir, 'api.md'), '## API Spec Content');
-
-    // Create a non-md file (should be ignored)
-    fs.writeFileSync(path.join(changeDir, 'image.png'), 'binary-data');
-
-    const { getChangeFilesContent } = await import('../src/services/repoService.js');
-    const result = getChangeFilesContent(tempDir, changeName);
-
-    expect(result).toContain('=== FILE: proposal.md ===\n# Proposal Content');
-    expect(result).toContain('=== FILE: specs/api.md ===\n## API Spec Content');
-    expect(result).not.toContain('image.png');
-  });
-});

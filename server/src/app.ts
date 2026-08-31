@@ -131,40 +131,38 @@ app.get('/api/artifacts', async (req, res) => {
     let parsedTasks: any[] = [];
     let linkages: any[] = [];
 
-    if (fs.existsSync(changeDir)) {
-      const allPaths = fs.readdirSync(changeDir, { recursive: true }) as string[];
-      files = allPaths.filter(f => {
-        try {
-          return fs.statSync(path.join(changeDir, f)).isFile();
-        } catch (e) {
-          return false;
-        }
-      });
+    const allPaths = fs.readdirSync(changeDir, { recursive: true }) as string[];
+    files = allPaths.filter(f => {
+      try {
+        return fs.statSync(path.join(changeDir, f)).isFile();
+      } catch (e) {
+        return false;
+      }
+    });
 
-      for (const f of files) {
-        const filePath = path.join(changeDir, f);
-        if (f === 'proposal.md') {
-          artifacts['proposal'] = fs.readFileSync(filePath, 'utf-8');
-        } else if (f === 'design.md') {
-          artifacts['design'] = fs.readFileSync(filePath, 'utf-8');
-        } else if (f === 'tasks.md') {
-          artifacts['tasks'] = fs.readFileSync(filePath, 'utf-8');
-        } else if (f.endsWith('spec.md')) {
-          const content = fs.readFileSync(filePath, 'utf-8');
-          artifacts['spec'] = artifacts['spec'] ? artifacts['spec'] + '\n\n---\n\n' + content : content;
-        } else if (f === 'linkages.json') {
-          try {
-            linkages = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-          } catch (e) {
-            console.error('Failed to parse linkages.json', e);
-          }
+    for (const f of files) {
+      const filePath = path.join(changeDir, f);
+      if (f === 'proposal.md') {
+        artifacts['proposal'] = fs.readFileSync(filePath, 'utf-8');
+      } else if (f === 'design.md') {
+        artifacts['design'] = fs.readFileSync(filePath, 'utf-8');
+      } else if (f === 'tasks.md') {
+        artifacts['tasks'] = fs.readFileSync(filePath, 'utf-8');
+      } else if (f.endsWith('spec.md')) {
+        const content = fs.readFileSync(filePath, 'utf-8');
+        artifacts['spec'] = artifacts['spec'] ? artifacts['spec'] + '\n\n---\n\n' + content : content;
+      } else if (f === 'linkages.json') {
+        try {
+          linkages = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+        } catch (e) {
+          console.error('Failed to parse linkages.json', e);
         }
       }
+    }
 
     // Deterministically parse Tasks
-      if (artifacts['tasks']) {
-        parsedTasks = parseTasks(artifacts['tasks']);
-      }
+    if (artifacts['tasks']) {
+      parsedTasks = parseTasks(artifacts['tasks']);
     }
 
     let agentProvider = 'antigravity';

@@ -1,17 +1,9 @@
-import fs from 'fs';
-import path from 'path';
-
 export interface TaskItem {
   id: string;
   title: string;
   status: 'todo' | 'wip' | 'done';
   assignee?: string;
   lineNumber: number;
-}
-
-export interface MarkdownDocument {
-  content: string;
-  tasks: TaskItem[];
 }
 
 /**
@@ -47,19 +39,3 @@ export function parseTasks(content: string): TaskItem[] {
   return tasks;
 }
 
-/**
- * Reads an OpenSpec artifact and parses its tasks.
- */
-export function readArtifact(repoPath: string, changeName: string, artifactName: string): MarkdownDocument | null {
-  const filePath = path.join(repoPath, 'openspec', 'changes', changeName, artifactName);
-  
-  if (!fs.existsSync(filePath)) {
-    return null;
-  }
-
-  const content = fs.readFileSync(filePath, 'utf8');
-  return {
-    content,
-    tasks: parseTasks(content)
-  };
-}
