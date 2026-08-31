@@ -11,7 +11,7 @@
   "scripts": {
     "dev:cli": "tsx src/cli.ts",
     "dev:mcp": "tsx src/mcp.ts",
-    "build": "tsc",
+    "build": "tsc && chmod +x dist/cli/src/cli.js dist/cli/src/mcp.js",
     "start:cli": "node dist/cli/src/cli.js",
     "start:mcp": "node dist/cli/src/mcp.js"
   },

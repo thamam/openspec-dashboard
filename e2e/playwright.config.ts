@@ -29,6 +29,8 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     stdout: 'pipe',
     stderr: 'pipe',
-    timeout: 15000,
+    // 15s was tight for a cold tsx(server)+vite(client) boot and produced
+    // spurious webServer timeouts; give the dev stack a comfortable margin.
+    timeout: 60000,
   },
 });

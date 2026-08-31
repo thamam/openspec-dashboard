@@ -1,9 +1,13 @@
 import { test, expect } from '@playwright/test';
+import { execFileSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
 
 test.describe('V1 Workspace - Deterministic E2E Verification', () => {
+  // Hermetic fixture: a throwaway git repo in the OS temp dir (same pattern as
+  // agent-harness.spec.ts). This spec must NEVER seed or mutate the dashboard
+  // repo's own committed openspec/changes/ directory.
   let tempDir: string;
   let repoPath: string;
 
@@ -20,6 +24,11 @@ test.describe('V1 Workspace - Deterministic E2E Verification', () => {
     fs.writeFileSync(path.join(changesDir, 'spec.md'), '# Specs\nMock specs.');
     fs.writeFileSync(path.join(changesDir, 'design.md'), '# Design\nMock design.');
     fs.writeFileSync(path.join(changesDir, '.openspec.yaml'), 'schema: spec-driven');
+
+    // The server validates repo-bearing endpoints (set_repo_path, /api/execute)
+    // via checkRepoStatus and rejects non-git directories, so the fixture must
+    // be a real git repo.
+    execFileSync('git', ['init'], { cwd: repoPath, stdio: 'ignore' });
     
     // GFM Task format
     fs.writeFileSync(path.join(changesDir, 'tasks.md'), `
@@ -63,11 +72,16 @@ test.describe('V1 Workspace - Deterministic E2E Verification', () => {
   test('P0: Load Artifacts - Artifact Viewer correctly displays tasks.md', async ({ page }) => {
     // Wait for the workspace to load
     await expect(page.locator('#workspace-header')).toContainText('Workspace:');
-    
+
     // Click the auth-refactor change
     await page.locator('#nav-item-auth-refactor').click();
 
-    // Verify Tasks tab is active
+    // The artifact tabs (proposal/spec/design/tasks) live in the Raw Diffs (L4)
+    // view; the viewer defaults to Skyline (L1).
+    await page.getByRole('button', { name: '📝 Raw Diffs (L4)', exact: true }).click();
+
+    // Verify Tasks tab is active (RawView activates the furthest populated tab,
+    // and this fixture populates all four)
     await expect(page.locator('#tab-tasks')).toHaveClass(/active/);
 
     // The raw markdown should be in the artifact content
@@ -98,15 +112,30 @@ test.describe('V1 Workspace - Deterministic E2E Verification', () => {
     await expect(task3.locator('.task-header')).toContainText('todo');
   });
 
-  test('P0: Command Center - Executing lifecycle command streams to terminal', async ({ page }) => {
+  test('P0: Command Center - Executing lifecycle command issues the execute API call', async ({ page }) => {
     await page.locator('#nav-item-auth-refactor').click();
+
+    // TerminalPane is now a live PTY over a socket and no longer renders the
+    // ops log ($ command echo / streamed output), so the honest hermetic
+    // assertion is the request the lifecycle button issues. Intercept it so the
+    // e2e run never spawns a real agent/tmux session on the host.
+    let executeBody: any = null;
+    await page.route('**/api/execute', async (route) => {
+      executeBody = route.request().postDataJSON();
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/plain; charset=utf-8',
+        body: '[Mock Lifecycle] ok\n[Process exited with code 0]',
+      });
+    });
 
     // Click Continue
     await page.locator('#btn-opsx-continue').click();
 
-    // Verify Terminal gets the command
-    const terminal = page.locator('#terminal-pane');
-    await expect(terminal).toContainText('$ opsx-continue');
+    // Verify the command reached the execute API with the fixture workspace
+    await expect.poll(() => executeBody, { timeout: 5000 }).not.toBeNull();
+    expect(executeBody.command).toBe('opsx-continue');
+    expect(executeBody.repoPath).toBe(repoPath);
   });
 
   test('P0: Model Selection - Selector updates active provider config', async ({ page }) => {
