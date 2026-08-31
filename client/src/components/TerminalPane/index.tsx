@@ -31,6 +31,8 @@ export const TerminalPane: React.FC<Props> = ({ onExecuteCommand, terminalHeight
   activeSessionRef.current = activeSession;
 
   const [sessions, setSessions] = useState<SessionItem[]>([{ id: 'main', cols: 100, rows: 30 }]);
+  const sessionsRef = useRef<SessionItem[]>(sessions);
+  sessionsRef.current = sessions;
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'reconnecting' | 'disconnected'>('disconnected');
   const [webglActive, setWebglActive] = useState<boolean>(false);
   const [fontSize, setFontSize] = useState<number>(13);
@@ -221,12 +223,71 @@ export const TerminalPane: React.FC<Props> = ({ onExecuteCommand, terminalHeight
       }
     });
 
-    socket.on('terminal-data', (payload: { sessionId: string; data: string } | string) => {
-      if (typeof payload === 'string') {
-        term.write(payload);
-      } else if (payload.sessionId === activeSessionRef.current) {
+    socket.on('terminal-data', (payload: { sessionId: string; data: string }) => {
+      if (payload.sessionId === activeSessionRef.current) {
         term.write(payload.data);
       }
+    });
+
+    // Drop a session tab server-side events make dead: C17 terminal-exit
+    // (the PTY exited or was reaped) and S7 terminal-error (a create was
+    // rejected after we added the tab optimistically). Switch away if the
+    // dead session was the active one.
+    const dropSession = (sessionId: string) => {
+      // Never drop 'main': the tab strip must keep at least one session (the
+      // invariant handleCloseSession enforces), and switching to main re-runs
+      // terminal-init, which recreates it server-side after a spawn failure.
+      if (sessionId === 'main') return;
+      const remaining = sessionsRef.current.filter(s => s.id !== sessionId);
+      // Keep the ref batch-current: two drops inside one React batch must see
+      // each other (terminal-error has no follow-up broadcast to self-heal).
+      sessionsRef.current = remaining;
+      setSessions(remaining);
+      if (activeSessionRef.current === sessionId && remaining.length > 0) {
+        // Prefer main as the switch target when it's alive.
+        const target = remaining.find(s => s.id === 'main') ?? remaining[0];
+        handleSwitchSession(target.id);
+      }
+    };
+    socket.on('terminal-exit', (payload: { sessionId: string }) => {
+      if (payload.sessionId === 'main') {
+        // The server restarts main on natural exit and broadcasts a list that
+        // still contains it — keep the tab and resubscribe to the fresh shell.
+        // Gate on the ACTIVE session: a stale exit event (e.g. main's PTY
+        // dying after we switched to another tab) must not re-init main,
+        // since terminal-init would move this socket's subscription off the
+        // session the user is watching.
+        if (activeSessionRef.current === 'main' && socket.connected) {
+          socket.emit('terminal-init', {
+            sessionId: 'main',
+            cols: xtermRef.current?.cols || 100,
+            rows: xtermRef.current?.rows || 30
+          });
+        }
+        return;
+      }
+      dropSession(payload.sessionId);
+    });
+    socket.on('terminal-error', (payload: { sessionId?: string; message?: string }) => {
+      if (payload.sessionId === 'main') {
+        // Main restart budget exhausted: the session stays dead until the
+        // 60s window slides. Surface it in the terminal and retry once the
+        // window has passed — otherwise main stays dead until a reload.
+        if (payload.message) {
+          term.write(`\r\n\x1b[33m${payload.message}\x1b[0m\r\n`);
+        }
+        setTimeout(() => {
+          if (activeSessionRef.current === 'main' && socketRef.current?.connected) {
+            socketRef.current.emit('terminal-init', {
+              sessionId: 'main',
+              cols: xtermRef.current?.cols || 100,
+              rows: xtermRef.current?.rows || 30
+            });
+          }
+        }, 61_000);
+        return;
+      }
+      if (payload.sessionId) dropSession(payload.sessionId);
     });
 
     term.onData((data: string) => {
@@ -302,7 +363,9 @@ export const TerminalPane: React.FC<Props> = ({ onExecuteCommand, terminalHeight
   }, [showSearch]);
 
   const handleSwitchSession = (sessionId: string) => {
-    if (sessionId === activeSession) return;
+    // Guard via the ref: socket handlers registered at mount capture the
+    // first render's closure, where the `activeSession` state is stale.
+    if (sessionId === activeSessionRef.current) return;
     setActiveSession(sessionId);
     activeSessionRef.current = sessionId;
 

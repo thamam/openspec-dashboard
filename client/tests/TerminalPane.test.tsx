@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, within, act } from '@testing-library/react';
 import React from 'react';
 import { io } from 'socket.io-client';
+import { Terminal } from '@xterm/xterm';
 import { TerminalPane } from '../src/components/TerminalPane';
 
 // Mock xterm and addons
@@ -93,6 +94,14 @@ function pushServerSessions(index: number, sessions: { id: string; cols: number;
   const handler = onMock.mock.calls.find((c: unknown[]) => c[0] === 'terminal-init-ack')?.[1];
   expect(handler, 'terminal-init-ack handler registered').toBeTruthy();
   act(() => handler({ sessionId: 'main', sessions }));
+}
+
+// Drive any server-pushed socket event (terminal-exit, terminal-error, ...).
+function pushSocketEvent(index: number, event: string, payload: unknown) {
+  const onMock = socketOf(index).on;
+  const handler = onMock.mock.calls.find((c: unknown[]) => c[0] === event)?.[1];
+  expect(handler, `${event} handler registered`).toBeTruthy();
+  act(() => handler(payload));
 }
 
 describe('TerminalPane Component', () => {
@@ -234,5 +243,125 @@ describe('TerminalPane Component', () => {
     expect(mockFetch).toHaveBeenCalledWith('/api/open-terminal', expect.objectContaining({
       body: JSON.stringify({ command: 'zsh' })
     }));
+  });
+
+  // C17: the server deletes a session when its PTY exits (or when the S7
+  // reaper collects it) and broadcasts; the client must drop the dead tab.
+  it('C17: terminal-exit removes the dead session tab and switches away if active', () => {
+    render(<TerminalPane />);
+    fireEvent.click(screen.getByTitle('Create New Terminal Session')); // session-2, active
+    expect(screen.getByText('session-2')).toBeInTheDocument();
+
+    const emitMock = socketOf(0).emit;
+    emitMock.mockClear();
+    pushSocketEvent(0, 'terminal-exit', { sessionId: 'session-2', exitCode: 0 });
+
+    expect(screen.queryByText('session-2')).not.toBeInTheDocument();
+    // Switched back to the remaining session.
+    const switchCalls = emitMock.mock.calls.filter(
+      (c: unknown[]) => c[0] === 'terminal-init' && (c[1] as { sessionId: string }).sessionId === 'main'
+    );
+    expect(switchCalls.length).toBeGreaterThan(0);
+  });
+
+  it('C17: terminal-exit of a background session keeps the active tab', () => {
+    render(<TerminalPane />);
+    fireEvent.click(screen.getByTitle('Create New Terminal Session')); // session-2
+    fireEvent.click(screen.getByTitle('Create New Terminal Session')); // session-3, active
+    expect(screen.getByText('session-3')).toBeInTheDocument();
+
+    const emitMock = socketOf(0).emit;
+    emitMock.mockClear();
+    pushSocketEvent(0, 'terminal-exit', { sessionId: 'session-2', exitCode: 0 });
+
+    expect(screen.queryByText('session-2')).not.toBeInTheDocument();
+    expect(screen.getByText('session-3')).toBeInTheDocument();
+    // No session switch should have been emitted.
+    const switchCalls = emitMock.mock.calls.filter((c: unknown[]) => c[0] === 'terminal-init');
+    expect(switchCalls).toHaveLength(0);
+  });
+
+  // S7: handleCreateSession adds the tab optimistically; when the server
+  // rejects the create (session cap) it replies with terminal-error and the
+  // client must revert the tab.
+  it('S7: terminal-error for a pending create reverts the optimistic tab', () => {
+    render(<TerminalPane />);
+    fireEvent.click(screen.getByTitle('Create New Terminal Session'));
+    expect(screen.getByText('session-2')).toBeInTheDocument();
+
+    pushSocketEvent(0, 'terminal-error', { sessionId: 'session-2', message: 'Session limit reached (10)' });
+
+    expect(screen.queryByText('session-2')).not.toBeInTheDocument();
+  });
+
+  it('S7: terminal-error never drops the main tab (tab strip keeps one session)', () => {
+    render(<TerminalPane />);
+    pushSocketEvent(0, 'terminal-error', { sessionId: 'main', message: 'Failed to create terminal session' });
+    expect(screen.getByText('Main Shell')).toBeInTheDocument();
+  });
+
+  // When the main restart budget is exhausted the server refuses recreation;
+  // the client must surface the refusal and retry once the window has slid,
+  // or main stays dead until a page reload.
+  it('S7: terminal-error for main surfaces the message and retries init after the budget window', () => {
+    vi.useFakeTimers();
+    try {
+      render(<TerminalPane />);
+      const emitMock = socketOf(0).emit;
+      emitMock.mockClear();
+
+      pushSocketEvent(0, 'terminal-error', { sessionId: 'main', message: 'Main session is restarting too frequently; try again shortly' });
+
+      expect(screen.getByText('Main Shell')).toBeInTheDocument();
+      const termInstance = vi.mocked(Terminal).mock.results[0].value;
+      expect(termInstance.write).toHaveBeenCalledWith(expect.stringContaining('restarting too frequently'));
+
+      // No immediate retry...
+      expect(emitMock.mock.calls.filter((c: unknown[]) => c[0] === 'terminal-init')).toHaveLength(0);
+      // ...but one after the 60s budget window has slid.
+      act(() => { vi.advanceTimersByTime(61_000); });
+      const retryCalls = emitMock.mock.calls.filter(
+        (c: unknown[]) => c[0] === 'terminal-init' && (c[1] as { sessionId: string }).sessionId === 'main'
+      );
+      expect(retryCalls.length).toBeGreaterThan(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // The real event sequence when the user types `exit` in the main shell:
+  // terminal-exit for main, then a terminal-sessions-updated broadcast whose
+  // list again contains main (the server restarts it). The tab must survive
+  // and the client must resubscribe to the fresh main.
+  it('C17: main exit + following broadcast keeps the main tab and resubscribes', () => {
+    render(<TerminalPane />);
+    const emitMock = socketOf(0).emit;
+    emitMock.mockClear();
+
+    pushSocketEvent(0, 'terminal-exit', { sessionId: 'main', exitCode: 0 });
+    pushSocketEvent(0, 'terminal-sessions-updated', [{ id: 'main', cols: 100, rows: 30 }]);
+
+    expect(screen.getByText('Main Shell')).toBeInTheDocument();
+    const reinitCalls = emitMock.mock.calls.filter(
+      (c: unknown[]) => c[0] === 'terminal-init' && (c[1] as { sessionId: string }).sessionId === 'main'
+    );
+    expect(reinitCalls.length).toBeGreaterThan(0);
+  });
+
+  // A stale terminal-exit for main while the user watches another tab must
+  // NOT re-init main: terminal-init would move the socket's subscription off
+  // the active session, black-holing its output and arming the reaper on it.
+  it('C17: main exit while another tab is active does not hijack the subscription', () => {
+    render(<TerminalPane />);
+    fireEvent.click(screen.getByTitle('Create New Terminal Session')); // session-2, active
+
+    const emitMock = socketOf(0).emit;
+    emitMock.mockClear();
+    pushSocketEvent(0, 'terminal-exit', { sessionId: 'main', exitCode: 0 });
+
+    const initCalls = emitMock.mock.calls.filter((c: unknown[]) => c[0] === 'terminal-init');
+    expect(initCalls).toHaveLength(0);
+    // The dead main tab is not resurrected into view either.
+    expect(screen.getByText('session-2')).toBeInTheDocument();
   });
 });
