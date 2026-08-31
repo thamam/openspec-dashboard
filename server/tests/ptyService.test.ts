@@ -217,6 +217,23 @@ describe('PtyService - S7/L3/C17 lifecycle hardening', () => {
     expect(mockIo.emit).not.toHaveBeenCalledWith('terminal-sessions-updated', expect.anything());
   });
 
+  it('S7: terminal-init for a fresh session id broadcasts the updated session list', () => {
+    const ptyService = makeService(mockIo);
+    ptyService.init();
+    const { socketCallbacks } = connectSocket('s-init-create');
+    mockIo.emit.mockClear();
+
+    socketCallbacks['terminal-init']({ sessionId: 'via-init' });
+
+    expect(ptyService.getSession('via-init')).toBeDefined();
+    // Other clients' tab strips must learn about sessions created via init,
+    // not just via terminal-create-session.
+    const calls = mockIo.emit.mock.calls.filter((c: unknown[]) => c[0] === 'terminal-sessions-updated');
+    expect(calls.length).toBeGreaterThan(0);
+    const list = calls[calls.length - 1][1] as { id: string }[];
+    expect(list.some(s => s.id === 'via-init')).toBe(true);
+  });
+
   it('S7: terminal-init for a fresh session id also respects the cap', () => {
     const ptyService = makeService(mockIo);
     ptyService.init();

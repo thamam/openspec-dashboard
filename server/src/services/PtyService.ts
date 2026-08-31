@@ -259,6 +259,9 @@ export class PtyService {
             socket.emit('terminal-error', { sessionId: reqSessionId, message: 'Failed to create terminal session' });
             return;
           }
+          // Other clients' tab strips must learn about sessions created via
+          // init, not just via terminal-create-session.
+          this.io.emit('terminal-sessions-updated', this.getAllSessionsInfo());
         }
 
         // Unsubscribe from previous
