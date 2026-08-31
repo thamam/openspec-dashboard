@@ -13,14 +13,17 @@ import { isDrifted, readPinnedContext } from './keystone/pinnedContext';
 // For E2E testing, we allow passing the repo path via query param
 const urlParams = new URLSearchParams(window.location.search);
 const INITIAL_REPO_PATH = urlParams.get('path') || '/tmp/toy-openspec-project';
-const INITIAL_CHANGE = urlParams.get('change') || 'main';
 
 const EMPTY_ARTIFACTS: Artifacts = { proposal: '', spec: '', design: '', tasks: '' };
 
 function App() {
   const [repoPath, setRepoPath] = useState<string>(INITIAL_REPO_PATH);
   const [changes, setChanges] = useState<ChangeItem[]>([]);
-  const [activeChange, setActiveChange] = useState<string>(INITIAL_CHANGE);
+  // Read at mount (not module import) so the ?change= deep link is resolved per
+  // component instance.
+  const [activeChange, setActiveChange] = useState<string>(
+    () => new URLSearchParams(window.location.search).get('change') || 'main'
+  );
   const [artifacts, setArtifacts] = useState<Artifacts>({ proposal: '', spec: '', design: '', tasks: '' });
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [files, setFiles] = useState<string[]>([]);
@@ -114,6 +117,7 @@ function App() {
       setChanges(data);
       setActiveChange(prev => (prev === 'main' && data.length > 0 ? data[0].id : prev));
     } catch (e) {
+      if (requestId === changesRequestIdRef.current) setChanges([]);
       console.error(e);
     }
   };
@@ -123,7 +127,9 @@ function App() {
     const requestId = ++artifactsRequestIdRef.current;
     artifactsInFlightRef.current = true;
     try {
-      const res = await fetch(`/api/artifacts?path=${encodeURIComponent(repoPath)}&change=${encodeURIComponent(changeName)}`);
+      // 30s timeout: a hung request must not wedge the in-flight flag (and
+      // with it the poll) forever.
+      const res = await fetch(`/api/artifacts?path=${encodeURIComponent(repoPath)}&change=${encodeURIComponent(changeName)}`, { signal: AbortSignal.timeout(30_000) });
       if (requestId !== artifactsRequestIdRef.current) return; // stale: superseded by a newer load
       if (!res.ok) {
         // e.g. the change doesn't exist in this workspace — don't leave the
@@ -159,17 +165,21 @@ function App() {
     }
   };
 
-  const isInitialRepoLoad = useRef(true);
+  const prevRepoPathRef = useRef(repoPath);
   useEffect(() => {
-    if (isInitialRepoLoad.current) {
-      isInitialRepoLoad.current = false;
-    } else {
-      // Workspace switch: drop the previous workspace's selection and artifacts
-      // immediately so nothing stale stays on screen while the new repo loads.
+    // Compare paths instead of a boolean "first run" flag: under StrictMode
+    // mount effects run twice with refs preserved, and a boolean would fire
+    // the reset on the second run, wiping a ?change= deep link.
+    if (prevRepoPathRef.current !== repoPath) {
+      prevRepoPathRef.current = repoPath;
+      // Workspace switch: drop the previous workspace's selection and artifact
+      // state immediately so nothing stale stays on screen while the new repo loads.
       setActiveChange('main');
+      setChanges([]);
       setArtifacts(EMPTY_ARTIFACTS);
       setTasks([]);
       setFiles([]);
+      setAgentProvider('codex');
     }
     loadChanges();
   }, [repoPath]);

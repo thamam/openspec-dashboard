@@ -57,6 +57,8 @@ const artifactsPayload = (proposal: string) => ({
 describe('App data flow (C1/C2/C4)', () => {
   beforeEach(() => {
     mockFetch.mockReset();
+    // App effects write ?change= into the URL; reset so each test mounts clean.
+    window.history.replaceState({}, '', '/');
   });
 
   afterEach(() => {
@@ -198,5 +200,40 @@ describe('App data flow (C1/C2/C4)', () => {
     // The app shell still renders and the changes pane shows no bogus entries.
     expect(screen.getByText('OpenSpec')).toBeInTheDocument();
     expect(screen.getByText('Changes')).toBeInTheDocument();
+  });
+
+  it('C2: StrictMode double-mount preserves the ?change= deep link', async () => {
+    // main.tsx wraps App in React.StrictMode, so mount effects run twice with
+    // refs preserved — the workspace-switch reset must not fire on the second run.
+    window.history.replaceState({}, '', '/?change=change-b');
+    vi.resetModules();
+    const { default: StrictApp } = await import('../src/App.js');
+
+    mockFetch.mockImplementation((url: string) => {
+      if (url.includes('/api/changes')) {
+        return Promise.resolve(jsonResponse([
+          { id: 'change-a', title: 'Change A' },
+          { id: 'change-b', title: 'Change B' },
+        ]));
+      }
+      if (url.includes('/api/artifacts')) {
+        return Promise.resolve(jsonResponse(artifactsPayload('PROPOSAL_B')));
+      }
+      return Promise.reject(new Error(`unexpected fetch: ${url}`));
+    });
+
+    const { container } = render(
+      <React.StrictMode>
+        <StrictApp />
+      </React.StrictMode>
+    );
+    await flush();
+    await flush();
+
+    // The URL-pinned change stays selected (not reset to 'main' -> first change).
+    expect(container.querySelector('#nav-item-change-b.active')).not.toBeNull();
+    expect(container.querySelector('#nav-item-change-a.active')).toBeNull();
+
+    window.history.replaceState({}, '', '/');
   });
 });
