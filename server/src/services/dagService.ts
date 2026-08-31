@@ -20,38 +20,6 @@ export interface DagEdge {
   target: string;
 }
 
-export async function getChanges(repoPath: string): Promise<string[]> {
-  const resolvedPath = resolvePath(repoPath);
-  const changesDir = path.join(resolvedPath, 'openspec', 'changes');
-
-  if (!fs.existsSync(changesDir)) {
-    return [];
-  }
-
-  const results: string[] = [];
-
-  const activeItems = fs.readdirSync(changesDir);
-  for (const item of activeItems) {
-    const itemPath = path.join(changesDir, item);
-    if (item !== 'archive' && fs.statSync(itemPath).isDirectory()) {
-      results.push(item);
-    }
-  }
-
-  const archiveDir = path.join(changesDir, 'archive');
-  if (fs.existsSync(archiveDir) && fs.statSync(archiveDir).isDirectory()) {
-    const archivedItems = fs.readdirSync(archiveDir);
-    for (const item of archivedItems) {
-      const itemPath = path.join(archiveDir, item);
-      if (fs.statSync(itemPath).isDirectory()) {
-        results.push(`archive/${item}`);
-      }
-    }
-  }
-
-  return results;
-}
-
 export async function getChangeDag(
   repoPath: string,
   changeName: string

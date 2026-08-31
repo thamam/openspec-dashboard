@@ -13,14 +13,6 @@ vi.mock('child_process', async (importOriginal) => {
   return { ...actual, spawn: vi.fn() };
 });
 
-// createNewChange runs the real `openspec` CLI; stub just that one export so
-// commitBrainstormChange reaches its spec-file write path. Every other
-// repoService export (resolvePath, updateChangeProvider, ...) stays real.
-vi.mock('../src/services/repoService.js', async (importOriginal) => {
-  const actual = await importOriginal<any>();
-  return { ...actual, createNewChange: vi.fn().mockResolvedValue(undefined) };
-});
-
 const mockedSpawn = vi.mocked(spawn);
 
 function fakeChild(exitCode = 0) {
@@ -40,7 +32,6 @@ function fakeChild(exitCode = 0) {
 
 import { app } from '../src/app.js';
 import { getKeystoneManifest } from '../src/services/keystoneService.js';
-import { commitBrainstormChange } from '../src/services/brainstormService.js';
 import { resolveProvider } from '../src/agents/ProviderResolver.js';
 import { ClaudeProvider } from '../src/agents/providers/ClaudeProvider.js';
 import { CodexProvider } from '../src/agents/providers/CodexProvider.js';
@@ -216,43 +207,6 @@ describe('S6 — keystoneService manifest row.path traversal', () => {
     const result = await getKeystoneManifest(repoDir);
     expect(result.artifacts![0].review).toBeTruthy();
     expect(result.artifacts![0].review!.payload.findings[0].id).toBe('OK-1');
-  });
-});
-
-describe('S6 — brainstormService commitBrainstormChange spec-path traversal', () => {
-  let tempDir: string;
-  let repoDir: string;
-  let sentinelFile: string;
-
-  beforeAll(() => {
-    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 's6-brainstorm-'));
-    repoDir = path.join(tempDir, 'repo');
-    // Pre-create the change dir; createNewChange is stubbed in this file. The
-    // traversal target sits OUTSIDE the repo (4 levels up from the change dir).
-    fs.mkdirSync(path.join(repoDir, 'openspec', 'changes', 'legit'), { recursive: true });
-    sentinelFile = path.join(tempDir, 'brainstorm-sentinel.md');
-  });
-
-  afterAll(() => {
-    fs.rmSync(tempDir, { recursive: true, force: true });
-  });
-
-  it('rejects a specs key that escapes the change dir and writes nothing outside', async () => {
-    await expect(
-      commitBrainstormChange(repoDir, 'legit', {
-        specs: { '../../../../brainstorm-sentinel.md': 'PWNED' },
-      })
-    ).rejects.toThrow();
-    expect(fs.existsSync(sentinelFile)).toBe(false);
-  });
-
-  it('rejects an absolute specs key', async () => {
-    await expect(
-      commitBrainstormChange(repoDir, 'legit', {
-        specs: { [sentinelFile]: 'PWNED' },
-      })
-    ).rejects.toThrow();
-    expect(fs.existsSync(sentinelFile)).toBe(false);
   });
 });
 

@@ -277,32 +277,6 @@ export async function initializeOpenSpec(dirPath: string): Promise<void> {
   }
 }
 
-export async function createGitWorktree(
-  repoPath: string,
-  branchName: string,
-  worktreePath: string
-): Promise<void> {
-  const resolvedRepoPath = resolvePath(repoPath);
-  const resolvedWorktreePath = resolvePath(worktreePath);
-
-  // Validate branch name ('/' allowed for feature branches, but no leading '-'
-  // so git's option parser cannot re-read it as a flag)
-  const branchRegex = /^[a-zA-Z0-9._/-]+$/;
-  if (!branchRegex.test(branchName) || branchName.startsWith('-')) {
-    throw new Error('Invalid branch name format');
-  }
-
-  // Verify repo path exists and is a git repository
-  const status = await checkRepoStatus(resolvedRepoPath);
-  if (!status.exists || !status.isGit) {
-    throw new Error('Source path is not a valid Git repository');
-  }
-
-  // Run git worktree add. '--' ends git's option parsing so a worktree path
-  // starting with '-' cannot be reinterpreted as a flag (verified vs real git).
-  await execFilePromise('git', ['worktree', 'add', '-b', branchName, '--', resolvedWorktreePath], resolvedRepoPath);
-}
-
 export async function createLocalSchema(
   repoPath: string,
   schemaName: string,
@@ -424,23 +398,6 @@ export async function getChangeWorktree(repoPath: string, changeName: string): P
   return null;
 }
 
-export async function runProposeCommand(
-  repoPath: string,
-  changeName: string,
-  engine: string
-): Promise<string> {
-  const resolvedRepoPath = resolvePath(repoPath);
-  // Validate before spawning — previously these reached a shell string with no
-  // validation at all.
-  if (!isSafeCliName(changeName)) {
-    throw new Error('Invalid change name format');
-  }
-  if (!isSafeCliName(engine)) {
-    throw new Error('Invalid engine format');
-  }
-  return await execFilePromise('openspec', ['propose', changeName, '--engine', engine], resolvedRepoPath);
-}
-
 export async function getChangeMetadata(
   repoPath: string,
   changeName: string
@@ -495,30 +452,6 @@ export async function getChangeMetadata(
   };
 }
 
-export async function updateProposeEngine(
-  repoPath: string,
-  changeName: string,
-  proposeEngine: string
-): Promise<void> {
-  const resolvedRepoPath = resolvePath(repoPath);
-  const nameRegex = /^[a-zA-Z0-9.-]+$/;
-  if (!nameRegex.test(proposeEngine)) {
-    throw new Error('Invalid propose engine format');
-  }
-
-  // S6: changeName is joined into a path below — same guard as updateChangeProvider.
-  assertSafeName(changeName, 'change name');
-  const changeConfigFile = path.join(resolvedRepoPath, 'openspec', 'changes', changeName, '.openspec.yaml');
-  if (!fs.existsSync(changeConfigFile)) {
-    throw new Error(`Change configuration file not found for change: ${changeName}`);
-  }
-
-  const yamlContent = fs.readFileSync(changeConfigFile, 'utf8');
-  const data = parseChangeConfig(yamlContent);
-  data.proposeEngine = proposeEngine;
-  fs.writeFileSync(changeConfigFile, stringifyChangeConfig(data), 'utf8');
-}
-
 export async function updateChangeProvider(
   repoPath: string,
   changeName: string,
@@ -543,41 +476,4 @@ export async function updateChangeProvider(
   data.agentProvider = agentProvider;
   fs.writeFileSync(changeConfigFile, stringifyChangeConfig(data), 'utf8');
 }
-
-export function getChangeFilesContent(
-  repoPath: string,
-  changeName: string
-): string {
-  const resolvedRepoPath = resolvePath(repoPath);
-  // S6: changeName is joined into a path below — same guard as updateChangeProvider.
-  assertSafeName(changeName, 'change name');
-  const changeDir = path.join(resolvedRepoPath, 'openspec', 'changes', changeName);
-
-  if (!fs.existsSync(changeDir)) {
-    throw new Error(`Change directory not found: ${changeName}`);
-  }
-
-  let result = '';
-
-  function readDirectory(dir: string, relativeDir: string = '') {
-    if (!fs.existsSync(dir)) return;
-    const entries = fs.readdirSync(dir, { withFileTypes: true });
-
-    for (const entry of entries) {
-      const fullPath = path.join(dir, entry.name);
-      const relPath = relativeDir ? path.join(relativeDir, entry.name) : entry.name;
-
-      if (entry.isDirectory()) {
-        readDirectory(fullPath, relPath);
-      } else if (entry.isFile() && entry.name.endsWith('.md')) {
-        const fileContent = fs.readFileSync(fullPath, 'utf8');
-        result += `=== FILE: ${relPath} ===\n${fileContent}\n\n`;
-      }
-    }
-  }
-
-  readDirectory(changeDir);
-  return result;
-}
-
 

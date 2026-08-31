@@ -39,7 +39,6 @@ function streamChildProcess(
 }
 
 export class OpenSpecController {
-
   /**
    * Executes a lifecycle command (e.g., opsx-continue) via child process.
    * In a full implementation, this would stream output to the client via WebSockets or SSE.
@@ -190,5 +189,3 @@ export class OpenSpecController {
     }
   }
 }
-
-export const openSpecController = new OpenSpecController();
