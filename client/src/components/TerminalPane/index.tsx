@@ -7,7 +7,6 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { io, Socket } from 'socket.io-client';
 import '@xterm/xterm/css/xterm.css';
-import { detectActiveSession } from '../../terminal/sessionDetect';
 
 interface SessionItem {
   id: string;
@@ -16,12 +15,11 @@ interface SessionItem {
 }
 
 interface Props {
-  lines?: string[];
   onExecuteCommand?: (cmd: string) => void;
   terminalHeight?: number;
 }
 
-export const TerminalPane: React.FC<Props> = ({ lines = [], onExecuteCommand, terminalHeight }) => {
+export const TerminalPane: React.FC<Props> = ({ onExecuteCommand, terminalHeight }) => {
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -36,7 +34,6 @@ export const TerminalPane: React.FC<Props> = ({ lines = [], onExecuteCommand, te
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'reconnecting' | 'disconnected'>('disconnected');
   const [webglActive, setWebglActive] = useState<boolean>(false);
   const [fontSize, setFontSize] = useState<number>(13);
-  const [activeAgentSession, setActiveAgentSession] = useState<string>('');
 
   // Search state
   const [showSearch, setShowSearch] = useState<boolean>(false);
@@ -44,13 +41,6 @@ export const TerminalPane: React.FC<Props> = ({ lines = [], onExecuteCommand, te
   const [caseSensitive, setCaseSensitive] = useState<boolean>(false);
   const [useRegex, setUseRegex] = useState<boolean>(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
-
-  // Detect active agent tmux session from recent logs (C8: shared helper —
-  // was an inline O(n²)-per-chunk rescan duplicated in App.tsx; the buffer is
-  // now capped, so this is a bounded scan over recent lines only).
-  useEffect(() => {
-    setActiveAgentSession(detectActiveSession(lines));
-  }, [lines]);
 
   const fitTerminal = useCallback(() => {
     if (fitAddonRef.current && xtermRef.current) {
@@ -330,11 +320,16 @@ export const TerminalPane: React.FC<Props> = ({ lines = [], onExecuteCommand, te
   };
 
   const handleCreateSession = () => {
-    const newSessionId = `session-${sessions.length + 1}`;
-    setSessions(prev => {
-      if (prev.some(s => s.id === newSessionId)) return prev;
-      return [...prev, { id: newSessionId, cols: 100, rows: 30 }];
-    });
+    // C9: lowest free id from the LIVE session list. `sessions.length + 1`
+    // collided after closes, and a mount-local counter collides after a page
+    // reload (the server's PtyService sessions survive and are pushed to us
+    // via terminal-init-ack). Neither bug is possible when the id is derived
+    // from the list itself.
+    const used = new Set(sessions.map(s => s.id));
+    let n = 2;
+    while (used.has(`session-${n}`)) n++;
+    const newSessionId = `session-${n}`;
+    setSessions(prev => [...prev, { id: newSessionId, cols: 100, rows: 30 }]);
     if (socketRef.current && socketRef.current.connected) {
       socketRef.current.emit('terminal-create-session', {
         sessionId: newSessionId,
@@ -379,19 +374,6 @@ export const TerminalPane: React.FC<Props> = ({ lines = [], onExecuteCommand, te
     setInputVal('');
   };
 
-  const handleAttachTmux = () => {
-    if (!activeAgentSession) return;
-    const cmd = `tmux attach -t ${activeAgentSession}`;
-    if (socketRef.current && socketRef.current.connected) {
-      socketRef.current.emit('terminal-input', {
-        sessionId: activeSession,
-        data: `${cmd}\r`
-      });
-    } else if (onExecuteCommand) {
-      onExecuteCommand(cmd);
-    }
-  };
-
   const handleClear = () => {
     if (xtermRef.current) {
       xtermRef.current.clear();
@@ -405,11 +387,10 @@ export const TerminalPane: React.FC<Props> = ({ lines = [], onExecuteCommand, te
   };
 
   const handleOpenITerm = () => {
-    const cmd = activeAgentSession ? `tmux attach -t ${activeAgentSession}` : 'zsh';
     fetch('/api/open-terminal', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ command: cmd })
+      body: JSON.stringify({ command: 'zsh' })
     });
   };
 
@@ -523,15 +504,6 @@ export const TerminalPane: React.FC<Props> = ({ lines = [], onExecuteCommand, te
           >
             Search
           </button>
-
-          {activeAgentSession && (
-            <button
-              onClick={handleAttachTmux}
-              style={{ padding: '3px 8px', fontSize: '11px', fontWeight: 600, backgroundColor: '#10b981', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-            >
-              Attach {activeAgentSession}
-            </button>
-          )}
 
           <button
             onClick={handleClear}
