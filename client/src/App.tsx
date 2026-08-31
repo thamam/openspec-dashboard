@@ -9,8 +9,12 @@ import CreateChangeForm from './components/CreateChangeForm';
 import { WorkspaceSelector } from './components/WorkspaceSelector';
 import { ChangeItem, TaskItem, Artifacts } from './types';
 import { isDrifted, readPinnedContext } from './keystone/pinnedContext';
-import { appendTerminalLines, capTerminalLines } from './terminal/lineBuffer';
-import { detectActiveSession } from './terminal/sessionDetect';
+
+// C16: the active agent tmux session is explicit state (see activeAgentSession
+// below), set when the user attaches via `tmux attach -t <name>`. Only
+// agent-named sessions get the /api/send-message routing treatment — the same
+// restriction the old log scan had, but anchored to the full session name.
+const AGENT_SESSION_PATTERN = /^(openspec-session-[0-9]+|agent-[0-9]+)$/;
 
 // For E2E testing, we allow passing the repo path via query param
 const urlParams = new URLSearchParams(window.location.search);
@@ -40,7 +44,15 @@ function App() {
   const [artifacts, setArtifacts] = useState<Artifacts>(EMPTY_ARTIFACTS);
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [files, setFiles] = useState<string[]>([]);
-  const [terminalLines, setTerminalLines] = useState<string[]>(['OpenSpec CLI v1.2.0 (Deterministic Engine)']);
+  // C16: the agent session the terminal prompt is currently routed to.
+  // Explicit state instead of parsing the old `terminalLines` log: every
+  // /api/execute reply ends with `[Process exited with code N]`, so the old
+  // exit-marker heuristic always read the session as gone, and the C7 cap
+  // could evict the session marker entirely. Set on `tmux attach -t <agent-N>`,
+  // cleared by `exit`/`disconnect`. (The log array itself was write-only since
+  // the PTY rework — xterm owns the visible scrollback — so it was removed
+  // along with the detection it fed.)
+  const [activeAgentSession, setActiveAgentSession] = useState<string>('');
   const [agentProvider, setAgentProvider] = useState<string>('codex');
   const [rightPaneWidth, setRightPaneWidth] = useState(320);
   const [terminalHeight, setTerminalHeight] = useState(220);
@@ -221,95 +233,35 @@ function App() {
     return () => clearInterval(interval);
   }, [activeChange, repoPath]);
 
-  const cleanAnsiText = (text: string) => {
-    return text
-      .replace(/\u001b\[[0-9;]*[a-zA-Z]/g, '')
-      .replace(/\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g, '')
-      .replace(/\r/g, '');
-  };
-
-  const captureTmuxPane = async (sessionName: string) => {
-    try {
-      const res = await fetch('/api/execute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ repoPath, command: 'tmux', args: ['capture-pane', '-pt', sessionName] })
-      });
-      const reader = res.body?.getReader();
-      if (!reader) return;
-      const decoder = new TextDecoder();
-      let text = '';
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        text += decoder.decode(value);
-      }
-      const cleaned = cleanAnsiText(text);
-      const paneLines = cleaned
-        .split('\n')
-        .map(l => l.trimEnd())
-        .filter(l => l.length > 0);
-
-      setTerminalLines(prev => {
-        const marker = `--- Active Session: ${sessionName} ---`;
-        const existingIdx = prev.findIndex(line => line.startsWith('--- Active Session:'));
-        // C7: the rebuilt array is capped too — xterm owns the real scrollback.
-        // The freshly inserted marker survives capping because `capture-pane -pt`
-        // grabs only the visible pane (a few dozen lines); if this ever switches
-        // to full-history capture (`-S -`), paneLines alone could exceed the cap
-        // and evict the marker, silently breaking session detection routing.
-        if (existingIdx !== -1) {
-          return capTerminalLines([
-            ...prev.slice(0, existingIdx),
-            marker,
-            ...paneLines
-          ]);
-        }
-        return appendTerminalLines(prev, [marker, ...paneLines]);
-      });
-    } catch (e: any) {
-      console.error('Failed to capture tmux pane:', e);
-    }
-  };
-
   const executeCommand = async (command: string, args: string[] = []) => {
     if (command === 'tmux' && args.includes('attach')) {
       const sessionIdx = args.indexOf('-t');
       const sessionName = sessionIdx !== -1 && args[sessionIdx + 1] ? args[sessionIdx + 1] : '';
       if (sessionName) {
-        await captureTmuxPane(sessionName);
+        // C16: record the attach explicitly. Only agent-named sessions get the
+        // message-routing treatment (same restriction the old log scan had).
+        setActiveAgentSession(AGENT_SESSION_PATTERN.test(sessionName) ? sessionName : '');
         return;
       }
     }
 
-    const fullCmdDisplay = args.length > 0 ? `${command} ${args.join(' ')}` : command;
-    setTerminalLines(prev => appendTerminalLines(prev, [`$ ${fullCmdDisplay}`]));
     try {
       const res = await fetch('/api/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ repoPath, command, args })
       });
-      
+      // Drain the streamed response to completion; the output renders in the
+      // PTY terminal, not in App state (the old write-only log was removed
+      // with C16).
       const reader = res.body?.getReader();
-      if (!reader) return;
-      const decoder = new TextDecoder();
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        const text = decoder.decode(value);
-        const cleaned = cleanAnsiText(text);
-        const newLines = cleaned.split('\n').filter((line, idx, arr) => {
-          // Skip consecutive empty lines at the chunk boundary
-          if (!line.trim() && idx > 0 && !arr[idx - 1].trim()) return false;
-          return true;
-        });
-        setTerminalLines(prev => appendTerminalLines(prev, newLines));
+      if (reader) {
+        while (!(await reader.read()).done) { /* drain */ }
       }
       // Reload artifacts after execution
       loadArtifacts(activeChange);
     } catch (e: any) {
-      setTerminalLines(prev => appendTerminalLines(prev, [`ERROR: ${e.message}`]));
+      console.error('execute failed:', e);
     }
   };
 
@@ -317,35 +269,27 @@ function App() {
     const trimmed = fullCommand.trim();
     if (!trimmed) return;
 
-    if (trimmed === 'clear') {
-      setTerminalLines([]);
-      return;
+    // C16: `exit`/`disconnect` detach from the routed agent session.
+    if (trimmed === 'exit' || trimmed === 'disconnect') {
+      setActiveAgentSession('');
     }
 
-    // Find the latest active agent session from terminal logs (C8: shared
-    // helper, same semantics as the old inline backward scan).
-    const activeSession = detectActiveSession(terminalLines);
-
-    // If an agent tmux session is active and user is not explicitly running a local tool command
+    // If an agent tmux session is attached and user is not explicitly running a local tool command
     const isExplicitLocalCmd = trimmed.startsWith('opsx-') || trimmed.startsWith('git ') || trimmed.startsWith('openspec ') || trimmed.startsWith('cd ') || trimmed.startsWith('ls ') || trimmed.startsWith('pwd');
 
-    if (activeSession && !isExplicitLocalCmd && trimmed !== 'exit' && trimmed !== 'disconnect') {
-      setTerminalLines(prev => appendTerminalLines(prev, [`$ [${activeSession}] ${trimmed}`]));
+    if (activeAgentSession && !isExplicitLocalCmd && trimmed !== 'exit' && trimmed !== 'disconnect') {
       try {
         const res = await fetch('/api/send-message', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionName: activeSession, message: trimmed })
+          body: JSON.stringify({ sessionName: activeAgentSession, message: trimmed })
         });
         const data = await res.json();
         if (data.error) {
-          setTerminalLines(prev => appendTerminalLines(prev, [`ERROR: ${data.error}`]));
-        } else {
-          // Capture the updated tmux pane output after 400ms
-          setTimeout(() => captureTmuxPane(activeSession), 400);
+          console.error('send-message failed:', data.error);
         }
       } catch (e: any) {
-        setTerminalLines(prev => appendTerminalLines(prev, [`ERROR: ${e.message}`]));
+        console.error('send-message failed:', e);
       }
       return;
     }
@@ -433,7 +377,7 @@ function App() {
         />
       </div>
       <div className="terminal-resizer" onMouseDown={startResizingTerminal} title="Drag to resize terminal height" />
-      <TerminalPane lines={terminalLines} onExecuteCommand={handleRunTerminalCommand} terminalHeight={terminalHeight} />
+      <TerminalPane onExecuteCommand={handleRunTerminalCommand} terminalHeight={terminalHeight} activeAgentSession={activeAgentSession} />
       
       {showCreateChange && (
         <div className="modal-overlay" style={{

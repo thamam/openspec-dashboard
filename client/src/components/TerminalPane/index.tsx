@@ -7,7 +7,6 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { io, Socket } from 'socket.io-client';
 import '@xterm/xterm/css/xterm.css';
-import { detectActiveSession } from '../../terminal/sessionDetect';
 
 interface SessionItem {
   id: string;
@@ -16,12 +15,17 @@ interface SessionItem {
 }
 
 interface Props {
-  lines?: string[];
   onExecuteCommand?: (cmd: string) => void;
   terminalHeight?: number;
+  // C16: the active agent tmux session is explicit App state (set on
+  // `tmux attach -t <agent-N>`), no longer parsed out of the capped
+  // terminalLines log — every /api/execute reply ends with an exit marker, so
+  // log-based detection always read the session as gone (and the C7 cap could
+  // evict the session marker entirely).
+  activeAgentSession?: string;
 }
 
-export const TerminalPane: React.FC<Props> = ({ lines = [], onExecuteCommand, terminalHeight }) => {
+export const TerminalPane: React.FC<Props> = ({ onExecuteCommand, terminalHeight, activeAgentSession = '' }) => {
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -36,7 +40,6 @@ export const TerminalPane: React.FC<Props> = ({ lines = [], onExecuteCommand, te
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'reconnecting' | 'disconnected'>('disconnected');
   const [webglActive, setWebglActive] = useState<boolean>(false);
   const [fontSize, setFontSize] = useState<number>(13);
-  const [activeAgentSession, setActiveAgentSession] = useState<string>('');
 
   // Search state
   const [showSearch, setShowSearch] = useState<boolean>(false);
@@ -44,13 +47,6 @@ export const TerminalPane: React.FC<Props> = ({ lines = [], onExecuteCommand, te
   const [caseSensitive, setCaseSensitive] = useState<boolean>(false);
   const [useRegex, setUseRegex] = useState<boolean>(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
-
-  // Detect active agent tmux session from recent logs (C8: shared helper —
-  // was an inline O(n²)-per-chunk rescan duplicated in App.tsx; the buffer is
-  // now capped, so this is a bounded scan over recent lines only).
-  useEffect(() => {
-    setActiveAgentSession(detectActiveSession(lines));
-  }, [lines]);
 
   const fitTerminal = useCallback(() => {
     if (fitAddonRef.current && xtermRef.current) {
@@ -329,12 +325,16 @@ export const TerminalPane: React.FC<Props> = ({ lines = [], onExecuteCommand, te
     }
   };
 
+  // C9: monotonic counter for new-session ids. Deriving the id from
+  // `sessions.length + 1` collided with an existing tab after any close; the
+  // old prev.some guard blocked the duplicate state entry but the
+  // terminal-create-session emit and the session switch still fired for the
+  // colliding id.
+  const sessionCounterRef = useRef(1);
+
   const handleCreateSession = () => {
-    const newSessionId = `session-${sessions.length + 1}`;
-    setSessions(prev => {
-      if (prev.some(s => s.id === newSessionId)) return prev;
-      return [...prev, { id: newSessionId, cols: 100, rows: 30 }];
-    });
+    const newSessionId = `session-${++sessionCounterRef.current}`;
+    setSessions(prev => [...prev, { id: newSessionId, cols: 100, rows: 30 }]);
     if (socketRef.current && socketRef.current.connected) {
       socketRef.current.emit('terminal-create-session', {
         sessionId: newSessionId,
