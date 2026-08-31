@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import './App.css';
 import { CommandCenter } from './components/CommandCenter';
 import { ArtifactViewer } from './components/ArtifactViewer';
@@ -13,13 +13,18 @@ import { isDrifted, readPinnedContext } from './keystone/pinnedContext';
 // For E2E testing, we allow passing the repo path via query param
 const urlParams = new URLSearchParams(window.location.search);
 const INITIAL_REPO_PATH = urlParams.get('path') || '/tmp/toy-openspec-project';
-const INITIAL_CHANGE = urlParams.get('change') || 'main';
+
+const EMPTY_ARTIFACTS: Artifacts = { proposal: '', spec: '', design: '', tasks: '' };
 
 function App() {
   const [repoPath, setRepoPath] = useState<string>(INITIAL_REPO_PATH);
   const [changes, setChanges] = useState<ChangeItem[]>([]);
-  const [activeChange, setActiveChange] = useState<string>(INITIAL_CHANGE);
-  const [artifacts, setArtifacts] = useState<Artifacts>({ proposal: '', spec: '', design: '', tasks: '' });
+  // Read at mount (not module import) so the ?change= deep link is resolved per
+  // component instance.
+  const [activeChange, setActiveChange] = useState<string>(
+    () => new URLSearchParams(window.location.search).get('change') || 'main'
+  );
+  const [artifacts, setArtifacts] = useState<Artifacts>(EMPTY_ARTIFACTS);
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [files, setFiles] = useState<string[]>([]);
   const [terminalLines, setTerminalLines] = useState<string[]>(['OpenSpec CLI v1.2.0 (Deterministic Engine)']);
@@ -86,24 +91,61 @@ function App() {
     document.addEventListener('mouseup', onMouseUp);
   }, [terminalHeight]);
 
+  // Monotonic request ids + in-flight flag so a slower, older response can
+  // never overwrite state written by a newer request (C1), and so the 2s poll
+  // can skip ticks while a load is still running.
+  const changesRequestIdRef = useRef(0);
+  const artifactsRequestIdRef = useRef(0);
+  const artifactsInFlightRef = useRef(false);
+
   const loadChanges = async () => {
+    const requestId = ++changesRequestIdRef.current;
     try {
       const res = await fetch(`/api/changes?path=${encodeURIComponent(repoPath)}`);
-      const data = await res.json();
-      setChanges(data);
-      if (data.length > 0 && activeChange === 'main') {
-        setActiveChange(data[0].id);
+      if (requestId !== changesRequestIdRef.current) return; // superseded by a newer load
+      if (!res.ok) {
+        setChanges([]);
+        return;
       }
+      const data = await res.json();
+      if (requestId !== changesRequestIdRef.current) return;
+      if (!Array.isArray(data)) {
+        // e.g. an {error: ...} body — never hand a non-array to CommandCenter.
+        setChanges([]);
+        return;
+      }
+      setChanges(data);
+      setActiveChange(prev => (prev === 'main' && data.length > 0 ? data[0].id : prev));
     } catch (e) {
+      if (requestId === changesRequestIdRef.current) setChanges([]);
       console.error(e);
     }
   };
 
   const loadArtifacts = async (changeName: string) => {
-    if (changeName === 'main') return;
+    // Bump the request id even for 'main' so an in-flight fetch for a
+    // previously-selected change is invalidated the moment the user leaves it.
+    const requestId = ++artifactsRequestIdRef.current;
+    if (changeName === 'main') {
+      artifactsInFlightRef.current = false;
+      return;
+    }
+    artifactsInFlightRef.current = true;
     try {
-      const res = await fetch(`/api/artifacts?path=${encodeURIComponent(repoPath)}&change=${encodeURIComponent(changeName)}`);
+      // 30s timeout: a hung request must not wedge the in-flight flag (and
+      // with it the poll) forever.
+      const res = await fetch(`/api/artifacts?path=${encodeURIComponent(repoPath)}&change=${encodeURIComponent(changeName)}`, { signal: AbortSignal.timeout(30_000) });
+      if (requestId !== artifactsRequestIdRef.current) return; // stale: superseded by a newer load
+      if (!res.ok) {
+        // e.g. the change doesn't exist in this workspace — don't leave the
+        // previous workspace's artifacts on screen.
+        setArtifacts(EMPTY_ARTIFACTS);
+        setTasks([]);
+        setFiles([]);
+        return;
+      }
       const data = await res.json();
+      if (requestId !== artifactsRequestIdRef.current) return; // stale
       if (data.artifacts) {
         setArtifacts({
           ...data.artifacts,
@@ -114,22 +156,48 @@ function App() {
         if (data.agentProvider) {
           setAgentProvider(data.agentProvider);
         }
+      } else {
+        setArtifacts(EMPTY_ARTIFACTS);
+        setTasks([]);
+        setFiles([]);
       }
     } catch (e) {
       console.error(e);
+    } finally {
+      if (requestId === artifactsRequestIdRef.current) {
+        artifactsInFlightRef.current = false;
+      }
     }
   };
 
+  const prevRepoPathRef = useRef(repoPath);
   useEffect(() => {
+    // Compare paths instead of a boolean "first run" flag: under StrictMode
+    // mount effects run twice with refs preserved, and a boolean would fire
+    // the reset on the second run, wiping a ?change= deep link.
+    if (prevRepoPathRef.current !== repoPath) {
+      prevRepoPathRef.current = repoPath;
+      // Workspace switch: drop the previous workspace's selection and artifact
+      // state immediately so nothing stale stays on screen while the new repo loads.
+      setActiveChange('main');
+      setChanges([]);
+      setArtifacts(EMPTY_ARTIFACTS);
+      setTasks([]);
+      setFiles([]);
+      setAgentProvider('codex');
+    }
     loadChanges();
   }, [repoPath]);
 
   useEffect(() => {
     loadArtifacts(activeChange);
-    
-    // Auto-polling every 2 seconds
+
+    // Auto-polling every 2 seconds; skip the tick while a load is in flight
+    // so requests can't pile up when latency exceeds the poll interval.
     const interval = setInterval(() => {
-      loadArtifacts(activeChange);
+      if (!artifactsInFlightRef.current) {
+        loadArtifacts(activeChange);
+      }
     }, 2000);
     
     // Update URL state

@@ -69,7 +69,7 @@ export const RawView: React.FC<Props> = ({ artifacts, activeChange }) => {
     });
 
     try {
-      await fetch('http://localhost:3011/api/send-message', {
+      await fetch('/api/send-message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ changeName: activeChange, message })
