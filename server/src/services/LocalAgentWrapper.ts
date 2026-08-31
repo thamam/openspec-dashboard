@@ -102,7 +102,7 @@ export class LocalAgentWrapper {
    * @param context Dashboard context (active change, etc.)
    * @param onChunk Callback when the agent streams stdout
    */
-  public async chat(repoPath: string, message: string, context: any, onChunk: (chunk: string) => void): Promise<void> {
+  public async chat(repoPath: string, message: string, context: any, onChunk: (chunk: string) => void, signal?: AbortSignal): Promise<void> {
     if (process.env.TEST_MODE === 'true') {
       return new Promise((resolve) => {
         onChunk(`Mocked reply to: "${message}"`);
@@ -139,11 +139,24 @@ Respond helpfully and concisely. Available OpenSpec workflows include: /opsx-pro
         cwd: repoPath
       });
 
+      // S8: AgentService passes an AbortSignal from its 45s chat timeout —
+      // aborting must kill the agy child, not leave it streaming into a
+      // conversation the server has already given up on.
+      const onAbort = () => child.kill('SIGTERM');
+      if (signal) {
+        if (signal.aborted) {
+          onAbort();
+        } else {
+          signal.addEventListener('abort', onAbort, { once: true });
+        }
+      }
+
       // Without a shell, a missing agy binary raises 'error' (ENOENT) instead
       // of exiting 127 — handle it or the server process crashes.
       child.on('error', (err) => {
         console.error(`[LocalAgentWrapper] Failed to spawn agy: ${err.message}`);
         onChunk(`⚠️ [Agent Error]: ${err.message}`);
+        signal?.removeEventListener('abort', onAbort);
         resolve();
       });
 
@@ -151,7 +164,10 @@ Respond helpfully and concisely. Available OpenSpec workflows include: /opsx-pro
         onChunk(data.toString());
       });
 
-      child.on('close', () => resolve());
+      child.on('close', () => {
+        signal?.removeEventListener('abort', onAbort);
+        resolve();
+      });
     });
   }
 

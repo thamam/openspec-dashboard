@@ -149,6 +149,23 @@ describe('LocalAgentWrapper — spawn contract (S5)', () => {
     mockedSpawn.mockReturnValue(fakeErrorChild(Object.assign(new Error('spawn agy ENOENT'), { code: 'ENOENT' })));
     await expect(wrapper.autofix(realRepo, path.join(realRepo, 'file.md'), 'warn')).resolves.toBeUndefined();
   });
+
+  it('chat kills the agy child when the caller aborts (S8)', async () => {
+    const child = new EventEmitter() as any;
+    child.stdout = new EventEmitter();
+    child.stderr = new EventEmitter();
+    child.kill = vi.fn(() => { process.nextTick(() => child.emit('close', null)); });
+    mockedSpawn.mockReturnValue(child);
+
+    const controller = new AbortController();
+    const chatPromise = wrapper.chat('/repo', 'hi', {}, () => {}, controller.signal);
+    controller.abort();
+
+    // Pre-fix chat had no signal parameter — a timed-out AgentService chat
+    // left the agy child running and streaming into a dead conversation.
+    expect(child.kill).toHaveBeenCalledWith('SIGTERM');
+    await chatPromise;
+  });
 });
 
 // Socket-trust-boundary fix (cycle 7): trigger_autofix hands autofix() a

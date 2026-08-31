@@ -342,3 +342,118 @@ describe('POST /api/send-message — shell injection hardening (S3)', () => {
     expect(fs.existsSync(pwnPath)).toBe(false);
   });
 });
+
+// S15: coverage for app.ts routes that had none. resolvePath is the identity
+// mock in this file, so tmp-dir fixtures exercise the real fs logic.
+describe('API Routes - GET /api/changes (S15)', () => {
+  let repo: string;
+
+  afterAll(() => {
+    if (repo && fs.existsSync(repo)) fs.rmSync(repo, { recursive: true, force: true });
+  });
+
+  it('returns 400 when path is missing', async () => {
+    const response = await request(app).get('/api/changes');
+    expect(response.status).toBe(400);
+  });
+
+  it('returns an empty list when the repo has no openspec/changes dir', async () => {
+    repo = fs.mkdtempSync(path.join(os.tmpdir(), 's15-changes-'));
+    const response = await request(app).get('/api/changes').query({ path: repo });
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual([]);
+  });
+
+  it('lists change directories and ignores stray files', async () => {
+    const changesDir = path.join(repo, 'openspec', 'changes');
+    fs.mkdirSync(path.join(changesDir, 'alpha-change'), { recursive: true });
+    fs.mkdirSync(path.join(changesDir, 'beta-change'));
+    fs.writeFileSync(path.join(changesDir, 'README.md'), 'not a change');
+
+    const response = await request(app).get('/api/changes').query({ path: repo });
+    expect(response.status).toBe(200);
+    const ids = response.body.map((c: any) => c.id).sort();
+    expect(ids).toEqual(['alpha-change', 'beta-change']);
+    expect(response.body[0]).toMatchObject({ title: 'alpha-change', status: 'In Progress' });
+  });
+});
+
+describe('API Routes - GET /api/artifacts error paths (S15)', () => {
+  it('returns 400 when change is missing', async () => {
+    const response = await request(app).get('/api/artifacts').query({ path: os.tmpdir() });
+    expect(response.status).toBe(400);
+  });
+
+  it('returns 404 when the change directory does not exist', async () => {
+    const response = await request(app)
+      .get('/api/artifacts')
+      .query({ path: os.tmpdir(), change: 'no-such-change' });
+    expect(response.status).toBe(404);
+    expect(response.body.error).toMatch(/not found/i);
+  });
+});
+
+describe('API Routes - GET /api/keystone/manifest (S15)', () => {
+  it('returns 400 when path is missing', async () => {
+    const response = await request(app).get('/api/keystone/manifest');
+    expect(response.status).toBe(400);
+  });
+
+  it('returns enabled:false for a repo without .aidev/manifest.yaml', async () => {
+    const repo = fs.mkdtempSync(path.join(os.tmpdir(), 's15-keystone-'));
+    try {
+      const response = await request(app).get('/api/keystone/manifest').query({ path: repo });
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({ enabled: false });
+    } finally {
+      fs.rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  it('accepts the ?repo= alias for the path parameter', async () => {
+    const repo = fs.mkdtempSync(path.join(os.tmpdir(), 's15-keystone-'));
+    try {
+      const response = await request(app).get('/api/keystone/manifest').query({ repo });
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({ enabled: false });
+    } finally {
+      fs.rmSync(repo, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('API Routes - service failure paths (S15)', () => {
+  it('POST /api/init returns 500 when initializeOpenSpec throws', async () => {
+    vi.mocked(repoService.initializeOpenSpec).mockRejectedValueOnce(new Error('init boom'));
+    const response = await request(app).post('/api/init').send({ path: '/tmp/x' });
+    expect(response.status).toBe(500);
+    expect(response.body.error).toBe('init boom');
+  });
+
+  it('POST /api/changes returns 500 when createNewChange throws', async () => {
+    vi.mocked(repoService.createNewChange).mockRejectedValueOnce(new Error('create boom'));
+    const response = await request(app)
+      .post('/api/changes')
+      .send({ repoPath: '/tmp/x', changeName: 'c1' });
+    expect(response.status).toBe(500);
+    expect(response.body.error).toBe('create boom');
+  });
+
+  it('POST /api/schema returns 500 when createLocalSchema throws', async () => {
+    vi.mocked(repoService.createLocalSchema).mockRejectedValueOnce(new Error('schema boom'));
+    const response = await request(app)
+      .post('/api/schema')
+      .send({ repoPath: '/tmp/x', schemaName: 's1', artifacts: ['proposal'] });
+    expect(response.status).toBe(500);
+    expect(response.body.error).toBe('schema boom');
+  });
+
+  it('POST /api/changes/:change/provider returns 500 when updateChangeProvider throws', async () => {
+    vi.mocked(repoService.updateChangeProvider).mockRejectedValueOnce(new Error('provider boom'));
+    const response = await request(app)
+      .post('/api/changes/feat-x/provider')
+      .send({ path: '/tmp/x', provider: 'claude' });
+    expect(response.status).toBe(500);
+    expect(response.body.error).toBe('provider boom');
+  });
+});

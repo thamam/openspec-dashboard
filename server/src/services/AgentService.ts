@@ -49,7 +49,7 @@ export class AgentService {
           if (this.activeRepoPath !== rootPath) {
             this.activeRepoPath = rootPath;
             this.chatHistory = this.loadChatHistory();
-            this.restartWatcher();
+            await this.restartWatcher();
           }
           socket.emit('chat_history', this.chatHistory);
         } catch (err: any) {
@@ -66,19 +66,28 @@ export class AgentService {
         this.saveChatHistory(this.chatHistory);
 
         let agentReply = '';
+        // S8: the timeout must kill the underlying agent child (via the
+        // AbortSignal the wrapper passes to child.kill) and must be cleared
+        // on success — previously it left the agy process running and leaked
+        // a pending 45s timer per chat.
+        const chatAbort = new AbortController();
+        let timeout: NodeJS.Timeout | undefined;
         try {
           // 45s timeout protection
           const chatPromise = this.agentWrapper.chat(this.activeRepoPath, message, context, (chunk) => {
             agentReply += chunk;
             socket.emit('chat_reply_chunk', chunk);
+          }, chatAbort.signal);
+
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            timeout = setTimeout(() => {
+              chatAbort.abort();
+              reject(new Error('Agent reply timed out after 45 seconds'));
+            }, 45000);
           });
 
-          const timeoutPromise = new Promise<never>((_, reject) => 
-            setTimeout(() => reject(new Error('Agent reply timed out after 45 seconds')), 45000)
-          );
-
           await Promise.race([chatPromise, timeoutPromise]);
-          
+
           this.chatHistory.push({ role: 'agent', content: agentReply });
           this.saveChatHistory(this.chatHistory);
           socket.emit('chat_reply_complete');
@@ -89,6 +98,8 @@ export class AgentService {
           this.chatHistory.push({ role: 'agent', content: errorMsg });
           this.saveChatHistory(this.chatHistory);
           socket.emit('chat_reply_error', { error: err.message });
+        } finally {
+          if (timeout) clearTimeout(timeout);
         }
       });
 
@@ -136,11 +147,22 @@ export class AgentService {
     });
   }
 
-  private restartWatcher() {
+  private async restartWatcher() {
     if (this.watcher) {
-      this.watcher.close();
+      // Await the close: chokidar releases its fs handles asynchronously, and
+      // starting the new watcher first would leave both live and emitting.
+      await this.watcher.close();
+      this.watcher = null;
     }
-    
+
+    // Pending debounce timers belong to the PREVIOUS repo's files — firing
+    // them now would emit stale agent_events and analyze old-repo paths
+    // against the new active root.
+    for (const timer of this.debounceTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.debounceTimers.clear();
+
     if (!this.activeRepoPath) return;
 
     const changesDir = path.join(this.activeRepoPath, 'openspec', 'changes');
