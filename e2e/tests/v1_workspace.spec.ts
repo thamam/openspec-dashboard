@@ -46,10 +46,9 @@ test.describe('V1 Workspace - Deterministic E2E Verification', () => {
   });
 
   test.beforeEach(async ({ page }) => {
-    // Navigate with the path query parameter to load the toy project
-    await page.goto(`/?path=${encodeURIComponent(repoPath)}`);
-    
-    // Disable all CSS transitions/animations globally to prevent E2E layout shift failures
+    // Disable all CSS transitions/animations globally to prevent E2E layout
+    // shift failures. addInitScript must be registered BEFORE page.goto —
+    // it only applies to navigations that happen after registration.
     await page.addInitScript(() => {
       const style = document.createElement('style');
       style.innerHTML = `
@@ -67,6 +66,9 @@ test.describe('V1 Workspace - Deterministic E2E Verification', () => {
       });
       observer.observe(document, { childList: true, subtree: true });
     });
+
+    // Navigate with the path query parameter to load the toy project
+    await page.goto(`/?path=${encodeURIComponent(repoPath)}`);
   });
 
   test('P0: Load Artifacts - Artifact Viewer correctly displays tasks.md', async ({ page }) => {
