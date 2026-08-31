@@ -225,9 +225,10 @@ describe('repoService - initializeOpenSpec & createGitWorktree', () => {
     
     const standardConfigPath = path.join(gitDir, 'openspec', 'changes', 'standard-change', '.openspec.yaml');
     expect(fs.existsSync(standardConfigPath)).toBe(true);
-    const standardConfig = fs.readFileSync(standardConfigPath, 'utf8');
-    expect(standardConfig).toContain('schema: "spec-driven"');
-    expect(standardConfig).toContain('proposeEngine: "claude"');
+    const { parseChangeConfig } = await import('../src/utils/yamlConfig.js');
+    const standardConfig = parseChangeConfig(fs.readFileSync(standardConfigPath, 'utf8'));
+    expect(standardConfig.schema).toBe('spec-driven');
+    expect(standardConfig.proposeEngine).toBe('claude');
 
     // Verify metadata retrieval
     const metadata = await getChangeMetadata(gitDir, 'standard-change');
@@ -252,9 +253,9 @@ describe('repoService - initializeOpenSpec & createGitWorktree', () => {
     
     const customConfigPath = path.join(gitDir, 'openspec', 'changes', 'custom-change', '.openspec.yaml');
     expect(fs.existsSync(customConfigPath)).toBe(true);
-    const customConfig = fs.readFileSync(customConfigPath, 'utf8');
-    expect(customConfig).toContain('schema: "my-custom-schema"');
-    expect(customConfig).toContain('proposeEngine: "gemini"');
+    const customConfig = parseChangeConfig(fs.readFileSync(customConfigPath, 'utf8'));
+    expect(customConfig.schema).toBe('my-custom-schema');
+    expect(customConfig.proposeEngine).toBe('gemini');
   });
 
   it('should not execute shell metacharacters in a change description (S5, real binaries)', async () => {
@@ -277,9 +278,12 @@ describe('repoService - initializeOpenSpec & createGitWorktree', () => {
     expect(fs.existsSync(path.join(gitDir, 'openspec', 'changes', 'pwn-change'))).toBe(true);
   });
 
-  it('should parse and stringify YAML correctly', async () => {
-    const { parseYaml, stringifyYaml } = await import('../src/services/repoService.js');
-    
+  it('should parse and stringify .openspec.yaml correctly', async () => {
+    // The naive parseYaml/stringifyYaml were replaced by the yaml package in
+    // S14; parser-level behavior (incl. multiline round-trip and the
+    // legacy-oracle equivalence sweep) is covered in yamlConfig.test.ts.
+    const { parseChangeConfig, stringifyChangeConfig } = await import('../src/utils/yamlConfig.js');
+
     const rawYaml = `
       # This is a comment
       schema: "spec-driven"
@@ -288,7 +292,7 @@ describe('repoService - initializeOpenSpec & createGitWorktree', () => {
       proposeEngine: "claude"
     `;
 
-    const parsed = parseYaml(rawYaml);
+    const parsed = parseChangeConfig(rawYaml);
     expect(parsed).toEqual({
       schema: 'spec-driven',
       created: '2026-06-17',
@@ -296,15 +300,14 @@ describe('repoService - initializeOpenSpec & createGitWorktree', () => {
       proposeEngine: 'claude',
     });
 
-    const stringified = stringifyYaml({
+    const written = stringifyChangeConfig({
       schema: 'my-custom',
       proposeEngine: 'cursor',
       nonExistent: undefined,
     });
 
-    expect(stringified).toContain('schema: "my-custom"');
-    expect(stringified).toContain('proposeEngine: "cursor"');
-    expect(stringified).not.toContain('nonExistent');
+    const reparsed = parseChangeConfig(written);
+    expect(reparsed).toEqual({ schema: 'my-custom', proposeEngine: 'cursor' });
   });
 });
 

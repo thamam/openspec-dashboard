@@ -5,27 +5,7 @@ import { AntiGravityProvider } from './providers/AntiGravityProvider.js';
 import { ClaudeProvider } from './providers/ClaudeProvider.js';
 import { CodexProvider } from './providers/CodexProvider.js';
 import { isSafeName } from '../utils/paths.js';
-
-function parseSimpleYaml(content: string): Record<string, string> {
-  const result: Record<string, string> = {};
-  const lines = content.split('\n');
-  for (const line of lines) {
-    const clean = line.trim();
-    if (!clean || clean.startsWith('#')) continue;
-    const colonIndex = clean.indexOf(':');
-    if (colonIndex !== -1) {
-      const key = clean.substring(0, colonIndex).trim();
-      let value = clean.substring(colonIndex + 1).trim();
-      if (value.startsWith('"') && value.endsWith('"')) {
-        value = value.substring(1, value.length - 1);
-      } else if (value.startsWith("'") && value.endsWith("'")) {
-        value = value.substring(1, value.length - 1);
-      }
-      result[key] = value;
-    }
-  }
-  return result;
-}
+import { parseChangeConfig } from '../utils/yamlConfig.js';
 
 export function resolveProvider(workspacePath: string, changeName?: string): IAgentProvider {
   // Precedence: change config (.openspec.yaml) -> AGENT_PROVIDER env -> default (codex).
@@ -40,7 +20,7 @@ export function resolveProvider(workspacePath: string, changeName?: string): IAg
     if (fs.existsSync(configPath)) {
       try {
         const content = fs.readFileSync(configPath, 'utf8');
-        const config = parseSimpleYaml(content);
+        const config = parseChangeConfig(content);
         if (config.agentProvider) {
           providerType = config.agentProvider;
         }
