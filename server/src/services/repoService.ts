@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { assertSafeName } from '../utils/paths.js';
+import { parseChangeConfig, stringifyChangeConfig } from '../utils/yamlConfig.js';
 
 export function resolvePath(targetPath: string): string {
   if (!targetPath) return targetPath;
@@ -335,38 +336,6 @@ export async function createLocalSchema(
   );
 }
 
-export function parseYaml(content: string): Record<string, string> {
-  const result: Record<string, string> = {};
-  const lines = content.split('\n');
-  for (const line of lines) {
-    const clean = line.trim();
-    if (!clean || clean.startsWith('#')) continue;
-    const colonIndex = clean.indexOf(':');
-    if (colonIndex !== -1) {
-      const key = clean.substring(0, colonIndex).trim();
-      let value = clean.substring(colonIndex + 1).trim();
-      if (value.startsWith('"') && value.endsWith('"')) {
-        value = value.substring(1, value.length - 1);
-      } else if (value.startsWith("'") && value.endsWith("'")) {
-        value = value.substring(1, value.length - 1);
-      }
-      result[key] = value;
-    }
-  }
-  return result;
-}
-
-export function stringifyYaml(data: Record<string, string | undefined>): string {
-  let content = '';
-  for (const [key, value] of Object.entries(data)) {
-    if (value !== undefined) {
-      const escaped = value.includes('"') ? value.replace(/"/g, '\\"') : value;
-      content += `${key}: "${escaped}"\n`;
-    }
-  }
-  return content;
-}
-
 export async function createNewChange(
   repoPath: string,
   changeName: string,
@@ -408,9 +377,9 @@ export async function createNewChange(
   const changeConfigFile = path.join(resolvedRepoPath, 'openspec', 'changes', changeName, '.openspec.yaml');
   if (fs.existsSync(changeConfigFile)) {
     const yamlContent = fs.readFileSync(changeConfigFile, 'utf8');
-    const data = parseYaml(yamlContent);
+    const data = parseChangeConfig(yamlContent);
     data.proposeEngine = proposeEngine || 'gemini';
-    fs.writeFileSync(changeConfigFile, stringifyYaml(data), 'utf8');
+    fs.writeFileSync(changeConfigFile, stringifyChangeConfig(data), 'utf8');
   }
 }
 
@@ -495,7 +464,7 @@ export async function getChangeMetadata(
 
   if (fs.existsSync(changeConfigFile)) {
     const yamlContent = fs.readFileSync(changeConfigFile, 'utf8');
-    const data = parseYaml(yamlContent);
+    const data = parseChangeConfig(yamlContent);
     if (data.schema) schema = data.schema;
     if (data.created) created = data.created;
     if (data.description) description = data.description;
@@ -545,9 +514,9 @@ export async function updateProposeEngine(
   }
 
   const yamlContent = fs.readFileSync(changeConfigFile, 'utf8');
-  const data = parseYaml(yamlContent);
+  const data = parseChangeConfig(yamlContent);
   data.proposeEngine = proposeEngine;
-  fs.writeFileSync(changeConfigFile, stringifyYaml(data), 'utf8');
+  fs.writeFileSync(changeConfigFile, stringifyChangeConfig(data), 'utf8');
 }
 
 export async function updateChangeProvider(
@@ -570,9 +539,9 @@ export async function updateChangeProvider(
   }
 
   const yamlContent = fs.readFileSync(changeConfigFile, 'utf8');
-  const data = parseYaml(yamlContent);
+  const data = parseChangeConfig(yamlContent);
   data.agentProvider = agentProvider;
-  fs.writeFileSync(changeConfigFile, stringifyYaml(data), 'utf8');
+  fs.writeFileSync(changeConfigFile, stringifyChangeConfig(data), 'utf8');
 }
 
 export function getChangeFilesContent(
