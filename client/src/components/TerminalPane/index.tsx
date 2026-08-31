@@ -238,13 +238,13 @@ export const TerminalPane: React.FC<Props> = ({ onExecuteCommand, terminalHeight
       // invariant handleCloseSession enforces), and switching to main re-runs
       // terminal-init, which recreates it server-side after a spawn failure.
       if (sessionId === 'main') return;
-      // Functional update: two drops inside one React batch must not clobber
-      // each other (terminal-error has no follow-up broadcast to self-heal).
-      setSessions(prev => prev.filter(s => s.id !== sessionId));
       const remaining = sessionsRef.current.filter(s => s.id !== sessionId);
+      // Keep the ref batch-current: two drops inside one React batch must see
+      // each other (terminal-error has no follow-up broadcast to self-heal).
+      sessionsRef.current = remaining;
+      setSessions(remaining);
       if (activeSessionRef.current === sessionId && remaining.length > 0) {
-        // Prefer main as the switch target: a second drop in the same batch
-        // may have just removed remaining[0], but main is always alive.
+        // Prefer main as the switch target when it's alive.
         const target = remaining.find(s => s.id === 'main') ?? remaining[0];
         handleSwitchSession(target.id);
       }
@@ -268,7 +268,25 @@ export const TerminalPane: React.FC<Props> = ({ onExecuteCommand, terminalHeight
       }
       dropSession(payload.sessionId);
     });
-    socket.on('terminal-error', (payload: { sessionId?: string }) => {
+    socket.on('terminal-error', (payload: { sessionId?: string; message?: string }) => {
+      if (payload.sessionId === 'main') {
+        // Main restart budget exhausted: the session stays dead until the
+        // 60s window slides. Surface it in the terminal and retry once the
+        // window has passed — otherwise main stays dead until a reload.
+        if (payload.message) {
+          term.write(`\r\n\x1b[33m${payload.message}\x1b[0m\r\n`);
+        }
+        setTimeout(() => {
+          if (activeSessionRef.current === 'main' && socketRef.current?.connected) {
+            socketRef.current.emit('terminal-init', {
+              sessionId: 'main',
+              cols: xtermRef.current?.cols || 100,
+              rows: xtermRef.current?.rows || 30
+            });
+          }
+        }, 61_000);
+        return;
+      }
       if (payload.sessionId) dropSession(payload.sessionId);
     });
 

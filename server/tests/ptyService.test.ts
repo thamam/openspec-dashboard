@@ -454,20 +454,22 @@ describe('PtyService - S7/L3/C17 lifecycle hardening', () => {
     expect(ptyService.getSession('main')).toBeUndefined();
   });
 
-  it('S7: closeSession detaches subscribers so an explicit close emits no terminal-exit', async () => {
+  it('C17: an explicit close still notifies remaining subscribers via terminal-exit', async () => {
     const ptyService = makeService(mockIo);
+    const toEmit = vi.fn();
+    mockIo.to.mockReturnValue({ emit: toEmit });
     ptyService.init();
     const session = ptyService.createSession('explicit-close');
+    // A second client is still watching when the first closes the tab.
     session.subscribers.add('socket-x');
 
     ptyService.closeSession('explicit-close');
 
-    expect(session.subscribers.size).toBe(0);
-    // The PTY's exit event must not emit terminal-exit to the stale subscriber.
-    const toEmit = vi.fn();
-    mockIo.to.mockReturnValue({ emit: toEmit });
-    await new Promise(r => setTimeout(r, 300));
-    expect(toEmit).not.toHaveBeenCalledWith('terminal-exit', expect.anything());
+    await vi.waitFor(() => {
+      expect(toEmit).toHaveBeenCalledWith('terminal-exit', expect.objectContaining({
+        sessionId: 'explicit-close'
+      }));
+    }, { timeout: 5000, interval: 50 });
   });
 
   it('S7: a stale exit event does not evict a same-id recreated session', async () => {

@@ -209,10 +209,6 @@ export class PtyService {
     const session = this.sessions.get(id);
     if (session) {
       this.cancelReap(id);
-      // Detach subscribers BEFORE kill: an explicit close already removed the
-      // client tab, so the exit event must not emit terminal-exit to them
-      // (a terminal-exit for main would trigger the client's re-init).
-      session.subscribers.clear();
       session.kill();
       this.sessions.delete(id);
     }

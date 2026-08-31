@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, within, act } from '@testing-library/react';
 import React from 'react';
 import { io } from 'socket.io-client';
+import { Terminal } from '@xterm/xterm';
 import { TerminalPane } from '../src/components/TerminalPane';
 
 // Mock xterm and addons
@@ -297,6 +298,35 @@ describe('TerminalPane Component', () => {
     render(<TerminalPane />);
     pushSocketEvent(0, 'terminal-error', { sessionId: 'main', message: 'Failed to create terminal session' });
     expect(screen.getByText('Main Shell')).toBeInTheDocument();
+  });
+
+  // When the main restart budget is exhausted the server refuses recreation;
+  // the client must surface the refusal and retry once the window has slid,
+  // or main stays dead until a page reload.
+  it('S7: terminal-error for main surfaces the message and retries init after the budget window', () => {
+    vi.useFakeTimers();
+    try {
+      render(<TerminalPane />);
+      const emitMock = socketOf(0).emit;
+      emitMock.mockClear();
+
+      pushSocketEvent(0, 'terminal-error', { sessionId: 'main', message: 'Main session is restarting too frequently; try again shortly' });
+
+      expect(screen.getByText('Main Shell')).toBeInTheDocument();
+      const termInstance = vi.mocked(Terminal).mock.results[0].value;
+      expect(termInstance.write).toHaveBeenCalledWith(expect.stringContaining('restarting too frequently'));
+
+      // No immediate retry...
+      expect(emitMock.mock.calls.filter((c: unknown[]) => c[0] === 'terminal-init')).toHaveLength(0);
+      // ...but one after the 60s budget window has slid.
+      act(() => { vi.advanceTimersByTime(61_000); });
+      const retryCalls = emitMock.mock.calls.filter(
+        (c: unknown[]) => c[0] === 'terminal-init' && (c[1] as { sessionId: string }).sessionId === 'main'
+      );
+      expect(retryCalls.length).toBeGreaterThan(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   // The real event sequence when the user types `exit` in the main shell:
