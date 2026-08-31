@@ -254,6 +254,10 @@ function App() {
         const marker = `--- Active Session: ${sessionName} ---`;
         const existingIdx = prev.findIndex(line => line.startsWith('--- Active Session:'));
         // C7: the rebuilt array is capped too — xterm owns the real scrollback.
+        // The freshly inserted marker survives capping because `capture-pane -pt`
+        // grabs only the visible pane (a few dozen lines); if this ever switches
+        // to full-history capture (`-S -`), paneLines alone could exceed the cap
+        // and evict the marker, silently breaking session detection routing.
         if (existingIdx !== -1) {
           return capTerminalLines([
             ...prev.slice(0, existingIdx),
