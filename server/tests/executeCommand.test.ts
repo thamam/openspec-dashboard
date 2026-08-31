@@ -70,7 +70,9 @@ describe('POST /api/execute — dispatch and argv contract (S15)', () => {
     mockedSpawn.mockReset();
     mockedCheckRepoStatus.mockReset();
     mockedCheckRepoStatus.mockResolvedValue({ exists: true, isGit: true, isOpenSpec: true });
-    mockedSpawn.mockReturnValue(fakeChild(0));
+    // A fresh child per spawn call: multi-request tests (aliases, opsx-verify)
+    // would otherwise share one EventEmitter and accumulate listeners.
+    mockedSpawn.mockImplementation(() => fakeChild(0) as any);
   });
 
   it('rejects a request with no command and never spawns', async () => {
@@ -204,7 +206,6 @@ describe('POST /api/execute — dispatch and argv contract (S15)', () => {
   });
 
   it('translates tmux attach into a non-interactive capture-pane', async () => {
-    mockedSpawn.mockReturnValue(fakeChild(0));
     const response = await request(app).post('/api/execute').send({
       repoPath: '/tmp/repo',
       command: 'tmux',

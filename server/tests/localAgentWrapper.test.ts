@@ -166,6 +166,31 @@ describe('LocalAgentWrapper — spawn contract (S5)', () => {
     expect(child.kill).toHaveBeenCalledWith('SIGTERM');
     await chatPromise;
   });
+
+  it('autofix kills the agy child on abort and does NOT write partial output (S8)', async () => {
+    const fs = await import('fs');
+    const target = path.join(realRepo, 'fixme.md');
+    fs.writeFileSync(target, 'ORIGINAL');
+
+    const child = new EventEmitter() as any;
+    child.stdout = new EventEmitter();
+    child.stderr = new EventEmitter();
+    child.kill = vi.fn(() => {
+      // The killed agent flushes a truncated code block before dying — an
+      // aborted autofix must not apply it.
+      child.stdout.emit('data', '```markdown\nTRUNCATED');
+      process.nextTick(() => child.emit('close', null));
+    });
+    mockedSpawn.mockReturnValue(child);
+
+    const controller = new AbortController();
+    const fixPromise = wrapper.autofix(realRepo, target, 'violation', controller.signal);
+    controller.abort();
+
+    expect(child.kill).toHaveBeenCalledWith('SIGTERM');
+    await fixPromise;
+    expect(fs.readFileSync(target, 'utf8')).toBe('ORIGINAL');
+  });
 });
 
 // Socket-trust-boundary fix (cycle 7): trigger_autofix hands autofix() a

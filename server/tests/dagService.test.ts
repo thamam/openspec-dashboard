@@ -177,4 +177,55 @@ describe('dagService — getChangeDag', () => {
     expect(new Set(ids).size).toBe(ids.length);
     expect(ids.filter((id) => id.startsWith('req-rate-limiting'))).toHaveLength(2);
   });
+
+  it('links a duplicated requirement label to BOTH disambiguated nodes', async () => {
+    fs.mkdirSync(path.join(changeDir, 'specs', 'billing'), { recursive: true });
+    fs.writeFileSync(path.join(changeDir, 'specs', 'auth', 'spec.md'), '### Requirement: Rate Limiting\n');
+    fs.writeFileSync(path.join(changeDir, 'specs', 'billing', 'spec.md'), '### Requirement: Rate Limiting\n');
+    fs.writeFileSync(path.join(changeDir, 'tasks.md'), '- [ ] 1.1 Implement throttling middleware\n');
+    fs.writeFileSync(
+      path.join(changeDir, 'linkages.json'),
+      JSON.stringify([{ source: 'Rate Limiting', target: '1.1 Implement throttling middleware' }])
+    );
+
+    const dag = await getChangeDag(repo, 'my-change');
+    const sources = dag.edges.map((e) => e.source).sort();
+    // Review pass 1: first-match-only resolution left req-...-2 unreachable.
+    expect(sources).toEqual(['req-rate-limiting', 'req-rate-limiting-2']);
+  });
+
+  it('prefers the most specific (longest) fuzzy match over a short requirement label', async () => {
+    fs.writeFileSync(path.join(changeDir, 'proposal.md'), '# Proposal\n');
+    fs.writeFileSync(
+      path.join(changeDir, 'specs', 'auth', 'spec.md'),
+      '### Requirement: User Login\n'
+    );
+    fs.writeFileSync(path.join(changeDir, 'tasks.md'), '- [ ] 1.1 Implement User Login flow\n');
+    fs.writeFileSync(
+      path.join(changeDir, 'linkages.json'),
+      // Matches both "User Login" (⊆) and "1.1 Implement User Login flow" (⊇);
+      // the task is the intended endpoint.
+      JSON.stringify([{ source: 'Proposal Document', target: 'User Login flow' }])
+    );
+
+    const dag = await getChangeDag(repo, 'my-change');
+    expect(dag.edges).toHaveLength(1);
+    const targetNode = dag.nodes.find((n) => n.id === dag.edges[0].target);
+    expect(targetNode?.type).toBe('task');
+  });
+
+  it('dedupes repeated linkage entries', async () => {
+    fs.writeFileSync(path.join(changeDir, 'proposal.md'), '# Proposal\n');
+    fs.writeFileSync(path.join(changeDir, 'tasks.md'), '- [ ] 1.1 Implement the thing\n');
+    fs.writeFileSync(
+      path.join(changeDir, 'linkages.json'),
+      JSON.stringify([
+        { source: 'Proposal Document', target: '1.1 Implement the thing' },
+        { source: 'Proposal Document', target: '1.1 Implement the thing' },
+      ])
+    );
+
+    const dag = await getChangeDag(repo, 'my-change');
+    expect(dag.edges).toHaveLength(1);
+  });
 });

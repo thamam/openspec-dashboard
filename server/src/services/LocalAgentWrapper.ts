@@ -177,7 +177,7 @@ Respond helpfully and concisely. Available OpenSpec workflows include: /opsx-pro
    * @param filePath Target file (absolute or repo-relative); socket-controlled,
    *   so it is containment-checked BEFORE any write (including Test Mode).
    */
-  public async autofix(repoPath: string, filePath: string, warningMessage: string): Promise<void> {
+  public async autofix(repoPath: string, filePath: string, warningMessage: string, signal?: AbortSignal): Promise<void> {
     // trigger_autofix hands us a fully client-controlled path that previously
     // reached fs.writeFileSync verbatim — an arbitrary file write. Contain it.
     if (!repoPath) {
@@ -208,10 +208,23 @@ Output the complete, corrected file contents inside a STRICT code block starting
         cwd: repoPath
       });
 
+      // S8: abort kills the child, and an aborted autofix must NOT apply the
+      // partial output — a killed agent's truncated markdown is not a fix.
+      let aborted = false;
+      const onAbort = () => { aborted = true; child.kill('SIGTERM'); };
+      if (signal) {
+        if (signal.aborted) {
+          onAbort();
+        } else {
+          signal.addEventListener('abort', onAbort, { once: true });
+        }
+      }
+
       // Without a shell, a missing agy binary raises 'error' (ENOENT) instead
       // of exiting 127 — handle it or the server process crashes.
       child.on('error', (err) => {
         console.error(`[LocalAgentWrapper] Failed to spawn agy: ${err.message}`);
+        signal?.removeEventListener('abort', onAbort);
         resolve();
       });
 
@@ -221,6 +234,11 @@ Output the complete, corrected file contents inside a STRICT code block starting
       });
 
       child.on('close', () => {
+        signal?.removeEventListener('abort', onAbort);
+        if (aborted) {
+          resolve();
+          return;
+        }
         try {
           const match = fullOutput.match(/```(?:markdown)?\s*([\s\S]*?)\s*```/);
           if (match && match[1]) {

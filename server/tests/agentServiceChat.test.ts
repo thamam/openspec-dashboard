@@ -75,4 +75,40 @@ describe('AgentService — chat timeout lifecycle (S8)', () => {
     // Pre-fix the setTimeout stayed pending for the full 45s per chat.
     expect(vi.getTimerCount()).toBe(0);
   });
+
+  // Review pass 1: trigger_autofix had the identical timeout bug chat had —
+  // and a hung autofix child WRITES files, so it is strictly worse.
+  it('aborts the in-flight autofix when its 45s timeout fires', async () => {
+    let capturedSignal: AbortSignal | undefined;
+    const autofixSpy = vi.spyOn(LocalAgentWrapper.prototype, 'autofix')
+      .mockImplementation(((_repo: string, _file: string, _msg: string, signal?: AbortSignal) => {
+        capturedSignal = signal;
+        return new Promise<void>(() => { /* never resolves — a hung agent */ });
+      }) as any);
+
+    const { handlers, emitted } = connect();
+    const pending = handlers['trigger_autofix']({ file: 'x.md', message: 'violation' });
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+    expect(autofixSpy).toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(45000);
+    await pending.catch(() => { /* defensive */ });
+    autofixSpy.mockRestore();
+
+    expect(emitted.some((e) => e.event === 'autofix_error')).toBe(true);
+    expect(capturedSignal?.aborted).toBe(true);
+    expect(emitted.some((e) => e.event === 'autofix_complete')).toBe(false);
+  });
+
+  it('leaves no dangling 45s timer after a successful autofix', async () => {
+    const autofixSpy = vi.spyOn(LocalAgentWrapper.prototype, 'autofix')
+      .mockResolvedValue(undefined);
+
+    const { handlers, emitted } = connect();
+    await handlers['trigger_autofix']({ file: 'x.md', message: 'violation' });
+    autofixSpy.mockRestore();
+
+    expect(emitted.some((e) => e.event === 'autofix_complete')).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+  });
 });

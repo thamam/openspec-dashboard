@@ -112,6 +112,24 @@ describe('AgentService — watcher lifecycle (S9)', () => {
     expect(watchers).toHaveLength(2);
   });
 
+  it('serializes overlapping repo switches — no watcher is left live and unclosable', async () => {
+    const handlers = connect();
+    await handlers['set_repo_path']('/repo-a');
+    expect(watchers).toHaveLength(1);
+
+    // Two rapid switches without awaiting the first: pre-fix both restarts
+    // awaited the SAME watcher's close, then both called chokidar.watch —
+    // one watcher was orphaned (created, never stored, never closed).
+    const s1 = handlers['set_repo_path']('/repo-b');
+    const s2 = handlers['set_repo_path']('/repo-c');
+    await Promise.all([s1, s2]);
+
+    // Every watcher except the active (last) one must have been closed.
+    const leaked = watchers.slice(0, -1).filter((w) => w.close.mock.calls.length === 0);
+    expect(leaked).toEqual([]);
+    expect(watchers[watchers.length - 1].close).not.toHaveBeenCalled();
+  });
+
   it('debounces rapid duplicate events for the same file into one agent_event', async () => {
     const handlers = connect();
     await handlers['set_repo_path']('/repo-a');

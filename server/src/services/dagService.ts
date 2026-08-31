@@ -142,19 +142,32 @@ export async function getChangeDag(
       const lb = b.toLowerCase();
       return la.includes(lb) || lb.includes(la);
     };
-    const resolveEndpoint = (label: unknown): string | null => {
-      if (typeof label !== 'string' || !label) return null;
-      const exact = nodes.find((n) => n.label === label);
-      if (exact) return exact.id;
-      const fuzzy = nodes.find((n) => fuzzyMatch(n.label, label));
-      return fuzzy ? fuzzy.id : null;
+    // Exact label match wins and returns ALL matches — a duplicated
+    // requirement label (suffixed req-foo-2) stays reachable as an endpoint.
+    // Fuzzy falls back to the LONGEST matching label (most specific), so a
+    // short requirement label doesn't silently win over the intended task.
+    const resolveEndpoints = (label: unknown): string[] => {
+      if (typeof label !== 'string' || !label) return [];
+      const exact = nodes.filter((n) => n.label === label).map((n) => n.id);
+      if (exact.length) return exact;
+      let best: DagNode | null = null;
+      for (const n of nodes) {
+        if (!fuzzyMatch(n.label, label)) continue;
+        if (!best || n.label.length > best.label.length) best = n;
+      }
+      return best ? [best.id] : [];
     };
 
+    const seenEdges = new Set<string>();
     for (const link of linkages) {
-      const source = resolveEndpoint(link.source);
-      const target = resolveEndpoint(link.target);
-      if (source && target && source !== target) {
-        edges.push({ source, target });
+      for (const source of resolveEndpoints(link.source)) {
+        for (const target of resolveEndpoints(link.target)) {
+          if (source === target) continue;
+          const key = `${source}→${target}`;
+          if (seenEdges.has(key)) continue;
+          seenEdges.add(key);
+          edges.push({ source, target });
+        }
       }
     }
   }

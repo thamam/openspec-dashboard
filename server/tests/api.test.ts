@@ -346,10 +346,15 @@ describe('POST /api/send-message — shell injection hardening (S3)', () => {
 // S15: coverage for app.ts routes that had none. resolvePath is the identity
 // mock in this file, so tmp-dir fixtures exercise the real fs logic.
 describe('API Routes - GET /api/changes (S15)', () => {
-  let repo: string;
+  const repos: string[] = [];
+  const makeRepo = () => {
+    const repo = fs.mkdtempSync(path.join(os.tmpdir(), 's15-changes-'));
+    repos.push(repo);
+    return repo;
+  };
 
   afterAll(() => {
-    if (repo && fs.existsSync(repo)) fs.rmSync(repo, { recursive: true, force: true });
+    for (const repo of repos) fs.rmSync(repo, { recursive: true, force: true });
   });
 
   it('returns 400 when path is missing', async () => {
@@ -358,13 +363,13 @@ describe('API Routes - GET /api/changes (S15)', () => {
   });
 
   it('returns an empty list when the repo has no openspec/changes dir', async () => {
-    repo = fs.mkdtempSync(path.join(os.tmpdir(), 's15-changes-'));
-    const response = await request(app).get('/api/changes').query({ path: repo });
+    const response = await request(app).get('/api/changes').query({ path: makeRepo() });
     expect(response.status).toBe(200);
     expect(response.body).toEqual([]);
   });
 
   it('lists change directories and ignores stray files', async () => {
+    const repo = makeRepo();
     const changesDir = path.join(repo, 'openspec', 'changes');
     fs.mkdirSync(path.join(changesDir, 'alpha-change'), { recursive: true });
     fs.mkdirSync(path.join(changesDir, 'beta-change'));
@@ -374,7 +379,9 @@ describe('API Routes - GET /api/changes (S15)', () => {
     expect(response.status).toBe(200);
     const ids = response.body.map((c: any) => c.id).sort();
     expect(ids).toEqual(['alpha-change', 'beta-change']);
-    expect(response.body[0]).toMatchObject({ title: 'alpha-change', status: 'In Progress' });
+    // readdir order is OS-dependent — look the entry up by id.
+    const alpha = response.body.find((c: any) => c.id === 'alpha-change');
+    expect(alpha).toMatchObject({ title: 'alpha-change', status: 'In Progress' });
   });
 });
 

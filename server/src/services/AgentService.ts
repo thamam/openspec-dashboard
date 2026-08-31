@@ -106,17 +106,27 @@ export class AgentService {
       socket.on('trigger_autofix', async (data) => {
         const { file, message } = data;
         console.log(`[AgentService] Triggering autofix for ${file}`);
+        // S8 (extended in review): same timeout lifecycle as chat — abort
+        // kills the agy child (which WRITES files, so a hung autofix is
+        // worse than a hung chat) and the timer is cleared on success.
+        const autofixAbort = new AbortController();
+        let timeout: NodeJS.Timeout | undefined;
         try {
-          const autofixPromise = this.agentWrapper.autofix(this.activeRepoPath, file, message);
-          const timeoutPromise = new Promise<never>((_, reject) => 
-            setTimeout(() => reject(new Error('Autofix timed out after 45 seconds')), 45000)
-          );
+          const autofixPromise = this.agentWrapper.autofix(this.activeRepoPath, file, message, autofixAbort.signal);
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            timeout = setTimeout(() => {
+              autofixAbort.abort();
+              reject(new Error('Autofix timed out after 45 seconds'));
+            }, 45000);
+          });
 
           await Promise.race([autofixPromise, timeoutPromise]);
           socket.emit('autofix_complete');
         } catch (err: any) {
           console.error(`[AgentService] Error handling autofix:`, err.message);
           socket.emit('autofix_error', { error: err.message });
+        } finally {
+          if (timeout) clearTimeout(timeout);
         }
       });
 
@@ -147,7 +157,20 @@ export class AgentService {
     });
   }
 
-  private async restartWatcher() {
+  private restartPromise: Promise<void> = Promise.resolve();
+
+  private restartWatcher(): Promise<void> {
+    // Serialize restarts: two overlapping set_repo_path emits would otherwise
+    // both read the same this.watcher, both await its close(), then BOTH call
+    // chokidar.watch — orphaning one live watcher forever (review pass 1).
+    // Chaining on a stored promise makes each restart wait for the previous.
+    this.restartPromise = this.restartPromise
+      .catch(() => { /* a failed restart must not poison later ones */ })
+      .then(() => this.restartWatcherSerial());
+    return this.restartPromise;
+  }
+
+  private async restartWatcherSerial() {
     if (this.watcher) {
       // Await the close: chokidar releases its fs handles asynchronously, and
       // starting the new watcher first would leave both live and emitting.
