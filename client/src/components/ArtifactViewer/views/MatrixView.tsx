@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Artifacts, Linkage } from '../../../types';
+import { Artifacts } from '../../../types';
+import { getConnectedSet } from './linkages';
 
 interface Props {
   artifacts: Artifacts;
@@ -45,36 +46,6 @@ const parseMarkdownTree = (md: string): TreeNode[] => {
   });
   
   return rootNodes;
-};
-
-const getConnectedSet = (seed: string | null, linkages: Linkage[] = []) => {
-  const connected = new Set<string>();
-  if (!seed) return connected;
-
-  const queue = [seed];
-  connected.add(seed);
-
-  const isMatch = (a: string, b: string) => {
-    if (!a || !b || a.length < 5 || b.length < 5) return false;
-    const lowA = a.toLowerCase();
-    const lowB = b.toLowerCase();
-    return lowA.includes(lowB) || lowB.includes(lowA);
-  };
-
-  while (queue.length > 0) {
-    const curr = queue.shift()!;
-    linkages.forEach(link => {
-      if (isMatch(link.source, curr) && !Array.from(connected).some(c => isMatch(c, link.target))) {
-        connected.add(link.target);
-        queue.push(link.target);
-      }
-      if (isMatch(link.target, curr) && !Array.from(connected).some(c => isMatch(c, link.source))) {
-        connected.add(link.source);
-        queue.push(link.source);
-      }
-    });
-  }
-  return connected;
 };
 
 interface TreeContextType {
