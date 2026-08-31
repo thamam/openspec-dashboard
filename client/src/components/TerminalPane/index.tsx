@@ -31,6 +31,8 @@ export const TerminalPane: React.FC<Props> = ({ onExecuteCommand, terminalHeight
   activeSessionRef.current = activeSession;
 
   const [sessions, setSessions] = useState<SessionItem[]>([{ id: 'main', cols: 100, rows: 30 }]);
+  const sessionsRef = useRef<SessionItem[]>(sessions);
+  sessionsRef.current = sessions;
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'reconnecting' | 'disconnected'>('disconnected');
   const [webglActive, setWebglActive] = useState<boolean>(false);
   const [fontSize, setFontSize] = useState<number>(13);
@@ -229,6 +231,25 @@ export const TerminalPane: React.FC<Props> = ({ onExecuteCommand, terminalHeight
       }
     });
 
+    // Drop a session tab server-side events make dead: C17 terminal-exit
+    // (the PTY exited or was reaped) and S7 terminal-error (a create was
+    // rejected after we added the tab optimistically). Switch away if the
+    // dead session was the active one.
+    const dropSession = (sessionId: string) => {
+      const remaining = sessionsRef.current.filter(s => s.id !== sessionId);
+      if (remaining.length === sessionsRef.current.length) return;
+      setSessions(remaining);
+      if (activeSessionRef.current === sessionId && remaining.length > 0) {
+        handleSwitchSession(remaining[0].id);
+      }
+    };
+    socket.on('terminal-exit', (payload: { sessionId: string }) => {
+      dropSession(payload.sessionId);
+    });
+    socket.on('terminal-error', (payload: { sessionId?: string }) => {
+      if (payload.sessionId) dropSession(payload.sessionId);
+    });
+
     term.onData((data: string) => {
       if (socket.connected) {
         socket.emit('terminal-input', {
@@ -302,7 +323,9 @@ export const TerminalPane: React.FC<Props> = ({ onExecuteCommand, terminalHeight
   }, [showSearch]);
 
   const handleSwitchSession = (sessionId: string) => {
-    if (sessionId === activeSession) return;
+    // Guard via the ref: socket handlers registered at mount capture the
+    // first render's closure, where the `activeSession` state is stale.
+    if (sessionId === activeSessionRef.current) return;
     setActiveSession(sessionId);
     activeSessionRef.current = sessionId;
 

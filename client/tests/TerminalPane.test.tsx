@@ -95,6 +95,14 @@ function pushServerSessions(index: number, sessions: { id: string; cols: number;
   act(() => handler({ sessionId: 'main', sessions }));
 }
 
+// Drive any server-pushed socket event (terminal-exit, terminal-error, ...).
+function pushSocketEvent(index: number, event: string, payload: unknown) {
+  const onMock = socketOf(index).on;
+  const handler = onMock.mock.calls.find((c: unknown[]) => c[0] === event)?.[1];
+  expect(handler, `${event} handler registered`).toBeTruthy();
+  act(() => handler(payload));
+}
+
 describe('TerminalPane Component', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -234,5 +242,54 @@ describe('TerminalPane Component', () => {
     expect(mockFetch).toHaveBeenCalledWith('/api/open-terminal', expect.objectContaining({
       body: JSON.stringify({ command: 'zsh' })
     }));
+  });
+
+  // C17: the server deletes a session when its PTY exits (or when the S7
+  // reaper collects it) and broadcasts; the client must drop the dead tab.
+  it('C17: terminal-exit removes the dead session tab and switches away if active', () => {
+    render(<TerminalPane />);
+    fireEvent.click(screen.getByTitle('Create New Terminal Session')); // session-2, active
+    expect(screen.getByText('session-2')).toBeInTheDocument();
+
+    const emitMock = socketOf(0).emit;
+    emitMock.mockClear();
+    pushSocketEvent(0, 'terminal-exit', { sessionId: 'session-2', exitCode: 0 });
+
+    expect(screen.queryByText('session-2')).not.toBeInTheDocument();
+    // Switched back to the remaining session.
+    const switchCalls = emitMock.mock.calls.filter(
+      (c: unknown[]) => c[0] === 'terminal-init' && (c[1] as { sessionId: string }).sessionId === 'main'
+    );
+    expect(switchCalls.length).toBeGreaterThan(0);
+  });
+
+  it('C17: terminal-exit of a background session keeps the active tab', () => {
+    render(<TerminalPane />);
+    fireEvent.click(screen.getByTitle('Create New Terminal Session')); // session-2
+    fireEvent.click(screen.getByTitle('Create New Terminal Session')); // session-3, active
+    expect(screen.getByText('session-3')).toBeInTheDocument();
+
+    const emitMock = socketOf(0).emit;
+    emitMock.mockClear();
+    pushSocketEvent(0, 'terminal-exit', { sessionId: 'session-2', exitCode: 0 });
+
+    expect(screen.queryByText('session-2')).not.toBeInTheDocument();
+    expect(screen.getByText('session-3')).toBeInTheDocument();
+    // No session switch should have been emitted.
+    const switchCalls = emitMock.mock.calls.filter((c: unknown[]) => c[0] === 'terminal-init');
+    expect(switchCalls).toHaveLength(0);
+  });
+
+  // S7: handleCreateSession adds the tab optimistically; when the server
+  // rejects the create (session cap) it replies with terminal-error and the
+  // client must revert the tab.
+  it('S7: terminal-error for a pending create reverts the optimistic tab', () => {
+    render(<TerminalPane />);
+    fireEvent.click(screen.getByTitle('Create New Terminal Session'));
+    expect(screen.getByText('session-2')).toBeInTheDocument();
+
+    pushSocketEvent(0, 'terminal-error', { sessionId: 'session-2', message: 'Session limit reached (10)' });
+
+    expect(screen.queryByText('session-2')).not.toBeInTheDocument();
   });
 });
