@@ -420,4 +420,67 @@ describe('PtyService - S7/L3/C17 lifecycle hardening', () => {
       expect(list.some(s => s.id === 'main')).toBe(true);
     }, { timeout: 5000, interval: 50 });
   });
+
+  it('S7: the main restart budget stops an instant-exit spawn loop', async () => {
+    const ptyService = makeService(mockIo);
+    ptyService.init();
+
+    // 3 exits within the window each restart main.
+    for (let i = 0; i < 3; i++) {
+      const pid = ptyService.getSession('main')!.ptyProcess.pid;
+      ptyService.getSession('main')!.kill();
+      await vi.waitFor(() => {
+        const s = ptyService.getSession('main');
+        expect(s).toBeDefined();
+        expect(s!.ptyProcess.pid).not.toBe(pid);
+      }, { timeout: 5000, interval: 50 });
+    }
+
+    // The 4th exit within the same minute is NOT restarted.
+    ptyService.getSession('main')!.kill();
+    await vi.waitFor(() => {
+      expect(ptyService.getSession('main')).toBeUndefined();
+    }, { timeout: 5000, interval: 50 });
+    // And it stays dead (no delayed respawn).
+    await new Promise(r => setTimeout(r, 300));
+    expect(ptyService.getSession('main')).toBeUndefined();
+
+    // terminal-init for main is refused while the budget is exhausted.
+    const { socketCallbacks, mockSocket } = connectSocket('s-budget');
+    socketCallbacks['terminal-init']({ sessionId: 'main' });
+    expect(mockSocket.emit).toHaveBeenCalledWith('terminal-error', expect.objectContaining({
+      sessionId: 'main'
+    }));
+    expect(ptyService.getSession('main')).toBeUndefined();
+  });
+
+  it('S7: closeSession detaches subscribers so an explicit close emits no terminal-exit', async () => {
+    const ptyService = makeService(mockIo);
+    ptyService.init();
+    const session = ptyService.createSession('explicit-close');
+    session.subscribers.add('socket-x');
+
+    ptyService.closeSession('explicit-close');
+
+    expect(session.subscribers.size).toBe(0);
+    // The PTY's exit event must not emit terminal-exit to the stale subscriber.
+    const toEmit = vi.fn();
+    mockIo.to.mockReturnValue({ emit: toEmit });
+    await new Promise(r => setTimeout(r, 300));
+    expect(toEmit).not.toHaveBeenCalledWith('terminal-exit', expect.anything());
+  });
+
+  it('S7: a stale exit event does not evict a same-id recreated session', async () => {
+    const ptyService = makeService(mockIo);
+    ptyService.init();
+    const first = ptyService.createSession('recreate-me');
+    ptyService.closeSession('recreate-me');
+    const second = ptyService.createSession('recreate-me');
+
+    // The first PTY's exit event arrives after the recreation; the live
+    // session must survive it.
+    await new Promise(r => setTimeout(r, 300));
+    expect(ptyService.getSession('recreate-me')).toBe(second);
+    expect(ptyService.getSession('recreate-me')).not.toBe(first);
+  });
 });

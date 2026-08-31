@@ -253,7 +253,11 @@ export const TerminalPane: React.FC<Props> = ({ onExecuteCommand, terminalHeight
       if (payload.sessionId === 'main') {
         // The server restarts main on natural exit and broadcasts a list that
         // still contains it — keep the tab and resubscribe to the fresh shell.
-        if (socket.connected) {
+        // Gate on the ACTIVE session: a stale exit event (e.g. main's PTY
+        // dying after we switched to another tab) must not re-init main,
+        // since terminal-init would move this socket's subscription off the
+        // session the user is watching.
+        if (activeSessionRef.current === 'main' && socket.connected) {
           socket.emit('terminal-init', {
             sessionId: 'main',
             cols: xtermRef.current?.cols || 100,

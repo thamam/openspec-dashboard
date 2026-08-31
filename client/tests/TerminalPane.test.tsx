@@ -317,4 +317,21 @@ describe('TerminalPane Component', () => {
     );
     expect(reinitCalls.length).toBeGreaterThan(0);
   });
+
+  // A stale terminal-exit for main while the user watches another tab must
+  // NOT re-init main: terminal-init would move the socket's subscription off
+  // the active session, black-holing its output and arming the reaper on it.
+  it('C17: main exit while another tab is active does not hijack the subscription', () => {
+    render(<TerminalPane />);
+    fireEvent.click(screen.getByTitle('Create New Terminal Session')); // session-2, active
+
+    const emitMock = socketOf(0).emit;
+    emitMock.mockClear();
+    pushSocketEvent(0, 'terminal-exit', { sessionId: 'main', exitCode: 0 });
+
+    const initCalls = emitMock.mock.calls.filter((c: unknown[]) => c[0] === 'terminal-init');
+    expect(initCalls).toHaveLength(0);
+    // The dead main tab is not resurrected into view either.
+    expect(screen.getByText('session-2')).toBeInTheDocument();
+  });
 });

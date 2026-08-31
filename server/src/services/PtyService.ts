@@ -168,23 +168,31 @@ export class PtyService {
         this.io.to(socketId).emit('terminal-exit', { sessionId, exitCode, signal });
       }
       this.cancelReap(sessionId);
-      // C17: delete() returns false when closeSession already removed the
-      // session (an explicit close broadcasts from the socket handler), so
-      // only a natural exit needs the broadcast here.
-      if (this.sessions.delete(sessionId)) {
-        // 'main' is the permanent default shell: a natural exit (the user
-        // typed `exit`, the shell crashed) restarts it so the broadcast list
-        // every client receives still contains the one guaranteed session.
-        // Explicit closes go through closeSession and are NOT resurrected.
-        if (sessionId === 'main') {
+      // Identity check: a same-id session recreated after this one was closed
+      // must not be evicted by this stale exit event; an explicit close also
+      // lands here (closeSession deletes before kill resolves) and must not
+      // double-broadcast.
+      if (this.sessions.get(sessionId) !== session) return;
+      this.sessions.delete(sessionId);
+      // 'main' is the permanent default shell: a natural exit (the user typed
+      // `exit`, the shell crashed) restarts it so the broadcast list every
+      // client receives still contains the one guaranteed session. Explicit
+      // closes go through closeSession and are NOT resurrected. The restart
+      // is budgeted: a shell that exits instantly (broken rc, bad SHELL)
+      // would otherwise loop spawn → exit → broadcast forever.
+      if (sessionId === 'main') {
+        this.mainExitTimes.push(Date.now());
+        if (this.mainRestartAllowed()) {
           try {
             this.createSession('main');
           } catch (e) {
             console.error('Failed to restart the main session after exit:', e);
           }
+        } else {
+          console.error('Main session exited too many times within a minute; not restarting automatically');
         }
-        this.io.emit('terminal-sessions-updated', this.getAllSessionsInfo());
       }
+      this.io.emit('terminal-sessions-updated', this.getAllSessionsInfo());
     });
 
     // S7: a freshly created session has zero subscribers; if the client's
@@ -201,9 +209,24 @@ export class PtyService {
     const session = this.sessions.get(id);
     if (session) {
       this.cancelReap(id);
+      // Detach subscribers BEFORE kill: an explicit close already removed the
+      // client tab, so the exit event must not emit terminal-exit to them
+      // (a terminal-exit for main would trigger the client's re-init).
+      session.subscribers.clear();
       session.kill();
       this.sessions.delete(id);
     }
+  }
+
+  // Budget for main restarts: at most 3 exits with recreation per minute,
+  // shared by the onExit auto-restart and terminal-init's recreation, so a
+  // shell that exits instantly cannot spin an unbounded spawn loop.
+  private mainExitTimes: number[] = [];
+
+  private mainRestartAllowed(): boolean {
+    const now = Date.now();
+    this.mainExitTimes = this.mainExitTimes.filter(t => now - t < 60_000);
+    return this.mainExitTimes.length <= 3;
   }
 
   public init() {
@@ -220,6 +243,13 @@ export class PtyService {
         const reqSessionId = payload?.sessionId || 'main';
         let session = this.sessions.get(reqSessionId);
         if (!session) {
+          // A main that died in a rapid exit loop stays dead until the
+          // restart budget window slides — recreating it here would just
+          // re-enter the loop one client-round-trip later.
+          if (reqSessionId === 'main' && !this.mainRestartAllowed()) {
+            socket.emit('terminal-error', { sessionId: 'main', message: 'Main session is restarting too frequently; try again shortly' });
+            return;
+          }
           // S7: cap + crash guard — a hostile or buggy client must not spawn
           // unbounded shells or take the server down via a spawn failure.
           if (this.sessions.size >= MAX_SESSIONS) {
