@@ -28,14 +28,15 @@ function legacyParseYaml(content: string): Record<string, string> {
 
 // Shapes observed in the wild: the 7 real .openspec.yaml files under
 // openspec/changes/archive/ in this repo (as of the S14 fix) are all flat
-// string maps of these forms.
+// string maps of the first three forms below (plain key: value, fully-quoted
+// variant); the rest are synthetic variants of the same shapes.
 const WILD_FIXTURES = [
   'schema: spec-driven\ncreated: 2026-07-21\n',
   'schema: spec-driven\ncreated: 2026-06-17\n',
   'schema: "spec-driven"\ncreated: "2026-07-22"\nproposeEngine: "antigravity"\n',
+  // Synthetic variants
   'agentProvider: claude\n',
   'agentProvider: codex\n',
-  // Synthetic variants of the same shapes
   '# comment line\nschema: spec-driven\ncreated: 2026-06-17\n',
   "schema: 'spec-driven'\ncreated: '2026-06-17'\n",
   'schema: spec-driven\ncreated: 2026-06-17\ndescription:\n',
@@ -71,6 +72,14 @@ describe('yamlConfig - parseChangeConfig', () => {
     expect(legacyParseYaml('description: value with: colon\n')).toEqual({
       description: 'value with: colon',
     });
+  });
+
+  it('drops non-string (nested map/list) values so consumers never see objects', () => {
+    // Hand-edited nested config — previously the naive parser collapsed it to
+    // flat garbage keys; now it parses structurally and the string filter
+    // keeps consumers like ProviderResolver's toLowerCase() safe.
+    const parsed = parseChangeConfig('schema: spec-driven\nagentProvider:\n  name: claude\n');
+    expect(parsed).toEqual({ schema: 'spec-driven' });
   });
 });
 

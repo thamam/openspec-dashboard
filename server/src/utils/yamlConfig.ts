@@ -13,7 +13,12 @@ export function parseChangeConfig(content: string): Record<string, string> {
   // A non-map document (bare scalar, list, empty file) yields no config keys —
   // same as the old line-based parser, which found no 'key: value' lines.
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
-  return parsed as Record<string, string>;
+  // Nested maps/lists (hand-edits only — no writer produces them) would put
+  // non-strings into the record; drop them so consumers like
+  // ProviderResolver's providerType.toLowerCase() never see an object.
+  return Object.fromEntries(
+    Object.entries(parsed).filter((entry): entry is [string, string] => typeof entry[1] === 'string')
+  );
 }
 
 export function stringifyChangeConfig(data: Record<string, string | undefined>): string {
