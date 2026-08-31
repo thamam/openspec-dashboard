@@ -154,12 +154,6 @@ export const SkylineCard: React.FC<Props> = ({ artifacts, activeChange, onSwitch
           >
             📝 Forensic Raw Diffs (Level 4)
           </button>
-          <button
-            onClick={() => alert(`Approved High-Level Intent for ${activeChange}!`)}
-            style={{ padding: '8px 18px', backgroundColor: '#238636', color: 'white', border: '1px solid #2ea043', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}
-          >
-            ⚡ 5-Sec Quick Approve
-          </button>
         </div>
       </div>
     </div>

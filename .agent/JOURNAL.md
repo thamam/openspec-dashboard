@@ -47,3 +47,13 @@ This journal maintains a continuous, unbroken record of development cycles, huma
   - `KeystoneView.tsx`: manifest fetch parses the body first, preserves the server's `{error}` message on non-ok responses, and handles unparseable bodies.
   - Review follow-ups folded in: StrictMode-safe workspace reset (prevRepoPath ref comparison, not a boolean flag — a boolean wipes `?change=` deep links on StrictMode's second mount-effect run), `?change=` read at mount instead of module import, workspace switch also clears `changes`/`agentProvider`, 30s `AbortSignal.timeout` so a hung fetch can't wedge the poll, request-id bumped before the `'main'` early return so leaving a change invalidates its in-flight fetch.
   - 6 new vitest regression tests (stale-response discard, poll skip, workspace-switch reset, error-body no-crash x2 guard branches, StrictMode deep-link preservation, relative URL), all verified red against the pre-fix code first.
+
+### [Cycle #013] - 2026-08-31 - Dead UI Controls & Keystone Pin Preservation (C5-C6)
+- **Human Pain Point / Friction:** User-facing buttons that do nothing erode trust in the review surface; creating a change from a Deck-pinned tab silently discarded the pinned context and drift badge.
+- **Matched UX Idea:** Exception-based review — the UI must never present affordances without a backing capability; Zoom Level framework continuity across navigation.
+- **Key Changes:**
+  - `TaskHub/index.tsx`: removed "Claim Task (Agent)"/"Claim Task (Human)" — no onClick and no reachable backing capability (`AgentProvider.executeTask` is defined on providers but never invoked from any route or socket event). Orphaned `.task-action` CSS removed from `App.css`.
+  - `WizardView.tsx`: removed "Reject (Needs Changes)" — no onClick, no reject endpoint, no callback prop; Back / Accept & Continue step navigation unchanged.
+  - `SkylineCard.tsx`: removed "5-Sec Quick Approve" — `alert()` placeholder with no approval capability. A real approve marker (persisted review state) remains a candidate follow-up.
+  - `App.tsx`: create-change success now merges into existing query params via exported `buildPostCreateSearch` instead of replacing the search string — `?project=`/`?sha=` Keystone pin params survive the reload, so the pinned Deck context and drift badge persist after creating a change.
+  - 12 new vitest regression tests (TaskHub x4, WizardView x3, SkylineCard x1, post-create search builder x4), verified red pre-fix where observable (jsdom cannot intercept `location.search` assignment, so C6 red was the missing helper seam — noted in PR).

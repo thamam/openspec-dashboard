@@ -43,5 +43,13 @@ describe('SkylineCard Component (Zoom Level 1)', () => {
 
     expect(handleSwitch).toHaveBeenCalledWith('dashboard');
   });
+
+  // C5: "5-Sec Quick Approve" was an alert() placeholder with no backing
+  // capability (no approval endpoint/state anywhere) — removed, not wired.
+  it('has no 5-Sec Quick Approve button (alert() placeholder removed)', () => {
+    render(<SkylineCard artifacts={mockArtifacts} activeChange="add-codex-to-agent-providers" />);
+
+    expect(screen.queryByRole('button', { name: /quick approve/i })).toBeNull();
+  });
 });
 

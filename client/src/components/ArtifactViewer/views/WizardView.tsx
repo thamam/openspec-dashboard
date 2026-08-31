@@ -64,11 +64,6 @@ export const WizardView: React.FC<Props> = ({ artifacts }) => {
           </div>
           <div style={{ display: 'flex', gap: '15px' }}>
             <button 
-              style={{ padding: '10px 20px', backgroundColor: '#21262d', color: '#f85149', border: '1px solid #30363d', borderRadius: '6px', cursor: 'pointer' }}
-            >
-              Reject (Needs Changes)
-            </button>
-            <button 
               disabled={currentStepIndex === STEPS.length - 1}
               onClick={() => setCurrentStepIndex(i => i + 1)}
               style={{ padding: '10px 20px', backgroundColor: '#238636', color: 'white', border: '1px solid rgba(240, 246, 252, 0.1)', borderRadius: '6px', cursor: currentStepIndex === STEPS.length - 1 ? 'not-allowed' : 'pointer', fontWeight: 'bold' }}
