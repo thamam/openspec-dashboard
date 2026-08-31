@@ -228,4 +228,38 @@ describe('dagService — getChangeDag', () => {
     const dag = await getChangeDag(repo, 'my-change');
     expect(dag.edges).toHaveLength(1);
   });
+
+  it('a case-drifted endpoint still hits the exact node, not a longer fuzzy one', async () => {
+    fs.writeFileSync(
+      path.join(changeDir, 'specs', 'auth', 'spec.md'),
+      '### Requirement: User Login\n'
+    );
+    fs.writeFileSync(path.join(changeDir, 'tasks.md'), '- [ ] 1.1 Implement User Login flow\n');
+    fs.writeFileSync(
+      path.join(changeDir, 'linkages.json'),
+      // LLM casing drift — fuzzy exists to absorb exactly this, but a
+      // case-only difference must not fall through and lose to the task.
+      JSON.stringify([{ source: 'user login', target: '1.1 Implement User Login flow' }])
+    );
+
+    const dag = await getChangeDag(repo, 'my-change');
+    expect(dag.edges).toHaveLength(1);
+    expect(dag.edges[0].source).toBe('req-user-login');
+  });
+
+  it('fuzzy ties reach every duplicated node, not just the first', async () => {
+    fs.mkdirSync(path.join(changeDir, 'specs', 'billing'), { recursive: true });
+    fs.writeFileSync(path.join(changeDir, 'specs', 'auth', 'spec.md'), '### Requirement: Rate Limiting\n');
+    fs.writeFileSync(path.join(changeDir, 'specs', 'billing', 'spec.md'), '### Requirement: Rate Limiting\n');
+    fs.writeFileSync(path.join(changeDir, 'tasks.md'), '- [ ] 1.1 Implement throttling middleware\n');
+    fs.writeFileSync(
+      path.join(changeDir, 'linkages.json'),
+      // Fuzzy (not exact) on both sides; both Rate Limiting nodes must edge.
+      JSON.stringify([{ source: 'Rate Limiting Rules', target: '1.1 Implement throttling middleware' }])
+    );
+
+    const dag = await getChangeDag(repo, 'my-change');
+    const sources = dag.edges.map((e) => e.source).sort();
+    expect(sources).toEqual(['req-rate-limiting', 'req-rate-limiting-2']);
+  });
 });

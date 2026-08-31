@@ -142,20 +142,30 @@ export async function getChangeDag(
       const lb = b.toLowerCase();
       return la.includes(lb) || lb.includes(la);
     };
-    // Exact label match wins and returns ALL matches — a duplicated
-    // requirement label (suffixed req-foo-2) stays reachable as an endpoint.
-    // Fuzzy falls back to the LONGEST matching label (most specific), so a
-    // short requirement label doesn't silently win over the intended task.
+    // Exact label match (case-insensitive — fuzzy exists to absorb LLM
+    // casing/wording drift, so a case-drifted endpoint must not fall through
+    // to fuzzy and lose to a longer candidate) wins and returns ALL matches:
+    // a duplicated requirement label (suffixed req-foo-2) stays reachable.
+    // Fuzzy falls back to the LONGEST matching label (most specific), keeping
+    // ties, so a short requirement label doesn't silently win over the
+    // intended task and duplicate labels are both reachable via fuzzy too.
+    const norm = (s: string) => s.trim().toLowerCase();
     const resolveEndpoints = (label: unknown): string[] => {
       if (typeof label !== 'string' || !label) return [];
-      const exact = nodes.filter((n) => n.label === label).map((n) => n.id);
+      const exact = nodes.filter((n) => norm(n.label) === norm(label)).map((n) => n.id);
       if (exact.length) return exact;
-      let best: DagNode | null = null;
+      let bestLen = 0;
+      let best: string[] = [];
       for (const n of nodes) {
         if (!fuzzyMatch(n.label, label)) continue;
-        if (!best || n.label.length > best.label.length) best = n;
+        if (n.label.length > bestLen) {
+          bestLen = n.label.length;
+          best = [n.id];
+        } else if (n.label.length === bestLen) {
+          best.push(n.id);
+        }
       }
-      return best ? [best.id] : [];
+      return best;
     };
 
     const seenEdges = new Set<string>();
