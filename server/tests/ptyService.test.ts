@@ -401,4 +401,23 @@ describe('PtyService - S7/L3/C17 lifecycle hardening', () => {
       expect(list.some(s => s.id === 'exit-test')).toBe(false);
     }, { timeout: 5000, interval: 50 });
   });
+
+  it('C17: natural exit of main restarts it so the broadcast list always contains main', async () => {
+    const ptyService = makeService(mockIo);
+    ptyService.init();
+    const oldPid = ptyService.getSession('main')!.ptyProcess.pid;
+    mockIo.emit.mockClear();
+
+    ptyService.getSession('main')!.kill(); // user typed `exit` in the main shell
+
+    await vi.waitFor(() => {
+      const restarted = ptyService.getSession('main');
+      expect(restarted).toBeDefined();
+      expect(restarted!.ptyProcess.pid).not.toBe(oldPid);
+      const calls = mockIo.emit.mock.calls.filter((c: unknown[]) => c[0] === 'terminal-sessions-updated');
+      expect(calls.length).toBeGreaterThan(0);
+      const list = calls[calls.length - 1][1] as { id: string }[];
+      expect(list.some(s => s.id === 'main')).toBe(true);
+    }, { timeout: 5000, interval: 50 });
+  });
 });

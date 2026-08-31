@@ -297,7 +297,24 @@ describe('TerminalPane Component', () => {
     render(<TerminalPane />);
     pushSocketEvent(0, 'terminal-error', { sessionId: 'main', message: 'Failed to create terminal session' });
     expect(screen.getByText('Main Shell')).toBeInTheDocument();
-    pushSocketEvent(0, 'terminal-exit', { sessionId: 'main', exitCode: 1 });
+  });
+
+  // The real event sequence when the user types `exit` in the main shell:
+  // terminal-exit for main, then a terminal-sessions-updated broadcast whose
+  // list again contains main (the server restarts it). The tab must survive
+  // and the client must resubscribe to the fresh main.
+  it('C17: main exit + following broadcast keeps the main tab and resubscribes', () => {
+    render(<TerminalPane />);
+    const emitMock = socketOf(0).emit;
+    emitMock.mockClear();
+
+    pushSocketEvent(0, 'terminal-exit', { sessionId: 'main', exitCode: 0 });
+    pushSocketEvent(0, 'terminal-sessions-updated', [{ id: 'main', cols: 100, rows: 30 }]);
+
     expect(screen.getByText('Main Shell')).toBeInTheDocument();
+    const reinitCalls = emitMock.mock.calls.filter(
+      (c: unknown[]) => c[0] === 'terminal-init' && (c[1] as { sessionId: string }).sessionId === 'main'
+    );
+    expect(reinitCalls.length).toBeGreaterThan(0);
   });
 });

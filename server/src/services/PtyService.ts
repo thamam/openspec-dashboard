@@ -172,6 +172,17 @@ export class PtyService {
       // session (an explicit close broadcasts from the socket handler), so
       // only a natural exit needs the broadcast here.
       if (this.sessions.delete(sessionId)) {
+        // 'main' is the permanent default shell: a natural exit (the user
+        // typed `exit`, the shell crashed) restarts it so the broadcast list
+        // every client receives still contains the one guaranteed session.
+        // Explicit closes go through closeSession and are NOT resurrected.
+        if (sessionId === 'main') {
+          try {
+            this.createSession('main');
+          } catch (e) {
+            console.error('Failed to restart the main session after exit:', e);
+          }
+        }
         this.io.emit('terminal-sessions-updated', this.getAllSessionsInfo());
       }
     });

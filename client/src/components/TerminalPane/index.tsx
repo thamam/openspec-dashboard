@@ -223,10 +223,8 @@ export const TerminalPane: React.FC<Props> = ({ onExecuteCommand, terminalHeight
       }
     });
 
-    socket.on('terminal-data', (payload: { sessionId: string; data: string } | string) => {
-      if (typeof payload === 'string') {
-        term.write(payload);
-      } else if (payload.sessionId === activeSessionRef.current) {
+    socket.on('terminal-data', (payload: { sessionId: string; data: string }) => {
+      if (payload.sessionId === activeSessionRef.current) {
         term.write(payload.data);
       }
     });
@@ -245,10 +243,25 @@ export const TerminalPane: React.FC<Props> = ({ onExecuteCommand, terminalHeight
       setSessions(prev => prev.filter(s => s.id !== sessionId));
       const remaining = sessionsRef.current.filter(s => s.id !== sessionId);
       if (activeSessionRef.current === sessionId && remaining.length > 0) {
-        handleSwitchSession(remaining[0].id);
+        // Prefer main as the switch target: a second drop in the same batch
+        // may have just removed remaining[0], but main is always alive.
+        const target = remaining.find(s => s.id === 'main') ?? remaining[0];
+        handleSwitchSession(target.id);
       }
     };
     socket.on('terminal-exit', (payload: { sessionId: string }) => {
+      if (payload.sessionId === 'main') {
+        // The server restarts main on natural exit and broadcasts a list that
+        // still contains it — keep the tab and resubscribe to the fresh shell.
+        if (socket.connected) {
+          socket.emit('terminal-init', {
+            sessionId: 'main',
+            cols: xtermRef.current?.cols || 100,
+            rows: xtermRef.current?.rows || 30
+          });
+        }
+        return;
+      }
       dropSession(payload.sessionId);
     });
     socket.on('terminal-error', (payload: { sessionId?: string }) => {
